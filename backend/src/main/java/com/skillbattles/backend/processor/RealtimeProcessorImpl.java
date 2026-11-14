@@ -2,6 +2,7 @@ package com.skillbattles.backend.processor;
 
 import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.mapper.BattleSnapshotMapper;
+import com.skillbattles.backend.mapper.MatchmakingMapper;
 import com.skillbattles.backend.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -27,13 +28,15 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
     private final Clock clock;
     private final ThreadPoolTaskExecutor executor;
     private final TransactionTemplate committedRead;
+    private final MatchmakingMapper matchmakingMapper;
 
     public RealtimeProcessorImpl(BattleService battles, BattleProcessor processor, BattleSnapshotMapper mapper,
             RealtimeSessionService sessions, SimpMessagingTemplate messaging, Clock clock, PlatformTransactionManager transactions,
-            ThreadPoolTaskExecutor realtimeEventExecutor) {
+            ThreadPoolTaskExecutor realtimeEventExecutor, MatchmakingMapper matchmakingMapper) {
         this.battles = battles; this.processor = processor; this.mapper = mapper;
         this.sessions = sessions; this.messaging = messaging; this.clock = clock;
         this.executor = realtimeEventExecutor;
+        this.matchmakingMapper = matchmakingMapper;
         this.committedRead = new TransactionTemplate(transactions);
         this.committedRead.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -74,7 +77,7 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
                 for (var player : battle.getState().getPlayers()) {
                     sessions.target(player.getId()).ifPresent(target -> {
                         BattleSnapshot snapshot = mapper.toResponse(mapper.snapshot(battle, player.getId(), clock.instant()));
-                        result.add(new Delivery(target, new RealtimeEvent(eventId, "BATTLE_CHANGED", battle.getId(),
+                        result.add(new Delivery(target, new RealtimeEvent<>(eventId, "BATTLE_CHANGED", battle.getId(),
                                 snapshot.getVersion(), event.occurredAt(), snapshot)));
                     });
                 }
@@ -94,6 +97,31 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
         }
     }
 
+    @Override
+    @EventListener
+    public void activityChanged(ActivityChangedEvent event) {
+        if (!sessions.hasSubscribers()) return;
+        enqueue(() -> {
+            try {
+                List<UUID> users = new ArrayList<>();
+                RealtimeEvent<?> envelope;
+                if (event.entry() != null) {
+                    var entry = event.entry(); users.add(entry.getUserId());
+                    envelope = new RealtimeEvent<>(UUID.randomUUID(), "QUEUE_CHANGED", entry.getId(), entry.getVersion(), event.occurredAt(), matchmakingMapper.toResponse(entry));
+                } else {
+                    var duel = event.duel(); users.add(duel.getHost().getId());
+                    if (duel.getGuest() != null) users.add(duel.getGuest().getId());
+                    envelope = new RealtimeEvent<>(UUID.randomUUID(), "PRIVATE_DUEL_CHANGED", duel.getId(), duel.getVersion(), event.occurredAt(), matchmakingMapper.toResponse(duel));
+                }
+                for (UUID user : users) sessions.target(user).ifPresent(target -> {
+                    SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
+                    headers.setSessionId(target.sessionId()); headers.setLeaveMutable(true);
+                    messaging.convertAndSendToUser(user.toString(), "/queue/events", envelope, headers.getMessageHeaders());
+                });
+            } catch (RuntimeException ex) { log.error("Activity notification failed: {}", ex.getClass().getSimpleName()); }
+        });
+    }
+
     private void enqueue(Runnable action) {
         try { executor.execute(action); }
         catch (TaskRejectedException ex) {
@@ -102,5 +130,5 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
         }
     }
 
-    private record Delivery(RealtimeTargetDto target, RealtimeEvent event) { }
+    private record Delivery(RealtimeTargetDto target, RealtimeEvent<?> event) { }
 }

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.support.*;
 import java.time.*;
 import java.util.*;
@@ -28,9 +29,19 @@ public class BattleProcessorImpl implements BattleProcessor {
     private final BattleProperties properties;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final MatchmakingRegistryService registry;
 
     @Override
+    @Transactional(propagation = Propagation.SUPPORTS)
     public UUID create(CreateBattleDto command) {
+        return registry.transact(state -> {
+            if (state.getActivities().containsKey(command.getFirstUserId()) || state.getActivities().containsKey(command.getSecondUserId()))
+                throw new ConflictException("ACTIVITY_CONFLICT", "User already has a waiting queue or duel.");
+            return createLocked(command);
+        });
+    }
+
+    private UUID createLocked(CreateBattleDto command) {
         if (command.getFirstUserId() == null || command.getSecondUserId() == null || command.getSubject() == null
                 || command.getMode() == null || command.getFirstUserId().equals(command.getSecondUserId())) {
             throw new BusinessValidationException("VALIDATION_ERROR", "Two distinct users, subject and mode are required.");

@@ -31,6 +31,9 @@ server:
     include-message: never
     include-stacktrace: never
 app:
+  matchmaking:
+    search-seconds: ${MATCHMAKING_SEARCH_SECONDS:90}
+    duel-seconds: ${PRIVATE_DUEL_SECONDS:600}
   realtime:
     heartbeat-ms: 5000
     read-timeout-ms: 10000

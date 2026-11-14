@@ -10,7 +10,8 @@ springdoc 2.10.0. Maven Wrapper 3.3.4 запускает Maven 3.9.12. Оста�
 [MapStruct](https://mapstruct.org/documentation/stable/reference/html/),
 [PostgreSQL](https://www.postgresql.org/support/versioning/).
 Boot 3.5.16 — последний OSS-релиз требуемой ветки 3.5.x; переход на другую ветку
-потребует отдельной задачи. Matchmaking, комнаты по коду, `/users/me/activity` и полноценные history/review endpoints пока не реализованы.
+потребует отдельной задачи. Ranked matchmaking, приватные дуэли по коду и текущая
+активность реализованы; полноценные history/review endpoints относятся к этапу 6.
 
 ## Локальная конфигурация
 
@@ -159,7 +160,8 @@ CSRF отключён для Bearer API. CORS пока не настроен; ф
 countdown 3 секунды, reveal 5 секунд. `contentAvailable=true` означает, что
 есть минимум нужное число разных активных вопросов сложности MEDIUM.
 Пустой/недостаточный банк даёт `false`, без подстановки выдуманного контента.
-Фактический старт батла и повторная проверка банка относятся к следующим этапам.
+При создании батла банк проверяется повторно; недавняя история не уменьшает
+доступность контента, если подходящих уникальных вопросов достаточно.
 
 Настройки в `application.yml`: `app.battle.math` / `app.battle.english`
 (`question-count`, `question-limit-seconds`), а также `ready-timeout-seconds`,
@@ -344,8 +346,8 @@ scheduler/recovery, WebSocket и presence-monitor и не прерывает а�
 
 Scheduler начинает обработку после recovery. Ошибка одного батла не останавливает
 остальные; повторный poll повторяет транзакцию. Обработка рассчитана на один
-экземпляр приложения согласно MVP. Очередь и комнаты по коду появятся следующими
-этапами; создание матчей пока доступно внутренним компонентам и тестовым fixtures.
+экземпляр приложения согласно MVP. Публичное создание матчей через очередь и
+приватные коды добавлено на этапе 5; отдельного тестового endpoint создания нет.
 
 Проверки **из backend/**:
 
@@ -457,11 +459,12 @@ Readiness, countdown, начало вопроса, принятие ответа
 изменений в актуальный snapshot. Для восстановления:
 
 1. Подключиться и подписаться на `/user/queue/events`, начать буферизовать события.
-2. Выполнить `GET /api/v1/battles/{id}` с access JWT.
+2. Выполнить `GET /api/v1/users/me/activity` с access JWT, затем GET найденного
+   queue entry / duel / battle. Если ID батла уже известен — `GET /api/v1/battles/{id}`.
 3. Применить snapshot и буфер по `resourceId`/`version`: состояние заменяется
    только более новой версией. `serverTime` используется для синхронизации часов.
 4. После REST-мутаций и reconnect снова запросить snapshot; принятый ответ и
-   исходный дедлайн сохраняются. `/users/me/activity` появится следующим этапом.
+   исходный дедлайн сохраняются.
 
 Same-origin остаётся обязательным для браузера. Frontend dev server должен
 проксировать `/api/**` и WebSocket upgrade `/ws/**` к backend, согласованно
@@ -472,6 +475,83 @@ Same-origin остаётся обязательным для браузера. F
 
 ```powershell
 .\mvnw.cmd -B -ntp '-Dtest=RealtimePostgresTest' test
+```
+
+## Этап 5: очередь, приватные коды и активность
+
+Все endpoints требуют access Bearer JWT; тела запросов строго соответствуют
+существующему контракту 0.2. Refresh JWT здесь не принимается.
+
+| Метод и путь | Тело запроса | Результат |
+|---|---|---|
+| `POST /api/v1/matchmaking/entries` | `{"subject":"MATH"}` | 201 QueueEntryResponse; возможен быстрый MATCHED |
+| `GET /api/v1/matchmaking/entries/{id}` | — | 200; только владелец |
+| `DELETE /api/v1/matchmaking/entries/{id}` | — | 204; повтор CANCELLED/EXPIRED также 204 |
+| `POST /api/v1/duels` | `{"subject":"ENGLISH"}` | 201 DuelResponse с кодом |
+| `POST /api/v1/duels/join` | `{"code":"K7P9XZ"}` | 200 MATCHED с battleId |
+| `GET /api/v1/duels/{id}` | — | 200; host или назначенный guest |
+| `DELETE /api/v1/duels/{id}` | — | 204; только host, до матча |
+| `GET /api/v1/users/me/activity` | — | 200 ActivityResponse |
+
+Ranked-поиск использует рейтинг выбранного предмета и самого давно ожидающего
+подходящего соперника. Разница рейтингов должна укладываться в окна обоих:
+±100 до 15 секунд, ±200 от 15 до 30 секунд, затем ±400. В 90 секунд поиск истекает.
+Self-match и повторное назначение исключены. Батл создаётся существующим движком
+с теми же снимками вопросов и защитой от повторов и начинается с WAITING_READY.
+Readiness требует действующей realtime-подписки обоих игроков.
+
+Приватный код — 6 криптографически случайных uppercase-букв/цифр без неоднозначных
+символов, срок 10 минут. Join обрезает пробелы и приводит код к uppercase.
+Присоединение атомарно назначает guest и создаёт PRIVATE battle без изменения Elo.
+Повторный join завершённой/занятой комнаты не создаёт новый батл. Код и терминальная
+комната сохраняются до рестарта; коды в этом процессе не переиспользуются.
+
+Основные ошибки: `ACTIVITY_CONFLICT`, `CONTENT_UNAVAILABLE`, `MATCH_ALREADY_FOUND`,
+`SELF_JOIN_NOT_ALLOWED`, `DUEL_NOT_JOINABLE` — 409; неизвестный код/чужой ресурс —
+404 (`DUEL_NOT_FOUND` / `QUEUE_ENTRY_NOT_FOUND`); истёкший код — 410 `DUEL_EXPIRED`.
+После MATCH_ALREADY_FOUND отмена выполняется через surrender батла. Нехватка
+контента не оставляет нового entry, guest или частичного батла. Существующая
+WAITING-комната допускает join после восстановления банка.
+Очередь, потерявшая доступный контент, переходит в CANCELLED; клиент может
+перепроверить `/battle-modes` и при новой попытке получить CONTENT_UNAVAILABLE.
+
+Аккаунт одновременно имеет одну очередь, ожидающую комнату или незавершённый
+батл. Для однопроцессного MVP registry сериализует переходы общей блокировкой
+до commit/rollback БД. Изменения памяти становятся видимы и события публикуются
+только после commit; rollback сохраняет прежние очередь/комнату. Результат и Elo
+по-прежнему фиксируются транзакцией движка. Завершённый батл, отмена и expiry
+освобождают активность; отдельного дублирующего in-memory флага BATTLE нет.
+
+ActivityResponse: `{"type":"NONE","resourceId":null,"battleId":null}`;
+для QUEUE/PRIVATE_DUEL заполнен resourceId, для BATTLE оба ID равны ID батла.
+Он пригоден для восстановления после reload и пропущенных уведомлений:
+CONNECT → SUBSCRIBE → activity → соответствующий GET snapshot → merge по версиям.
+Не нужно считать события очереди и события батла единой упорядоченной лентой.
+
+QUEUE_CHANGED получает только владелец entry; PRIVATE_DUEL_CHANGED — host и
+назначенный guest. Envelope прежний, `data` содержит полный контрактный ответ,
+version совпадает с ним. При MATCHED у обоих участников доступен battleId.
+Коды не отправляются посторонним подписчикам. События остаются недолговечными
+уведомлениями; REST является источником актуального состояния.
+
+Настройки: `app.matchmaking.search-seconds` / `MATCHMAKING_SEARCH_SECONDS` = 90,
+`app.matchmaking.duel-seconds` / `PRIVATE_DUEL_SECONDS` = 600;
+`app.matchmaking.scheduling.poll-ms` = 500. Для управляемых тестов можно отключить
+`app.matchmaking.scheduling.enabled` и вызывать poll с внедряемым Clock.
+Scheduler использует отдельный поток и начинает работу после battle recovery.
+Профиль question-import его не запускает.
+
+Очереди, комнаты и их терминальные snapshots находятся в памяти одного процесса
+и теряются после рестарта; их GET затем возвращает 404, activity — NONE.
+Сохранённые незавершённые батлы отменяются существующим SERVER_INTERRUPTION recovery;
+завершённые результаты сохраняются. Масштабирование на несколько экземпляров
+и очистка долгоживущего registry не входят в MVP. Production-банк не добавлен.
+
+Проверка сценариев этапа 5 **из backend/** (Docker/PostgreSQL):
+
+```powershell
+.\mvnw.cmd -B -ntp '-Dtest=MatchmakingPostgresTest' test
+.\mvnw.cmd -B -ntp verify
 ```
 
 ## Архитектура и проверки
@@ -545,3 +625,15 @@ heartbeat timeout и однократное Elo. Heartbeat/expiry и опрос 
 HTTP auth/API и dry-run `question-import` без HTTP/WebSocket-сервера.
 Временные процессы и PostgreSQL после проверки удалены. Публичный контракт,
 порядок вопросов и защита от недавних повторов сохранены.
+
+Для этапа 5 итоговый `verify` — 145 тестов, 0 ошибок и пропусков.
+Добавлены 28 PostgreSQL-сценариев: границы и взаимность окон, FIFO и предметные
+рейтинги, ownership/HTTP-валидация, конкурирующие активности, cancel/match/expiry,
+параллельные и повторные join, блокировка до внешнего commit/rollback,
+ошибка после flush, освобождение активности и восстановление после рестарта.
+Настоящие STOMP-подключения проверяют QUEUE_CHANGED/PRIVATE_DUEL_CHANGED,
+приватность, commit/rollback, общий battleId и неизменность Elo в PRIVATE.
+Проверен собранный JAR с обычными scheduler/recovery: все восемь новых routes,
+Bearer security и поля ответов в generated OpenAPI, ranked/private HTTP flow,
+activity и явный dry-run/apply test-only fixtures без web-сервера импорта.
+Временные процессы и БД удалены; публичный контракт 0.2 не изменён.
