@@ -3,7 +3,7 @@ import lombok.*;
 import java.time.*;
 import java.util.*;
 @Data @NoArgsConstructor @AllArgsConstructor
-@io.swagger.v3.oas.annotations.media.Schema(requiredProperties={"isPro","version","unlimitedRanked","historyMatchLimit","canViewCorrectAnswers","canViewExplanations","canViewAdvancedAnalytics","canFilterMistakes","canPracticeSimilar"})
+@io.swagger.v3.oas.annotations.media.Schema(requiredProperties={"isPro","version","unlimitedRanked","historyMatchLimit","canViewCorrectAnswers","canViewExplanations","canViewAdvancedAnalytics","canFilterMistakes"})
 public class Entitlements {
     @com.fasterxml.jackson.annotation.JsonProperty("isPro") private boolean pro;
     private int version;
@@ -13,5 +13,4 @@ public class Entitlements {
     private boolean canViewExplanations;
     private boolean canViewAdvancedAnalytics;
     private boolean canFilterMistakes;
-    private boolean canPracticeSimilar;
 }

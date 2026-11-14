@@ -50,7 +50,7 @@ class CataloguePostgresTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
 
-    @BeforeEach void setup() { jdbc.execute("TRUNCATE ranked_usage, battles, questions"); jdbc.execute("UPDATE disciplines SET active=false WHERE code NOT IN ('SAT_MATH','SAT_RW')"); }
+    @BeforeEach void setup() { jdbc.execute("TRUNCATE question_reports,ranked_usage, battles, questions"); jdbc.execute("UPDATE disciplines SET active=false WHERE code NOT IN ('SAT_MATH','SAT_RW')"); }
     @AfterEach void cleanup() { jdbc.execute("UPDATE disciplines SET active=false WHERE code NOT IN ('SAT_MATH','SAT_RW')"); }
 
     @Test void cataloguesExposeExactTimingsSchedulesAndAllTwentySevenRanksWithoutContent() throws Exception {
@@ -234,5 +234,5 @@ class CataloguePostgresTest {
     private String bearer(AuthDto user){return "Bearer "+user.getTokens().getAccessToken();}
     private UUID id(AuthDto user){return user.getUser().getId();}
     private List<QuestionImportDto> fixture()throws Exception{return files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI()));}
-    private AuthDto register(){var dto=new RegisterDto();String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);dto.setEmail(suffix+"@example.com");dto.setNickname("Catalog_"+suffix);dto.setPassword("ExamplePass123!");return auth.register(dto);}
+    private AuthDto register(){var dto=new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1);String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);dto.setEmail(suffix+"@example.com");dto.setNickname("Catalog_"+suffix);dto.setPassword("ExamplePass123!");return auth.register(dto);}
 }

@@ -37,8 +37,8 @@ def main():
     # or frame logging. Only this runner's freshly created database may be used.
     for key in list(env):
         upper = key.upper()
-        if upper.startswith(('SPRING_', 'APP_', 'DB_', 'JWT_', 'LOGGING_', 'STRIPE_', 'BILLING_')) or upper in {
-            'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'JAVA_OPTS', 'NODE_OPTIONS', 'NODE_USE_ENV_PROXY'
+        if upper.startswith(('SPRING_', 'APP_', 'DB_', 'JWT_', 'LOGGING_', 'STRIPE_', 'BILLING_', 'SMTP_', 'PASSWORD_RESET_')) or upper in {
+            'MAIL_FROM', 'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'JAVA_OPTS', 'NODE_OPTIONS', 'NODE_USE_ENV_PROXY'
         }:
             env.pop(key)
     java = str(Path(env['JAVA_HOME']) / 'bin' / ('java.exe' if os.name == 'nt' else 'java')) if env.get('JAVA_HOME') else shutil.which('java')

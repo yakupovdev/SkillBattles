@@ -51,7 +51,7 @@ class SeasonsPostgresTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper json;
     @BeforeEach void setup() throws Exception {
-        clock.set(OLD);presence.clear();jdbc.execute("TRUNCATE ranked_usage, battles,questions,season_archives");uniformTiming(jdbc,10);
+        clock.set(OLD);presence.clear();jdbc.execute("TRUNCATE question_reports,ranked_usage, battles,questions,season_archives");uniformTiming(jdbc,10);
         imports.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())),false);
     }
     @Test void activeOldRankedSettlesThenArchivesAndRollsExactlyOnceWithoutChangingResult() throws Exception {
@@ -232,5 +232,5 @@ class SeasonsPostgresTest {
     }
     private UUID id(AuthDto user) {return user.getUser().getId();}
     private String bearer(AuthDto user) {return "Bearer "+user.getTokens().getAccessToken();}
-    private AuthDto register() {var dto=new RegisterDto();String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);dto.setEmail(suffix+"@example.com");dto.setNickname("Season_"+suffix);dto.setPassword("ExamplePass123!");return auth.register(dto);}
+    private AuthDto register() {var dto=new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1);String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);dto.setEmail(suffix+"@example.com");dto.setNickname("Season_"+suffix);dto.setPassword("ExamplePass123!");return auth.register(dto);}
 }

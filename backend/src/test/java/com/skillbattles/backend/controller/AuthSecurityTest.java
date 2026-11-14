@@ -30,6 +30,8 @@ class AuthSecurityTest {
     @Autowired TokenService tokens;
     @MockitoBean AuthProcessor processor;
     @MockitoBean UserService users;
+    @MockitoBean com.skillbattles.backend.processor.ProfileProcessor profiles;
+    @MockitoBean RequestRateLimiter limiter;
     @MockitoBean com.skillbattles.backend.processor.AccountProcessor accounts;
 
     @TestConfiguration
@@ -91,15 +93,15 @@ class AuthSecurityTest {
     @Test
     void rejectsUnknownFieldsMalformedJsonAndOverlongUtf8Passwords() throws Exception {
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"alex@example.com\",\"password\":\"Password123\",\"nickname\":\"Alex_One\",\"deleted\":true}"))
+                        .content("{\"email\":\"alex@example.com\",\"password\":\"Password123\",\"birthYear\":2000,\"birthMonth\":1,\"nickname\":\"Alex_One\",\"deleted\":true}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"alex@example.com\",\"password\":\"" + "я".repeat(37) + "\",\"nickname\":\"Alex_One\"}"))
+                        .content("{\"email\":\"alex@example.com\",\"password\":\"" + "я".repeat(37) + "\",\"birthYear\":2000,\"birthMonth\":1,\"nickname\":\"Alex_One\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors[0].field").value("password"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"alex@example.com\",\"password\":\"яяяя\",\"nickname\":\"Alex_One\"}"))
+                        .content("{\"email\":\"alex@example.com\",\"password\":\"яяяя\",\"birthYear\":2000,\"birthMonth\":1,\"nickname\":\"Alex_One\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.fieldErrors[0].field").value("password"));
         verifyNoInteractions(processor);
     }

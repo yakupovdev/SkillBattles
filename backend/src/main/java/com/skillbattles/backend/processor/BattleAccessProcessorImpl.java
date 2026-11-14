@@ -19,7 +19,7 @@ public class BattleAccessProcessorImpl implements BattleAccessProcessor {
         if(battle.getState().getPlayers().stream().noneMatch(p -> p.getId().equals(user)))throw new NotFoundException("BATTLE_NOT_FOUND","Battle not found.");
         if(BattleEngineImpl.terminal(battle)&&!e.isPro()&&!battles.recentTerminal(user,10).contains(battle.getId()))throw new HistoryAccessException();
     }
-    private AnswerAccessDto access(EntitlementsDto e,boolean terminal) {return new AnswerAccessDto(e.isPro(),terminal&&e.isPro(),e.isPro()?null:"PRO");}
+    private AnswerAccessDto access(EntitlementsDto e,boolean terminal) {return new AnswerAccessDto(e.isPro(),terminal&&e.isPro(),e.getVersion());}
     private void answers(List<AnswerViewDto> answers,UUID user,boolean pro) {if(!pro)answers.stream().filter(a -> !a.getUserId().equals(user)).forEach(a -> a.setSelectedOptionId(null));}
     private void badges(BattleResultDto result,Map<UUID,Boolean> flags) {if(result!=null)result.getPlayers().forEach(p -> p.setPro(flags.getOrDefault(p.getId(),false)));}
     @Override public BattleSnapshotDto snapshot(BattleDto battle,UUID user,Instant at) {

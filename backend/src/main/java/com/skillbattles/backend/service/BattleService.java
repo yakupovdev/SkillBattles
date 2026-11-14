@@ -4,6 +4,7 @@ import com.skillbattles.backend.dto.*;
 import java.util.*;
 
 public interface BattleService {
+    java.util.List<BattleDto> finishedHistory(UUID userId);
     BattleDto create(BattleDto dto);
     BattleDto lock(UUID id);
     BattleDto getForParticipant(UUID id, UUID userId);

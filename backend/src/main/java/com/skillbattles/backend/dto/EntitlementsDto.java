@@ -12,5 +12,4 @@ public class EntitlementsDto {
     private boolean canViewExplanations;
     private boolean canViewAdvancedAnalytics;
     private boolean canFilterMistakes;
-    private boolean canPracticeSimilar;
 }

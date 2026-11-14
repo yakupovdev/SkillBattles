@@ -18,11 +18,14 @@ public class RatingServiceImpl implements RatingService {
     private final DisciplineService disciplines;
     private final RankService ranks;
     private final SeasonService seasons;
+    private final java.time.Clock clock;
 
+    @Override public List<UUID> rolloverCandidates(String code,String season){return repository.rolloverCandidates(code,season);}
+    @Override public List<com.skillbattles.backend.dto.LeaderboardRowDto> leaderboard(String code,String season,UUID user){return repository.leaderboard(code,season,user).stream().map(r->new com.skillbattles.backend.dto.LeaderboardRowDto(r.getPosition(),r.getUserId(),r.getNickname(),r.getRating(),r.getCalibrationCompletedMatches())).toList();}
     @Override
     @Transactional
     public void initialize(UUID userId) {
-        disciplines.active().forEach(discipline -> repository.initializeMissing(userId, discipline.getCode(), seasons.current().getId()));
+        disciplines.active().forEach(discipline -> repository.initializeMissing(userId, discipline.getCode(), seasons.current().getId(), clock.instant()));
     }
 
     @Override
@@ -41,6 +44,7 @@ public class RatingServiceImpl implements RatingService {
     public void rollover(RatingDto expected,String nextSeasonId,int resetRating) {
         var rating=repository.lockForSettlement(List.of(expected.getUserId()),expected.getDisciplineCode()).stream().findFirst().orElseThrow();
         if(!rating.getSeasonId().equals(expected.getSeasonId()) || rating.getRating()!=expected.getRating()) throw new IllegalStateException("Rating changed during rollover.");
+        rating.setRatingReachedAt(clock.instant());
         rating.setRating(resetRating); rating.setSeasonId(nextSeasonId); rating.setSeasonPeakRating(resetRating);
         // A seasonal reset must never create an artificial lifetime peak.
         repository.flush();
@@ -58,6 +62,7 @@ public class RatingServiceImpl implements RatingService {
         for (var rating : locked) {
             var update = updates.stream().filter(item -> item.getUserId().equals(rating.getUserId())).findFirst().orElseThrow();
             if (rating.getRating() != update.getBefore() || update.getAfter() < 0 || !rating.getSeasonId().equals(update.getSeasonId()) || rating.getCalibrationCompletedMatches()!=update.getCompletedMatchesBefore()) throw new IllegalStateException("Participant rating changed during the battle.");
+            if(rating.getRating()!=update.getAfter())rating.setRatingReachedAt(clock.instant());
             rating.setRating(update.getAfter());
             rating.setCalibrationCompletedMatches(Math.addExact(rating.getCalibrationCompletedMatches(),1));
             rating.setSeasonPeakRating(Math.max(rating.getSeasonPeakRating(),update.getAfter()));

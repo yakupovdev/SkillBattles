@@ -54,7 +54,7 @@ class BillingPostgresTest {
     @Autowired Notifications notifications;
     @MockitoBean StripeBillingClient stripe;
     @BeforeEach void setup() throws Exception {
-        clock.set(START);presence.clear();notifications.values.clear();jdbc.execute("TRUNCATE ranked_usage,battles,questions");uniformTiming(jdbc,10);
+        clock.set(START);presence.clear();notifications.values.clear();jdbc.execute("TRUNCATE question_reports,ranked_usage,battles,questions");uniformTiming(jdbc,10);
         imports.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())),false);
         when(stripe.available()).thenReturn(true);
         when(stripe.customer(any())).thenAnswer(call -> "cus_test_"+call.getArgument(0));
@@ -247,7 +247,7 @@ class BillingPostgresTest {
     UUID create(AuthDto a,AuthDto b,String code,BattleMode mode){presence.connect(id(a),clock.instant());presence.connect(id(b),clock.instant());return processor.create(new CreateBattleDto(id(a),id(b),code,mode));}
     void start(UUID battle,AuthDto a,AuthDto b){processor.ready(battle,id(a));processor.ready(battle,id(b));clock.set(clock.instant().plusSeconds(3));processor.tick(battle);}
     UUID id(AuthDto a){return a.getUser().getId();}String bearer(AuthDto a){return "Bearer "+a.getTokens().getAccessToken();}
-    AuthDto register(){var d=new RegisterDto();String s=UUID.randomUUID().toString().replace("-","").substring(0,12);d.setEmail(s+"@example.com");d.setNickname("Billing_"+s);d.setPassword("ExamplePass123!");return auth.register(d);}
+    AuthDto register(){var d=new RegisterDto(); d.setBirthYear(2000); d.setBirthMonth(1);String s=UUID.randomUUID().toString().replace("-","").substring(0,12);d.setEmail(s+"@example.com");d.setNickname("Billing_"+s);d.setPassword("ExamplePass123!");return auth.register(d);}
     void checkout(AuthDto a){billing.checkout(id(a),"PRO_MONTHLY",UUID.randomUUID());}
     String customer(AuthDto a){return subscriptions.account(id(a)).getCustomerId();}
     ProviderSubscriptionDto paid(AuthDto a){return new ProviderSubscriptionDto(customer(a),"sub_test_"+id(a),"price_monthly_fixture","ACTIVE",clock.instant().minusSeconds(1),clock.instant().plusSeconds(3600),false,true,false);}

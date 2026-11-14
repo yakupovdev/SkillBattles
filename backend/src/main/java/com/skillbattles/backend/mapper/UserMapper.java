@@ -22,6 +22,8 @@ public interface UserMapper {
     User toEntity(RegisterDto dto);
 
     UserResponse toResponse(UserDto dto);
+    PublicPlayer toPublicResponse(PublicPlayerDto dto);
+    ProfileUpdateDto toDto(UpdateProfileRequest request);
 
     default Instant toUtc(LocalDateTime value) {
         return value == null ? null : value.toInstant(ZoneOffset.UTC);

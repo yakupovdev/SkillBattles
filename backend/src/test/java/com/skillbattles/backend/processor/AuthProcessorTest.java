@@ -24,7 +24,7 @@ class AuthProcessorTest {
 
     @Test
     void registrationInitializesRatingsBeforeIssuingTokens() {
-        RegisterDto registration = new RegisterDto();
+        RegisterDto registration = new RegisterDto(); registration.setBirthYear(2000); registration.setBirthMonth(1);
         UserDto user = new UserDto();
         UUID id = UUID.randomUUID();
         user.setId(id);

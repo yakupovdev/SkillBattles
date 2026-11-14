@@ -25,7 +25,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Override public EntitlementsDto entitlements(UUID id) {return entitlements(account(id));}
     private EntitlementsDto entitlements(BillingAccountDto a) {
         boolean pro=active(a);int version=a.getVersion()+(a.isProActive()&&!pro?1:0);
-        return new EntitlementsDto(pro,version,pro,pro?null:10,pro,pro,pro,pro,pro);
+        return new EntitlementsDto(pro,version,pro,pro?null:10,pro,pro,pro,pro);
     }
     @Override public SubscriptionDto current(UUID id) {
         var a=account(id);var e=entitlements(a);

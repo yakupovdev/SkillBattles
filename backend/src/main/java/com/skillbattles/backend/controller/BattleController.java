@@ -36,6 +36,7 @@ public class BattleController {
     @GetMapping("/{id}")
     @Operation(summary = "Get participant-specific battle state", description = "Shows only the current question. Opponent selection and current-round correctness and points are hidden until reveal.")
     @ApiResponse(responseCode = "200", description = "Authoritative redacted snapshot")
+    @ApiResponse(responseCode="403",description="HISTORY_ACCESS_REQUIRED")
     public BattleSnapshot snapshot(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return mapper.toResponse(processor.snapshot(id, UUID.fromString(jwt.getSubject())));
     }
@@ -44,6 +45,7 @@ public class BattleController {
     @Operation(summary = "Set ready=true", description = "Requires an authenticated live realtime subscription. Idempotent while WAITING_READY; both ready and online starts COUNTDOWN.")
     @ApiResponse(responseCode = "200", description = "Updated battle snapshot")
     @ApiResponse(responseCode = "409", description = "INVALID_BATTLE_STATE or REALTIME_CONNECTION_REQUIRED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode="429",description="DAILY_LIMIT_REACHED")
     public BattleSnapshot ready(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ReadinessRequest request) {
         return mapper.toResponse(processor.ready(id, UUID.fromString(jwt.getSubject())));
     }
@@ -62,6 +64,7 @@ public class BattleController {
     @PostMapping("/{id}/surrender")
     @Operation(summary = "Surrender a battle", description = "Before the first question: cancel without rating. After start: forfeit. Terminal state is immutable on repeated requests.")
     @ApiResponse(responseCode = "200", description = "Current battle snapshot")
+    @ApiResponse(responseCode="403",description="HISTORY_ACCESS_REQUIRED")
     public BattleSnapshot surrender(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return mapper.toResponse(processor.surrender(id, UUID.fromString(jwt.getSubject())));
     }
@@ -70,6 +73,7 @@ public class BattleController {
     @Operation(summary = "Get the final result relative to the caller", description = "Returns final score and actual rating deltas. Private and cancelled battles never change ratings.")
     @ApiResponse(responseCode = "200", description = "Final result")
     @ApiResponse(responseCode = "409", description = "BATTLE_NOT_FINISHED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    @ApiResponse(responseCode="403",description="HISTORY_ACCESS_REQUIRED")
     public BattleResultResponse result(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return mapper.toResponse(processor.result(id, UUID.fromString(jwt.getSubject())));
     }
@@ -78,7 +82,10 @@ public class BattleController {
     @Operation(operationId = "getBattlesIdReview", summary = "Review own terminal battle", description = "Started rounds only, using immutable saved question and answer snapshots. Incomplete rounds include only accepted answers; learning breakdown never changes final scores.")
     @ApiResponse(responseCode = "200", description = "Started-round review")
     @ApiResponse(responseCode = "409", description = "BATTLE_NOT_FINISHED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public BattleReview review(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return reviewMapper.toResponse(processor.review(id, UUID.fromString(jwt.getSubject())));
+    @ApiResponse(responseCode="403",description="HISTORY_ACCESS_REQUIRED or PRO_REQUIRED")
+    public BattleReview review(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, @RequestParam(defaultValue="false") boolean mistakesOnly, HttpServletRequest request) {
+        String filter=request.getParameter("mistakesOnly");
+        if(filter!=null && !java.util.Set.of("true","false").contains(filter))throw new com.skillbattles.backend.exception.BusinessValidationException("VALIDATION_ERROR","mistakesOnly must be true or false.");
+        return reviewMapper.toResponse(processor.review(id, UUID.fromString(jwt.getSubject()),mistakesOnly));
     }
 }

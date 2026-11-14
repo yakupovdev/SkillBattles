@@ -26,4 +26,6 @@ public class DisciplineStatisticsResponse {
     private MatchCountsResponse ranked;
     @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
     private MatchCountsResponse privateMatches;
+    @io.swagger.v3.oas.annotations.media.Schema(nullable=true) private java.util.List<TopicStats> topicStats;
+    @io.swagger.v3.oas.annotations.media.Schema(nullable=true) private java.util.List<RatingHistoryPoint> ratingHistory;
 }

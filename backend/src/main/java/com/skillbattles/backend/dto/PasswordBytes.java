@@ -8,6 +8,7 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = PasswordBytesValidator.class)
 public @interface PasswordBytes {
+    int min() default 8;
     String message() default "Password must contain 8 to 72 UTF-8 bytes.";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};

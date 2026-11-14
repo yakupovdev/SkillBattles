@@ -14,4 +14,6 @@ public class DisciplineStatisticsDto {
     private boolean seasonRolloverPending;
     private MatchCountsDto ranked;
     private MatchCountsDto privateMatches;
+    private java.util.List<TopicStatsDto> topicStats;
+    private java.util.List<RatingHistoryPointDto> ratingHistory;
 }

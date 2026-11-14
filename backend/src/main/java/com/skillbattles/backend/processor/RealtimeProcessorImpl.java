@@ -125,6 +125,17 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
         });
     }
 
+    @Override @EventListener public void rematchChanged(RematchChangedEvent event){
+        if(!sessions.hasSubscribers())return;
+        enqueue(()->{try{
+            var r=event.rematch();var envelope=new RealtimeEvent<>(UUID.randomUUID(),"REMATCH_CHANGED",r.getSourceBattleId(),r.getVersion(),event.occurredAt(),matchmakingMapper.toResponse(r));
+            for(var user:r.getParticipants())sessions.target(user).ifPresent(target->{
+                if(!sessions.isCurrent(target.sessionId()))return;
+                var headers=SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);headers.setSessionId(target.sessionId());headers.setLeaveMutable(true);
+                messaging.convertAndSendToUser(user.toString(),"/queue/events",envelope,headers.getMessageHeaders());
+            });
+        }catch(RuntimeException ex){log.error("Rematch notification failed: {}",ex.getClass().getSimpleName());}});
+    }
     private void enqueue(Runnable action) {
         try { executor.execute(action); }
         catch (TaskRejectedException ex) {

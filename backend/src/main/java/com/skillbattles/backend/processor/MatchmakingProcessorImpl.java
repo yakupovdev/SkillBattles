@@ -122,7 +122,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
             if (battle.isPresent()) return ActivityDto.builder().type(ActivityType.BATTLE).resourceId(battle.get()).battleId(battle.get()).build();
             ActivityReservationDto reservation = state.getActivities().get(userId);
             return reservation == null ? ActivityDto.builder().type(ActivityType.NONE).build()
-                    : ActivityDto.builder().type(reservation.type()).resourceId(reservation.resourceId()).build();
+                    : ActivityDto.builder().type(reservation.type()).resourceId(reservation.resourceId()).resourceKind(reservation.resourceKind()).build();
         });
     }
 
@@ -132,6 +132,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
     }
 
     private void refresh(MatchmakingStateDto state, Instant now) {
+        RematchExpiry.expire(state,now);
         for (QueueEntryDto entry : List.copyOf(state.getEntries().values())) {
             if (entry.getStatus() != QueueStatus.SEARCHING) continue;
             if (!entry.getExpiresAt().isAfter(now)) { endEntry(state, entry, QueueStatus.EXPIRED); continue; }
@@ -140,7 +141,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
             if(rating!=null && entry.getRating()!=rating.getRating()) {
                 entry=entry.toBuilder().rating(rating.getRating()).version(entry.getVersion()+1).build();state.getEntries().put(entry.getId(),entry);
             }
-            if (!contentAvailable(entry.getDisciplineCode(), entry.getRating())) { endEntry(state, entry, QueueStatus.CANCELLED); continue; }
+            if (!contentAvailable(entry.getDisciplineCode(), entry.getRating())) { endEntry(state, entry, QueueStatus.CANCELLED, ErrorResponse.of("CONTENT_UNAVAILABLE", "Not enough suitable questions remain available.")); continue; }
             int window = window(entry, now);
             if (window != entry.getRatingWindow()) state.getEntries().put(entry.getId(), entry.toBuilder().ratingWindow(window).version(entry.getVersion() + 1).build());
         }
@@ -195,8 +196,9 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
         for (var difficulty : Difficulty.values()) counts.put(difficulty, questions.countAvailable(code, difficulty));
         return discipline.getSchedules().stream().anyMatch(s -> s.getMinRating() <= rating && DisciplineContentPolicy.available(s, counts));
     }
-    private void endEntry(MatchmakingStateDto state, QueueEntryDto entry, QueueStatus status) {
-        state.getEntries().put(entry.getId(), entry.toBuilder().status(status).version(entry.getVersion() + 1).build());
+    private void endEntry(MatchmakingStateDto state, QueueEntryDto entry, QueueStatus status) {endEntry(state,entry,status,null);}
+    private void endEntry(MatchmakingStateDto state, QueueEntryDto entry, QueueStatus status,ErrorResponse error) {
+        state.getEntries().put(entry.getId(), entry.toBuilder().status(status).error(error).version(entry.getVersion() + 1).build());
         state.getActivities().remove(entry.getUserId(), new ActivityReservationDto(ActivityType.QUEUE, entry.getId()));
     }
     private void endDuel(MatchmakingStateDto state, DuelDto duel, DuelStatus status) {

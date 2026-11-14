@@ -24,7 +24,8 @@ public class StatisticsProcessorImpl implements StatisticsProcessor {
     public StatisticsDto getForUser(UUID userId) {
         userService.getById(userId);
         var current=ratingProcessor.prepare(userId);
-        var results=battleService.statistics(userId);
+        var history=battleService.finishedHistory(userId);
+        var entitlement=subscriptions.entitlements(userId);
         var tiers=ranks.tiers();
         return new StatisticsDto(current.stream().map(rating -> {
             var dto=new DisciplineStatisticsDto();dto.setDisciplineCode(rating.getDisciplineCode());dto.setRating(rating.getRating());
@@ -36,9 +37,11 @@ public class StatisticsProcessorImpl implements StatisticsProcessor {
             dto.setAllTimePeakRating(rating.getAllTimePeakRating());dto.setAllTimePeakRankCode(RankCalculator.fromRating(tiers,rating.getAllTimePeakRating()).getCode());
             dto.setSeasonId(rating.getSeasonId());dto.setSeasonPeakRating(rating.getSeasonPeakRating());
             dto.setSeasonPeakRankCode(RankCalculator.fromRating(tiers,rating.getSeasonPeakRating()).getCode());dto.setSeasonRolloverPending(rating.isSeasonRolloverPending());
-            dto.setRanked(results.stream().filter(item -> item.getDisciplineCode().equals(rating.getDisciplineCode()) && item.getMode()==BattleMode.RANKED).map(BattleCountsDto::getCounts).findFirst().orElseGet(MatchCountsDto::new));
-            dto.setPrivateMatches(results.stream().filter(item -> item.getDisciplineCode().equals(rating.getDisciplineCode()) && item.getMode()==BattleMode.PRIVATE).map(BattleCountsDto::getCounts).findFirst().orElseGet(MatchCountsDto::new));
+            var disciplineHistory=history.stream().filter(b -> b.getDisciplineCode().equals(rating.getDisciplineCode())).toList();
+            dto.setRanked(StatisticsCalculator.matches(disciplineHistory,userId,BattleMode.RANKED));
+            dto.setPrivateMatches(StatisticsCalculator.matches(disciplineHistory,userId,BattleMode.PRIVATE));
+            if(entitlement.isPro()){dto.setTopicStats(StatisticsCalculator.topics(disciplineHistory,userId));dto.setRatingHistory(StatisticsCalculator.ratings(disciplineHistory,userId));}
             return dto;
-        }).toList(),subscriptions.entitlements(userId),streaks.current(userId));
+        }).toList(),entitlement,streaks.current(userId));
     }
 }

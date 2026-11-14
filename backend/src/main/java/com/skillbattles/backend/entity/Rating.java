@@ -14,6 +14,7 @@ import java.util.UUID;
 @SQLRestriction("deleted = false")
 @SQLDelete(sql = "UPDATE ratings SET deleted = true, updated_at = timezone('UTC', now()) WHERE id = ?")
 public class Rating extends BaseEntity {
+    @Column(nullable=false) private java.time.Instant ratingReachedAt=java.time.Instant.now();
     @Column(nullable = false)
     private UUID userId;
     @Column(nullable = false, length = 64)

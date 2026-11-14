@@ -20,9 +20,20 @@ import java.util.UUID;
 @Tag(name = "Users")
 public class UserController {
     private final UserService service;
+    private final com.skillbattles.backend.processor.ProfileProcessor profiles;
     private final com.skillbattles.backend.processor.AccountProcessor accounts;
     private final UserMapper mapper;
 
+    @PatchMapping("/me")
+    @Operation(summary="Update nickname or password", security=@SecurityRequirement(name="accessBearer"))
+    @ApiResponse(responseCode="200",description="Profile updated; password change revokes every refresh token")
+    @ApiResponse(responseCode="400",description="VALIDATION_ERROR or EMPTY_UPDATE")
+    @ApiResponse(responseCode="401",description="UNAUTHORIZED or INVALID_CURRENT_PASSWORD")
+    @ApiResponse(responseCode="409",description="NICKNAME_ALREADY_EXISTS")
+    public UpdateProfileResponse update(@AuthenticationPrincipal Jwt jwt,@jakarta.validation.Valid @RequestBody UpdateProfileRequest request) {
+        var user=profiles.update(UUID.fromString(jwt.getSubject()),mapper.toDto(request)); boolean changed=request.getNewPassword()!=null;
+        return new UpdateProfileResponse(mapper.toResponse(user),changed,changed);
+    }
     @GetMapping("/me")
     @Operation(summary = "Get the current active user", description = "Returns the owner's profile without password hashes.", security = @SecurityRequirement(name = "accessBearer"))
     @ApiResponse(responseCode = "200", description = "Current user")

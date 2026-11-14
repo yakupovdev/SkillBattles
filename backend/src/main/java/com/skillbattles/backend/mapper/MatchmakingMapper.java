@@ -6,6 +6,7 @@ import org.mapstruct.Mapper;
 
 @Mapper(config = CommonMapperConfig.class)
 public interface MatchmakingMapper {
+    RematchResponse toResponse(RematchDto dto);
     QueueEntryResponse toResponse(QueueEntryDto dto);
     DuelResponse toResponse(DuelDto dto);
     PublicPlayer toResponse(PublicPlayerDto dto);

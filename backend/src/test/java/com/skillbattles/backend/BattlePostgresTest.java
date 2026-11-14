@@ -79,7 +79,7 @@ class BattlePostgresTest {
         clock.set(START);
         presence.clear();
         events.values.clear();
-        jdbc.execute("TRUNCATE TABLE ranked_usage, battles, questions");
+        jdbc.execute("TRUNCATE question_reports,ranked_usage, battles, questions");
         questions.importQuestions(fixture(), false);
     }
 
@@ -515,7 +515,7 @@ class BattlePostgresTest {
         return files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI()));
     }
     private AuthDto register() {
-        RegisterDto command = new RegisterDto();
+        RegisterDto command = new RegisterDto(); command.setBirthYear(2000); command.setBirthMonth(1);
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         command.setEmail(suffix + "@example.com"); command.setNickname("Test_" + suffix); command.setPassword("ExamplePass123!");
         return auth.register(command);

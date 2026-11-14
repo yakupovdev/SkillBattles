@@ -60,7 +60,7 @@ class HistoryPostgresTest {
 
     @BeforeEach void setup() throws Exception {
         uniformTiming(jdbc, 10);
-        clock.set(START); presence.clear(); jdbc.execute("TRUNCATE ranked_usage, battles, questions");
+        clock.set(START); presence.clear(); jdbc.execute("TRUNCATE question_reports,ranked_usage, battles, questions");
         questions.importQuestions(fixture(), false);
     }
 
@@ -152,7 +152,10 @@ class HistoryPostgresTest {
         assertThat(incomplete.path("answers").get(0).path("points").asInt()).isEqualTo(1100);
         assertThat(incomplete.path("question").path("explanation").asText()).startsWith("TEST ONLY");
         assertThat(playerResult(result(a, battleId, 200), id(a)).path("score").asInt()).isEqualTo(1000); // Incomplete round awards nothing.
-        assertThat(getJson("/api/v1/battles/" + battleId + "/review", b, 200)).isEqualTo(review);
+        var otherReview=getJson("/api/v1/battles/" + battleId + "/review", b, 200);
+        assertThat(otherReview.path("rounds")).isEqualTo(review.path("rounds"));
+        assertThat(otherReview.path("answerAccess").path("canViewCorrectAnswer").asBoolean()).isTrue();
+        // entitlementVersion belongs to the caller; it need not match the opponent's version.
         for (int i = 0; i < 3; i++) { result(a, battleId, 200); history(a, ""); getJson("/api/v1/battles/" + battleId + "/review", a, 200); getJson("/api/v1/users/me/statistics", a, 200); }
         assertThat(persisted(battleId)).isEqualTo(before);
         assertPrivate(review); assertPrivate(history(a, ""));
@@ -260,7 +263,7 @@ class HistoryPostgresTest {
     private void assertPrivate(JsonNode value) { assertThat(value.toString()).doesNotContain("email", "password", "Token", "submissionId", "acceptedAt", "sessionId"); }
     private UUID id(AuthDto user) { return user.getUser().getId(); }
     private AuthDto register() {
-        var dto = new RegisterDto(); String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        var dto = new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1); String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         dto.setEmail(suffix + "@example.com"); dto.setNickname("History_" + suffix); dto.setPassword("ExamplePass123!"); var user=auth.register(dto);
         // Internal fixture: old full-history/revision tests exercise the Pro view. No public switch exists.
         jdbc.update("UPDATE subscription_accounts SET plan_code='PRO_MONTHLY',status='ACTIVE',paid=true,pro_active=true,current_period_start=?,current_period_end=? WHERE user_id=?",java.sql.Timestamp.from(clock.instant().minusSeconds(1)),java.sql.Timestamp.from(clock.instant().plusSeconds(3600)),id(user));

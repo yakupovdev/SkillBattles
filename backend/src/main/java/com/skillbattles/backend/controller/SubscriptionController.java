@@ -37,11 +37,11 @@ public class SubscriptionController {
     @ApiResponse(responseCode="401",description="UNAUTHORIZED",content=@Content(schema=@Schema(implementation=ErrorResponse.class)))
     @ApiResponse(responseCode="409",description="BILLING_CUSTOMER_NOT_FOUND",content=@Content(schema=@Schema(implementation=ErrorResponse.class)))
     @ApiResponse(responseCode="503",description="BILLING_UNAVAILABLE",content=@Content(schema=@Schema(implementation=ErrorResponse.class)))
-    public PortalResponse portal(@AuthenticationPrincipal Jwt jwt,@RequestBody(required=false) byte[] body){if(body!=null&&body.length>0)throw new BusinessValidationException("VALIDATION_ERROR","This operation accepts no body.");return mapper.toResponse(processor.portal(UUID.fromString(jwt.getSubject())));}
+    public PortalResponse portal(@AuthenticationPrincipal Jwt jwt,@io.swagger.v3.oas.annotations.Parameter(hidden=true) @RequestBody(required=false) byte[] body){if(body!=null&&body.length>0)throw new BusinessValidationException("VALIDATION_ERROR","This operation accepts no body.");return mapper.toResponse(processor.portal(UUID.fromString(jwt.getSubject())));}
     @PostMapping(value="/webhook",consumes=MediaType.APPLICATION_JSON_VALUE) @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(operationId="postSubscriptionWebhook",summary="Verify raw Stripe TEST webhook and reconcile current provider state",security=@SecurityRequirement(name="stripeSignature"))
     @ApiResponse(responseCode="204",description="Committed event or idempotent replay")
     @ApiResponse(responseCode="400",description="INVALID_WEBHOOK_SIGNATURE, INVALID_WEBHOOK_EVENT",content=@Content(schema=@Schema(implementation=ErrorResponse.class)))
     @ApiResponse(responseCode="503",description="BILLING_UNAVAILABLE; retry delivery",content=@Content(schema=@Schema(implementation=ErrorResponse.class)))
-    public void webhook(@RequestBody byte[] raw,@RequestHeader(value="Stripe-Signature",required=false) String signature){processor.webhook(raw,signature);}
+    public void webhook(@io.swagger.v3.oas.annotations.parameters.RequestBody(content=@Content(schema=@Schema(implementation=StripeEventRequest.class))) @RequestBody byte[] raw,@RequestHeader(value="Stripe-Signature",required=false) String signature){processor.webhook(raw,signature);}
 }

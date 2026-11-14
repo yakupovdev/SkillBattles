@@ -180,6 +180,14 @@ public class BattleProcessorImpl implements BattleProcessor {
         return access.review(terminalRead(battleId, userId),userId);
     }
 
+    @Override @Transactional(readOnly=true) public BattleReviewDto review(UUID battleId,UUID userId,boolean mistakesOnly){
+        var dto=review(battleId,userId);
+        if(mistakesOnly){
+            if(!dto.getAnswerAccess().isCanViewCorrectAnswer())throw new ProRequiredException();
+            dto.setRounds(dto.getRounds().stream().filter(r->r.getAnswers().stream().noneMatch(a->a.getUserId().equals(userId)&&a.isCorrect())).toList());
+        }
+        dto.setMistakesOnly(mistakesOnly);return dto;
+    }
     private BattleDto terminalRead(UUID battleId, UUID userId) {
         BattleDto battle = battleService.getForParticipant(battleId, userId);
         if (!BattleEngineImpl.terminal(battle)) throw new ConflictException("BATTLE_NOT_FINISHED", "Battle is not finished.");

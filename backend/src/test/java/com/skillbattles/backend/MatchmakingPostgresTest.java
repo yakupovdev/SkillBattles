@@ -96,7 +96,7 @@ class MatchmakingPostgresTest {
         uniformTiming(jdbc, 10);
         clock.set(START);
         registry.transact(state -> { state.getEntries().clear(); state.getDuels().clear(); state.getActivities().clear(); return null; });
-        jdbc.execute("TRUNCATE ranked_usage, battles, questions");
+        jdbc.execute("TRUNCATE question_reports,ranked_usage, battles, questions");
         questions.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())), false);
         events.values.clear();
     }
@@ -407,7 +407,7 @@ class MatchmakingPostgresTest {
         var none = json.readTree(mvc.perform(get("/api/v1/users/me/activity").header("Authorization", bearer(a))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(none.has("resourceId")).isTrue(); assertThat(none.path("resourceId").isNull()).isTrue(); assertThat(none.path("battleId").isNull()).isTrue();
         var entry = json.readTree(mvc.perform(post("/api/v1/matchmaking/entries").header("Authorization", bearer(a)).contentType("application/json").content("{\"disciplineCode\":\"SAT_MATH\",\"format\":\"STANDARD\"}")).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
-        assertThat(entry.fieldNames()).toIterable().containsExactlyInAnyOrder("id", "disciplineCode", "format", "status", "createdAt", "expiresAt", "ratingWindow", "battleId", "version");
+        assertThat(entry.fieldNames()).toIterable().containsExactlyInAnyOrder("id", "disciplineCode", "format", "status", "createdAt", "expiresAt", "ratingWindow", "battleId", "version", "error");
         mvc.perform(get("/api/v1/matchmaking/entries/" + entry.path("id").asText()).header("Authorization", bearer(b))).andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("QUEUE_ENTRY_NOT_FOUND"));
         mvc.perform(delete("/api/v1/matchmaking/entries/" + entry.path("id").asText()).header("Authorization", bearer(b))).andExpect(status().isNotFound());
         mvc.perform(delete("/api/v1/matchmaking/entries/" + entry.path("id").asText()).header("Authorization", bearer(a))).andExpect(status().isNoContent()).andExpect(content().string(""));
@@ -472,7 +472,7 @@ class MatchmakingPostgresTest {
     }
 
     private AuthDto register() {
-        var dto = new RegisterDto(); var suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        var dto = new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1); var suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         dto.setEmail(suffix + "@example.com"); dto.setNickname("Queue_" + suffix); dto.setPassword("ExamplePass123!"); return auth.register(dto);
     }
     private UUID id(AuthDto user) { return user.getUser().getId(); }

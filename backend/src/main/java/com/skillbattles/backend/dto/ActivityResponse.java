@@ -12,6 +12,7 @@ public class ActivityResponse {
     private ActivityType type;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private UUID resourceId;
+    @Schema(requiredMode=Schema.RequiredMode.REQUIRED,nullable=true,allowableValues={"DUEL","REMATCH"}) private String resourceKind;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private UUID battleId;
 }

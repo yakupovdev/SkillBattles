@@ -1,11 +1,11 @@
-# SkillBattles — v0.3 stage C
+# SkillBattles — backend v0.3
 
-Промежуточная ветка обновления, **не готовый релиз v0.3**. Реализованы каталог,
-scoring/streak, overtime, индивидуальная калибровка, рейтинговые сезоны и этап C:
-Stripe TEST, entitlements, квоты и персональная выдача истории/ответов. Полные локальные
-документы `SKILLBATTLES_BACKEND_V0_3.md` и `OPENAPI_V0_3.yaml` описывают конечный
-контракт из 42 операций; наличие операции в них не означает, что она реализована.
-Generated Swagger помечен версией `0.3.0-stage-c` и показывает фактический API.
+Реализованы этапы A–E и 39 REST-операций контракта v0.3. Generated Swagger
+имеет версию `0.3.0` и строится из действующих controllers/DTO. Контрактная
+проверка сопоставляет маршруты, успешные статусы, request/response-поля,
+типы и единый ErrorResponse. Локальные спецификации остаются игнорируемыми Git.
+Stripe работает только в TEST: настоящий Checkout → webhook → Pro round trip
+пока не проверен из-за недоступного локального listener.
 
 Java 21, Spring Boot 3.5.16, MVC/JPA/Security Resource Server, PostgreSQL 17.12,
 Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3.4
@@ -14,6 +14,9 @@ Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3
 ## Что работает сейчас
 
 - JWT access/refresh, ротация refresh, logout и изоляция токенов по назначению.
+- Возрастная проверка регистрации по ET, профиль PATCH и одноразовый password reset.
+- Полная базовая статистика, Pro topicStats/ratingHistory и сезонный leaderboard.
+- Pro mistakesOnly, приватный реванш и идемпотентные жалобы.
 - Динамический каталог активных дисциплин из PostgreSQL: `SAT_MATH`, `SAT_RW`.
   Код дисциплины — строка, не Java/frontend enum. Вопросы — SINGLE_CHOICE, 4 опции.
 - `mode=RANKED|PRIVATE` обозначает соревнование, `format=STANDARD` — формат.
@@ -32,7 +35,9 @@ Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3
 
 ## Отдельная база для обновления
 
-V1–V7 сохранены, V8 добавляет подписки/receipt, quota ledger, qualifying days
+V1–V8 сохранены. V9 добавляет данные age-screen, reset hashes и ratingReachedAt;
+V10 сохранена без изменения checksum; V11 удаляет только устаревшую таблицу
+practice_sessions. Таблица question_reports и остальные данные сохраняются. V8 добавляет подписки/receipt, quota ledger, qualifying days
 и индексы истории по finishedAt. V7 добавляет калибровку, пики и архивы сезонов. V5 создаёт каталоги дисциплин/рангов, V6 переводит ключи на
 `discipline_code`, добавляет topicCode и формат. V6 **отказывается** мигрировать
 базу с вопросами или батлами v0.2. Совместимый адаптер старых snapshots не входит
@@ -98,7 +103,7 @@ REST: `http://localhost:8080/api/v1`, WebSocket: `ws://localhost:8080/ws/v1/even
 Если меняете BACKEND_PORT, обновите три BILLING_*_URL в том же `.env`.
 Frontend получает только явно выбранные публичные URLs, а не серверный ENV;
 API/WebSocket должны идти через same-origin dev proxy с поддержкой Upgrade.
-Wildcard CORS/origins не добавлены. SMTP пока не реализован: SMTP ENV не нужны.
+Wildcard CORS/origins не добавлены. SMTP/reset ENV описаны ниже.
 
 ## Каталог, сетки и конфигурация
 
@@ -417,7 +422,7 @@ Listener/webhook, оплата, выдача Pro и Portal приложения 
 Проверки единой конфигурации: безопасный ENV-parser, `docker compose config --quiet`,
 сборка/запуск Docker и host JVM, HTTP 200 для Swagger/OpenAPI/return URLs,
 соответствие runtime ENV, Stripe TEST account/Prices/default Portal и повторный
-setup без новых Prices. Итоговый verify: **306 тестов, 0 ошибок/пропусков**.
+setup без новых Prices. Предыдущий verify этапа C: **306 тестов, 0 ошибок/пропусков**.
 Секретов в tracked/unignored файлах и verify-логе не обнаружено. Полный
 Checkout → webhook → Pro → Portal round trip пока не выполнен из-за блокировки CLI.
 
@@ -472,28 +477,129 @@ Weekly — последовательные завершённые недели 
 Это общие streaks по дисциплинам, отдельно от combat streak и будущего win streak.
 Statistics и AccountState показывают реальные значения, не имитацию аналитики.
 
-## Временные отличия от конечного OPENAPI_V0_3.yaml
+## Возраст, профиль и восстановление пароля
 
-- Не реализованы age-screen, profile PATCH/password reset, полные базовые метрики
-  accuracy/avg time/win streak, расширенная аналитика/leaderboard и функции D/E
-  rematch/report/similar practice. Statistics матчей пока W/L/D/played, без
-  фиктивных topicStats/ratingHistory. Pro entitlements задают права плана, но
-  наличие права не означает, что отложенная операция уже доступна.
-- mistakesOnly не реализован, review показывает mistakesOnly=false. Review
-  сохраняет промежуточное поле format этапа A. Frontend-спецификация отсутствует;
-  сокращённая замена не создавалась. Ориентируйтесь на фактический Swagger stage C.
-- Billing — однопроцессный TEST. Реальные Checkout/Portal round trips проверяются
-  только при наличии sandbox keys; подписанные fixtures и SDK payload tests их
-  не заменяют. Provider lists обрабатываются с пагинацией. При нескольких
-  открытых provider subscriptions адаптер отвечает fail-closed BILLING_UNAVAILABLE
-  для reconciliation, не выбирая случайную подписку.
-- Generated Swagger — 0.3.0-stage-c, не все 42 конечные операции. Ветка остаётся
-  промежуточной и не является готовым релизом v0.3.
+Регистрация требует birthYear>=1900 и birthMonth=1..12. birthDay нужен только
+в текущем ET-месяце 13-летия; переданный день всегда проверяется на существование
+даты. В день 13-летия регистрация разрешена, младше 13 — 403 AGE_RESTRICTED,
+будущая/несуществующая дата — 400 VALIDATION_ERROR. Верхнего возрастного запрета
+нет. Данные рождения не входят в API-профиль, leaderboard или realtime. Один
+age-screen не доказывает полного соответствия COPPA.
 
-Следующий этап — D: полная базовая статистика, Pro-аналитика, leaderboard,
-профиль и восстановление пароля; затем E.
+`PATCH /api/v1/users/me`: nickname и/или currentPassword+newPassword. Пустое
+обновление, явные null, неполная пара, неизвестные поля/email отклоняются.
+Nickname уникален среди активных аккаунтов без учёта регистра. Смена/reset пароля
+отзывает все refresh; access JWT работает до expiry без новой проверки пользователя
+в БД на каждом запросе. Ответ PATCH содержит passwordChanged/reauthenticationRequired.
+
+`POST /api/v1/auth/password-reset/request` принимает email и даёт одинаковый 202
+для существующего/неизвестного адреса. Поиск аккаунта и SMTP выполняются асинхронно
+отдельным ограниченным executor. Ошибка доставки не меняет ответ и не раскрывает
+наличие аккаунта. При ненастроенном adapter или полной очереди — одинаковый
+503 EMAIL_SERVICE_UNAVAILABLE. Rate limiting: 3 запроса/email, 30/IP за 20 минут;
+confirm — 30/IP. Register/login — 30/60 запросов/IP за 20 минут. Используется
+remote address без доверия произвольному X-Forwarded-For. Лимиты однопроцессные,
+обнуляются после restart; 429 содержит Retry-After.
+
+`POST /api/v1/auth/password-reset/confirm`: token+newPassword, 204. 32 случайных
+байта кодируются Base64url; в БД только SHA-256 hash. TTL ровно PT20M, повтор/expiry —
+400 INVALID_RESET_TOKEN. Условный UPDATE и user lock обеспечивают однократное
+применение вместе со сменой password hash и отзывом refresh. Token не возвращается API.
+
+Все настройки только в корневом `.env` и `.env.example`: SMTP_HOST, SMTP_PORT,
+SMTP_USERNAME, SMTP_PASSWORD, SMTP_AUTH, SMTP_STARTTLS, MAIL_FROM,
+PASSWORD_RESET_BASE_URL, PASSWORD_RESET_TTL=PT20M. Внешние credentials не созданы.
+SMTP_HOST, MAIL_FROM и PASSWORD_RESET_BASE_URL пока пусты: доставка выключена.
+Доверенный frontend URL — абсолютный http(s), без query/fragment; письмо добавляет
+`?token=...`. После обмена frontend удаляет token из адресной строки.
+Локально возможен Mailpit: SMTP_HOST=localhost, SMTP_PORT=1025, SMTP_AUTH=false,
+SMTP_STARTTLS=false, локальный MAIL_FROM и frontend reset route. В Docker нужен
+доступный контейнеру SMTP hostname. Автотесты используют mail adapter/JavaMailSender
+mocks и никому не отправляют письма.
+
+## Статистика и leaderboard
+
+Метрики по всей истории FINISHED независимо от лимита Free: W/L/D, played,
+winRatePercent, currentWinStreak/bestWinStreak, accuracyPercent, avgAnswerTimeMs,
+questionCount. LOSS/DRAW обрывают win streak, CANCELLED исключены. Completed questions
+включают wrong/timeouts/overtime; incomplete forfeit — только принятые ответы.
+Будущие раунды исключены. Среднее время — только отправленные ответы, без timeout;
+без данных проценты/среднее равны null. Проценты округлены HALF_UP до 2 знаков,
+среднее время — до целых миллисекунд.
+
+Free получает topicStats/ratingHistory=null. Pro видит темы по всей истории,
+weak при неокруглённой accuracy<65% и >=5 samples, последние 30 ranked outcomes
+в хронологическом порядке с seasonId и before/after/delta. Сезонный сброс не
+создаёт точку графика. Ранги/пики/calibration и daily/weekly streak доступны всем.
+
+`GET /api/v1/leaderboards/{disciplineCode}` — текущий ET-сезон, top50 и отдельная me.
+Порядок rating DESC → ratingReachedAt ASC → userId ASC, позиции ROW_NUMBER.
+Calibration включена; deleted и rollover-pending исключены. Подготавливаются только
+устаревшие строки сезона, без обхода текущих аккаунтов по одному на каждом чтении.
+Pro влияет только на badge. me может быть null при pending.
+
+## Review, rematch и reports
+
+`GET /api/v1/battles/{id}/review?mistakesOnly=true` — Pro. Оставляет неправильные
+и неотвеченные показанные раунды, включая incomplete. false доступен Free.
+Owner/history gating действует также на прямые чтения и жалобы/реванши. Free в
+REST/STOMP не получает correctOptionId/explanation/выбор соперника.
+
+POST/GET/DELETE `/api/v1/battles/{id}/rematch`: участники terminal PRIVATE.
+Первое согласие резервирует activity на 60 секунд; второе атомарно создаёт один
+новый PRIVATE. Повторы не продлевают срок. Expiry/cancel освобождают activity;
+CANCELLED/EXPIRED consent нельзя начать повторно. Новая сетка/вопросы/анти-повторы,
+оба игрока снова проходят Ready. Общий lock с очередью/комнатами защищает commit/rollback.
+REMATCH_CHANGED приходит обоим после commit. Memory-consents теряются при restart.
+
+POST `/api/v1/battles/{id}/rounds/{roundId}/report`: показанный revealed/terminal
+раунд, reason=INCORRECT_ANSWER|UNCLEAR_QUESTION|TYPO|OTHER, comment<=1000, OTHER требует
+непустой comment. Первый report(user,battle,round) — 201, точный повтор — 200 с тем же
+объектом, другой payload — 409 REPORT_ALREADY_EXISTS. Контент/результат/Elo не меняются.
+
+## Контракт и передача frontend
+
+Swagger `/v3/api-docs` содержит 39 реализованных REST-операций. OpenAPI 3.1 может
+представлять nullable как `type: [integer, null]`, эквивалент nullable=true целевого
+OpenAPI 3.0.3. Имена схем могут отличаться; публичные поля и типы сверяются.
+Webhook дополнительно документирует фактический 503 BILLING_UNAVAILABLE для retry
+при сбое reconciliation — уточнение существующей обработки внешнего отказа.
+
+Frontend нужно передать generated OpenAPI и следующие изменения:
+- birthYear/birthMonth/условный birthDay; reset route без логирования token;
+- PATCH profile, reauthenticationRequired и очистку сессии после смены пароля;
+- nullable метрики/advanced-поля, leaderboard/rematch/report routes;
+- review без промежуточного format; AnswerAccess: canViewCorrectAnswer,
+  canViewExplanation, entitlementVersion; Entitlements сохраняет plural-поля;
+- QueueEntryResponse.error=null либо ErrorResponse при async cancellation;
+- activity.resourceKind=null|DUEL|REMATCH и REMATCH_CHANGED в прежнем envelope;
+- same-origin proxy REST/WebSocket, серверные права/версии и повторный Ready.
+
+Согласованная с frontend функция similar practice удалена: нет трёх routes,
+Practice DTO/mapper/service/repository/entity, соответствующего entitlement и прав в
+описаниях Pro. Цены и остальные права не менялись. Версия API осталась 0.3.0.
+V11 удаляет только practice_sessions; V10 и более старые миграции не редактируются.
+Frontend не изменён, отдельной frontend-спецификации в репозитории нет.
+Production-банк и реальные платежи вне задачи. Stripe TEST остаётся fail-closed:
+STRIPE_WEBHOOK_SECRET пустой, Windows Application Control блокирует stripe.exe.
+Полный внешний Checkout → webhook → Pro не проверен; политики ОС не менялись.
 
 ## Проверки
+
+Итоговая проверка после согласованного удаления функции, 2026-11-15:
+`clean verify` на Java 21 / PostgreSQL 17.12 — **349 тестов, 0 failures/errors/skipped**.
+Проверены чистая схема V11 и upgrade V10 → V11 с удалением только practice-данных,
+сохранением пользователей/батлов/жалоб и неизменным checksum V10. Hibernate работает
+с `ddl-auto=validate`. Все 39 REST-операций и формы request/response/ErrorResponse
+сверены; в generated OpenAPI нет удалённых routes, Practice DTO и canPracticeSimilar.
+Версия API сохранена 0.3.0, цены и остальные права Free/Pro не изменились.
+
+В собранном JAR нет классов удалённой функции. Из него пройдены реальные HTTP/STOMP
+ranked/private, profile, leaderboard, reports, Pro gates, rematch consent/activity/events/cancel,
+перезапуск и recovery. Runner использовал отдельную tmpfs PostgreSQL и случайный
+loopback-порт; собственные процессы/контейнер удалены. Синтаксис smoke script и
+`git diff --check` проверены. Внешняя SMTP-доставка и настоящий Stripe webhook round trip
+этими проверками не подтверждаются.
 
 К существующим проверкам scoring/overtime/калибровки/сезонов добавлены signed
 webhook fixtures, SDK payload/version/period, duplicate/out-of-order/payment failure,
@@ -501,13 +607,11 @@ webhook fixtures, SDK payload/version/period, duplicate/out-of-order/payment fai
 last10-before-filter и все пути redaction, daily/weekly streak, реальные
 REST/STOMP ACCOUNT_CHANGED и rollback. Используются отдельные PostgreSQL контейнеры.
 
-Проверено на Java 21 / PostgreSQL 17.12: итоговый `verify` — **306 тестов,
-0 failures/errors/skipped**, JAR собран; V8 и ddl-auto=validate проверены на чистых БД.
-Реальные REST/STOMP из JAR, включая ACCOUNT_CHANGED и возврат quota после
-рестарта/recovery, пройдены. Также проверены Compose config, JS/Python syntax
-и `git diff --check`. Stripe sandbox keys в окружении отсутствовали: реальные
-provider Checkout/Portal round trips не запускались. Stripe-проверки выполнены
-на подписанных fixtures, тестовом provider adapter и SDK request/response fixtures.
+Новые проверки: границы возраста ET, profile validation/uniqueness/refresh revocation,
+reset privacy/replay/race/expiry, all-history statistics/Pro gating, leaderboard ties/top50/pending,
+mistakesOnly, rematch races/expiry/cancel/rollback, report idempotency/races, отсутствие удалённых routes/entitlement и миграция
+V10 → V11 с сохранением пользователей, батлов и жалоб. Реальный STOMP проверяет REMATCH_CHANGED.
+Тесты не используют внешние SMTP/Stripe credentials.
 
 Из backend/, Java 21 и Docker:
 
@@ -538,10 +642,10 @@ REST/STOMP ranked/private, retry/conflict, reconnect, review/history и пере
 Runner также проверяет PRIVATE overtime с одним tieBreakPoint, калибровку ranked,
 согласованность сезонных полей и сохранение новых матчей после рестарта.
 Runner принудительно исключает STRIPE_/BILLING_ deployment ENV, проверяет Free
-fallback, квоту, masked review, ACCOUNT_CHANGED наряду с прежними flow. Он не
+fallback, квоту, masked review, ACCOUNT_CHANGED, profile/reset availability, leaderboard, report и rematch consent/activity/REMATCH_CHANGED наряду с прежними flow. Он не
 выполняет платежи даже при наличии ключей в пользовательском окружении.
 
 Frontend-спецификация отсутствует; сокращённая замена не создавалась. Production-банк
 не поставляется. До предметного демо нужны разрешённые/проверенные SAT-вопросы,
 достаточные пулы всех требуемых сложностей, успешный dry-run/apply и frontend,
-согласованный с фактическим этапом API.
+согласованный с API v0.3.

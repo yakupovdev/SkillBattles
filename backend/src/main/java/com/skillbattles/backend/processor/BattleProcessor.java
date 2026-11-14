@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public interface BattleProcessor {
+    BattleReviewDto review(UUID battleId,UUID userId,boolean mistakesOnly);
     UUID create(CreateBattleDto command);
     BattleSnapshotDto snapshot(UUID battleId, UUID userId);
     BattleSnapshotDto ready(UUID battleId, UUID userId);

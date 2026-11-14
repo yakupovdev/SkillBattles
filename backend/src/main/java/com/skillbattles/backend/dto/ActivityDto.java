@@ -9,5 +9,6 @@ import java.util.UUID;
 public class ActivityDto {
     ActivityType type;
     UUID resourceId;
+    String resourceKind;
     UUID battleId;
 }

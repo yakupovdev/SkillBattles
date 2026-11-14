@@ -23,6 +23,8 @@ public class BattleServiceImpl implements BattleService {
     private final BattleHistoryMapper historyMapper;
     private final DisciplineService disciplines;
 
+    @Override public List<BattleDto> finishedHistory(UUID userId) {return repository.finishedHistory(userId).stream().map(mapper::toDto).toList();}
+
     @Override @Transactional
     public BattleDto create(BattleDto dto) { return mapper.toDto(repository.saveAndFlush(mapper.create(dto))); }
 

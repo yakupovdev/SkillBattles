@@ -43,7 +43,7 @@ class BillingRealtimePostgresTest {
     @MockitoBean StripeBillingClient stripe;
     final HttpClient http=HttpClient.newHttpClient();final List<NativeStompClient> sockets=new ArrayList<>();
     @BeforeEach void setup() throws Exception {
-        clock.set(START);jdbc.execute("TRUNCATE ranked_usage,battles,questions");uniformTiming(jdbc,60);
+        clock.set(START);jdbc.execute("TRUNCATE question_reports,ranked_usage,battles,questions");uniformTiming(jdbc,60);
         imports.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())),false);
         when(stripe.available()).thenReturn(true);when(stripe.customer(any())).thenAnswer(c -> "cus_test_"+c.getArgument(0));
         when(stripe.checkout(any(),anyString(),anyString(),any())).thenAnswer(c -> new CheckoutDto("cs_test_"+c.getArgument(3),"https://checkout.stripe.com/test_fixture",clock.instant().plusSeconds(1800)));
@@ -99,5 +99,5 @@ class BillingRealtimePostgresTest {
     String sign(byte[] raw) throws Exception {long time=clock.instant().getEpochSecond();var mac=Mac.getInstance("HmacSHA256");mac.init(new SecretKeySpec("whsec_realtime_fixture".getBytes(StandardCharsets.UTF_8),"HmacSHA256"));return "t="+time+",v1="+HexFormat.of().formatHex(mac.doFinal((time+"."+new String(raw,StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8)));}
     void webhook(AuthDto a,String type) throws Exception {var raw=event(a,type);var request=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/subscriptions/webhook")).header("Content-Type","application/json").header("Stripe-Signature",sign(raw)).POST(HttpRequest.BodyPublishers.ofByteArray(raw)).build();assertThat(http.send(request,HttpResponse.BodyHandlers.discarding()).statusCode()).isEqualTo(204);}
     UUID id(AuthDto a){return a.getUser().getId();}
-    AuthDto register(){var d=new RegisterDto();String s=UUID.randomUUID().toString().replace("-","").substring(0,12);d.setEmail(s+"@example.com");d.setNickname("BillWS_"+s);d.setPassword("ExamplePass123!");return auth.register(d);}
+    AuthDto register(){var d=new RegisterDto(); d.setBirthYear(2000); d.setBirthMonth(1);String s=UUID.randomUUID().toString().replace("-","").substring(0,12);d.setEmail(s+"@example.com");d.setNickname("BillWS_"+s);d.setPassword("ExamplePass123!");return auth.register(d);}
 }

@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface BattleRepository extends JpaRepository<Battle, UUID> {
+    @Query("select b from Battle b where (b.firstUserId=:userId or b.secondUserId=:userId) and b.phase=com.skillbattles.backend.entity.BattlePhase.FINISHED order by b.finishedAt,b.id")
+    List<Battle> finishedHistory(@Param("userId") UUID userId);
     @Query("select b.id from Battle b where (b.firstUserId=:userId or b.secondUserId=:userId) and b.phase in (com.skillbattles.backend.entity.BattlePhase.FINISHED,com.skillbattles.backend.entity.BattlePhase.CANCELLED) order by b.finishedAt desc,b.id desc")
     List<UUID> recentTerminal(@Param("userId") UUID userId,Pageable pageable);
 

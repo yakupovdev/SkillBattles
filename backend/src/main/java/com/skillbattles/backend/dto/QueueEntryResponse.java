@@ -26,4 +26,5 @@ public class QueueEntryResponse {
     private UUID battleId;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private int version;
+    @Schema(requiredMode=Schema.RequiredMode.REQUIRED,nullable=true) private ErrorResponse error;
 }

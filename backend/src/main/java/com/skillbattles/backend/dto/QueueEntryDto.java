@@ -19,4 +19,5 @@ public class QueueEntryDto {
     int ratingWindow;
     UUID battleId;
     int version;
+    ErrorResponse error;
 }

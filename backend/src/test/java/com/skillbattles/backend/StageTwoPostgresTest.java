@@ -207,7 +207,7 @@ class StageTwoPostgresTest {
 
     @Test
     void registrationRollsBackUserWhenRatingInitializationFails() {
-        RegisterDto registration = new RegisterDto();
+        RegisterDto registration = new RegisterDto(); registration.setBirthYear(2000); registration.setBirthMonth(1);
         registration.setEmail("rollback-test@example.com");
         registration.setNickname("RollbackTest");
         registration.setPassword("ExamplePass123!");
@@ -228,7 +228,7 @@ class StageTwoPostgresTest {
 
     private AuthDto register() {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        RegisterDto registration = new RegisterDto();
+        RegisterDto registration = new RegisterDto(); registration.setBirthYear(2000); registration.setBirthMonth(1);
         registration.setEmail(suffix + "@example.com");
         registration.setNickname("Test_" + suffix);
         registration.setPassword("ExamplePass123!");

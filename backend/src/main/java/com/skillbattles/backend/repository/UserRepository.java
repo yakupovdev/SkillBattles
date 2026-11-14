@@ -9,6 +9,7 @@ import java.util.*;
 public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select u.id from User u order by u.id")
     java.util.List<UUID> activeIds();
+    Optional<User> findByEmailNormalized(String email);
     boolean existsByEmailNormalized(String email);
     boolean existsByNicknameNormalized(String nickname);
 

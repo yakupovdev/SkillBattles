@@ -30,7 +30,7 @@ async function request(method, path, auth, body, expected = 200) {
 }
 async function register() {
   const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
-  return request('POST', '/api/v1/auth/register', null, {email: suffix + '@example.com', nickname: 'Demo_' + suffix, password: 'IsolatedDemo123!'}, 201);
+  return request('POST', '/api/v1/auth/register', null, {birthYear: 2000, birthMonth: 1, email: suffix + '@example.com', nickname: 'Demo_' + suffix, password: 'IsolatedDemo123!'}, 201);
 }
 class Stomp {
   constructor(auth) {
@@ -125,11 +125,14 @@ async function consistency(id, auth) {
 
 try {
   const api = await get('/v3/api-docs', null);
+  assert.equal(Object.values(api.paths).reduce((count, path) => count + Object.keys(path).filter(method => ['get', 'post', 'patch', 'delete'].includes(method)).length, 0), 39);
+  assert(!JSON.stringify(api).includes('canPracticeSimilar'));
+  assert(!Object.keys(api.paths).some(path => path.includes('/practice')));
   for (const path of ['/api/v1/users/me/battles', '/api/v1/battles/{id}/review']) {
     assert(api.paths[path].get.responses['200']); assert(api.paths[path].get.security.some(item => 'accessBearer' in item));
   }
   for (const [name, fields] of Object.entries({
-    BattleReview: ['battleId', 'disciplineCode', 'format', 'mode', 'rulesVersion', 'rounds', 'answerAccess', 'mistakesOnly'],
+    BattleReview: ['battleId', 'disciplineCode', 'mode', 'rulesVersion', 'rounds', 'answerAccess', 'mistakesOnly'],
     BattleHistoryItem: ['battleId', 'disciplineCode', 'format', 'mode', 'outcome', 'reason', 'opponent', 'myScore', 'opponentScore', 'ratingDelta', 'seasonId', 'overtimePlayed', 'createdAt', 'finishedAt'],
     BattleHistoryPage: ['data', 'pagination', 'historyLimit']
   })) {
@@ -142,7 +145,7 @@ try {
   const catalogue = await get('/api/v1/battle-modes', a);
   const mainCount = catalogue.find(item => item.disciplineCode === 'SAT_MATH').questionCount;
   assert.equal(mainCount, 5); assert.equal((await get('/api/v1/ranks', a)).length, 27);
-  assert.equal(api.info.version, '0.3.0-stage-c');
+  assert.equal(api.info.version, '0.3.0');
   const plans = await get('/api/v1/subscriptions/plans', null);
   assert.deepEqual(plans.map(plan => plan.amountCents), [0, 799, 4799]); assert(plans.every(plan => plan.checkoutAvailable === false));
   assert.equal((await get('/api/v1/subscriptions/me', a)).entitlements.isPro, false);
@@ -156,7 +159,7 @@ try {
   const match = await request('POST', '/api/v1/matchmaking/entries', b, {disciplineCode: 'SAT_MATH', format: 'STANDARD'}, 201);
   const ranked = match.battleId;
   assert.equal(match.status, 'MATCHED');
-  for (const auth of [a, b]) assert.deepEqual(await activity(auth), {type: 'BATTLE', resourceId: ranked, battleId: ranked});
+  for (const auth of [a, b]) assert.deepEqual(await activity(auth), {type: 'BATTLE', resourceId: ranked, resourceKind: null, battleId: ranked});
   assert.equal((await get('/api/v1/matchmaking/entries/' + entry.id, a)).battleId, ranked);
   await ready(ranked, a); await ready(ranked, b);
   await battleEvent(sa, ranked, 'COUNTDOWN');
@@ -246,7 +249,7 @@ try {
   assert(partial.rounds[0].answers[0].points >= 800);
   const surrendered = await consistency(surrenderId, a);
   assert.equal(surrendered.reason, 'SURRENDER'); assert(surrendered.players.every(player => player.score === 0 && player.ratingDelta === 0));
-  const savedHistory = await history(a);
+  let savedHistory = await history(a);
   assert.equal(savedHistory.historyLimit, 10);
   const freeReview = await review(ranked, a);
   assert(freeReview.rounds.every(round => round.question.correctOptionId === null && round.question.explanation === null));
@@ -254,6 +257,39 @@ try {
   assert.equal((await get('/api/v1/users/me/limits', a)).rankedStartedToday, 1);
   const savedReviews = new Map(); const savedResults = new Map();
   for (const id of [ranked, privateId, surrenderId]) { savedReviews.set(id, await review(id, a)); savedResults.set(id, await result(id, a)); }
+  // Stage D/E: real HTTP/STOMP checks stay Free and never call a live mail/payment provider.
+  const reviewRound = (await review(surrenderId, a)).rounds[0];
+  const reportPath = `/api/v1/battles/${surrenderId}/rounds/${reviewRound.roundId}/report`;
+  const reportPayload = {reason: 'TYPO', comment: 'TEST ONLY smoke report'};
+  const report = await request('POST', reportPath, a, reportPayload, 201);
+  assert.deepEqual(await request('POST', reportPath, a, reportPayload), report);
+  assert.equal((await request('POST', reportPath, a, {reason: 'OTHER', comment: 'Different TEST ONLY report'}, 409)).code, 'REPORT_ALREADY_EXISTS');
+  assert.equal((await get(`/api/v1/battles/${surrenderId}/review?mistakesOnly=true`, a, 403)).code, 'PRO_REQUIRED');
+  const board = await get('/api/v1/leaderboards/SAT_MATH', a);
+  assert.equal(board.me.player.id, a.user.id); assert.equal(board.me.rating, 1032); privateShape(board);
+  const rematchPath = `/api/v1/battles/${privateId}/rematch`;
+  const consent = await request('POST', rematchPath, a);
+  assert.deepEqual(await request('POST', rematchPath, a), consent);
+  assert.equal((await activity(a)).resourceKind, 'REMATCH');
+  const rematchEvent = await sa.event(event => event.type === 'REMATCH_CHANGED' && event.resourceId === privateId && event.data.status === 'WAITING');
+  assert.equal(rematchEvent.version, consent.version);
+  const rematch = await request('POST', rematchPath, b);
+  assert.equal(rematch.status, 'MATCHED');
+  assert.equal((await snapshot(rematch.battleId, a)).phase, 'WAITING_READY');
+  await request('POST', '/api/v1/battles/' + rematch.battleId + '/surrender', a);
+  const cancelPath = `/api/v1/battles/${surrenderId}/rematch`;
+  await request('POST', cancelPath, a); await request('DELETE', cancelPath, b, undefined, 204);
+  assert.equal((await get(cancelPath, a)).status, 'CANCELLED'); assert.equal((await activity(a)).type, 'NONE');
+  const profile = await register();
+  const changed = await request('PATCH', '/api/v1/users/me', profile, {nickname: 'Updated_' + randomUUID().replaceAll('-', '').slice(0, 10), currentPassword: 'IsolatedDemo123!', newPassword: 'UpdatedDemo123!'});
+  assert.equal(changed.passwordChanged, true); assert.equal(changed.reauthenticationRequired, true);
+  await request('POST', '/api/v1/auth/refresh', profile.refreshToken, undefined, 401);
+  await get('/api/v1/users/me', profile);
+  const reset = await request('POST', '/api/v1/auth/password-reset/request', null, {email: profile.user.email}, 503);
+  assert.equal(reset.code, 'EMAIL_SERVICE_UNAVAILABLE');
+  console.log('D/E REST/STOMP: profile/password refresh revocation, leaderboard, reports, Pro gates, rematch consent/activity/events/cancel passed.');
+
+  savedHistory = await history(a);
   const statsBefore = await get('/api/v1/users/me/statistics', a);
   assert.equal(statsBefore.disciplines.find(item => item.disciplineCode === 'SAT_MATH').rating, 1032);
   assert.equal(statsBefore.disciplines.find(item => item.disciplineCode === 'SAT_MATH').ranked.wins, 1);

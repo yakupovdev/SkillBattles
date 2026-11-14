@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
     private final AuthProcessor processor;
     private final AuthMapper mapper;
+    private final com.skillbattles.backend.service.RequestRateLimiter limiter;
     private final DefaultBearerTokenResolver bearerTokenResolver = new DefaultBearerTokenResolver();
 
     @PostMapping("/register")
@@ -32,7 +33,10 @@ public class AuthController {
     @ApiResponse(responseCode = "201", description = "User created and token pair issued")
     @ApiResponse(responseCode = "400", description = "VALIDATION_ERROR", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "409", description = "EMAIL_ALREADY_EXISTS or NICKNAME_ALREADY_EXISTS", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public AuthResponse register(@Valid @RequestBody RegisterRequest request) {
+    @ApiResponse(responseCode="403",description="AGE_RESTRICTED")
+    @ApiResponse(responseCode="429",description="RATE_LIMITED")
+    public AuthResponse register(@Valid @RequestBody RegisterRequest request, HttpServletRequest servlet) {
+        limiter.check("register:"+servlet.getRemoteAddr(),30);
         return mapper.toResponse(processor.register(mapper.toDto(request)));
     }
 
@@ -41,7 +45,9 @@ public class AuthController {
     @ApiResponse(responseCode = "200", description = "Token pair issued")
     @ApiResponse(responseCode = "400", description = "VALIDATION_ERROR", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "401", description = "INVALID_CREDENTIALS", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public AuthResponse login(@Valid @RequestBody LoginRequest request) {
+    @ApiResponse(responseCode="429",description="RATE_LIMITED")
+    public AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest servlet) {
+        limiter.check("login:"+servlet.getRemoteAddr(),60);
         return mapper.toResponse(processor.login(mapper.toDto(request)));
     }
 

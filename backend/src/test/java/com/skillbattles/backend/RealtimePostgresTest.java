@@ -64,7 +64,7 @@ class RealtimePostgresTest {
     @BeforeEach void setup() throws Exception {
         uniformTiming(jdbc, 60);
         clock.set(START);
-        jdbc.execute("TRUNCATE ranked_usage, battles, questions");
+        jdbc.execute("TRUNCATE question_reports,ranked_usage, battles, questions");
         questions.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())), false);
     }
     @AfterEach void cleanup() throws Exception {
@@ -338,7 +338,7 @@ class RealtimePostgresTest {
     }
 
     private AuthDto register() {
-        RegisterDto request = new RegisterDto();
+        RegisterDto request = new RegisterDto(); request.setBirthYear(2000); request.setBirthMonth(1);
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         request.setEmail(suffix + "@example.com"); request.setNickname("Socket_" + suffix); request.setPassword("ExamplePass123!");
         return auth.register(request);

@@ -10,4 +10,7 @@ public interface UserService {
     UserDto getById(UUID id);
     UserDto lockActiveById(UUID id);
     void softDelete(UUID id);
+    UserDto update(UUID id, ProfileUpdateDto dto);
+    java.util.Optional<UserDto> findByEmail(String email);
+    void resetPassword(UUID id, String password);
 }
