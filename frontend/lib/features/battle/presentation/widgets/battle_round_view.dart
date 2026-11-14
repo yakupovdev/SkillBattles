@@ -251,23 +251,27 @@ final class _Question extends StatelessWidget {
           Row(
             spacing: 16,
             children: <Widget>[
-              Flexible(
-                child: AppTag(
-                  label: round.isOvertime ? 'Overtime · $topic' : topic,
-                  tone: round.isOvertime
-                      ? AppTagTone.accent
-                      : AppTagTone.primary,
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AppTag(
+                    label: round.isOvertime ? 'Overtime · $topic' : topic,
+                    tone: round.isOvertime
+                        ? AppTagTone.accent
+                        : AppTagTone.primary,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (!isReveal)
                 AppCountdownText(
+                  key: const ValueKey<String>('round-deadline'),
                   target: round.deadline,
                   clockOffset: snapshot.clockOffset,
                   style: AppTextStyles.monoMd,
                 )
               else if (next != null)
                 AppCountdownText(
+                  key: const ValueKey<String>('next-round'),
                   target: next,
                   clockOffset: snapshot.clockOffset,
                   format: AppCountdownFormat.seconds,

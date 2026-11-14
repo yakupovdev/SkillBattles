@@ -35,3 +35,8 @@ final class _EntryReceived extends RankedSearchEvent {
 final class _RefreshTick extends RankedSearchEvent {
   const _RefreshTick();
 }
+
+/// Loads the own ratings for the rating range.
+final class _StatisticsRequested extends RankedSearchEvent {
+  const _StatisticsRequested();
+}

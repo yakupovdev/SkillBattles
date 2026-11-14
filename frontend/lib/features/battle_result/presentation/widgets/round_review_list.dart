@@ -4,18 +4,18 @@ import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:skill_battles/app/router/app_navigation.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
+import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/domain/entity/question_option_entity.dart';
 import 'package:skill_battles/core/domain/entity/round_answer_entity.dart';
-import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
-import 'package:skill_battles/core/presentation/widgets/app_locked_panel.dart';
+import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
-import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/report_params_entity.dart';
+import 'package:skill_battles/features/battle_result/domain/entity/review_question_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_round_entity.dart';
 import 'package:skill_battles/features/battle_result/presentation/bloc/battle_result_bloc/battle_result_bloc.dart';
 import 'package:skill_battles/features/battle_result/presentation/widgets/report_round_dialog.dart';
@@ -26,6 +26,7 @@ import 'package:skill_battles/features/battle_result/presentation/widgets/report
 final class RoundReviewList extends StatefulWidget {
   const RoundReviewList({
     required this.review,
+    required this.disciplineName,
     required this.opponentNickname,
     required this.opponentId,
     required this.mistakesOnly,
@@ -35,6 +36,7 @@ final class RoundReviewList extends StatefulWidget {
   });
 
   final BattleReviewEntity review;
+  final String disciplineName;
   final String opponentNickname;
   final String opponentId;
   final bool mistakesOnly;
@@ -69,6 +71,11 @@ final class _RoundReviewListState extends State<RoundReviewList> {
       context,
       battleId: widget.review.battleId,
       roundId: round.roundId,
+      eyebrow: <String>[
+        if (round.isOvertime) 'Overtime' else 'Round ${_roundNumber(round)}',
+        if (widget.disciplineName.isNotEmpty) widget.disciplineName,
+      ].join(' · '),
+      prompt: round.question.question.prompt,
     );
     if (params != null) bloc.add(BattleResultReportSubmitted(params));
   }
@@ -81,42 +88,27 @@ final class _RoundReviewListState extends State<RoundReviewList> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          spacing: 16,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
           children: <Widget>[
             const Text('Round review', style: AppTextStyles.titleLg),
             const Spacer(),
-            Skeleton.ignore(
-              child: _MistakesToggle(
-                value: widget.mistakesOnly,
-                isEnabled: widget.canFilterMistakes,
-              ),
+            Text(
+              'Base + speed + streak',
+              style: AppTextStyles.bodySm.copyWith(color: AppColors.muted),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Correct = base points by difficulty + speed bonus + streak bonus. '
-          'Overtime only breaks a tie.',
-          style: AppTextStyles.bodySm.copyWith(color: AppColors.muted),
+        const SizedBox(height: 12),
+        _ColumnHeader(
+          opponentNickname: widget.opponentNickname,
+          mistakesToggle: widget.canFilterMistakes
+              ? Skeleton.ignore(
+                  child: _MistakesToggle(value: widget.mistakesOnly),
+                )
+              : null,
         ),
-        const SizedBox(height: 16),
-        if (!isPro)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Skeleton.ignore(
-              child: AppLockedPanel(
-                title: 'Correct answers and explanations',
-                message:
-                    "You see your choice and whether it was right. Pro adds "
-                    "the correct option, your opponent's choice and a short "
-                    'explanation for every round — also for older matches.',
-                onUpgrade: context.goPro,
-              ),
-            ),
-          ),
-        const _ColumnHeader(),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         if (review.rounds.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -131,12 +123,13 @@ final class _RoundReviewListState extends State<RoundReviewList> {
         for (final ReviewRoundEntity round in review.rounds)
           Padding(
             key: ValueKey<String>(round.roundId),
-            padding: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.only(bottom: 12),
             child: _RoundRow(
               round: round,
               myUserId: review.myUserId,
               opponentId: widget.opponentId,
               opponentNickname: widget.opponentNickname,
+              isPro: isPro,
               isExpanded: _expanded.contains(round.roundId),
               isReported: widget.reportedRoundIds.contains(round.roundId),
               onTap: () => _toggle(round.roundId),
@@ -148,11 +141,26 @@ final class _RoundReviewListState extends State<RoundReviewList> {
   }
 }
 
+/// `03` — the round number as the review and the report show it.
+String _roundNumber(ReviewRoundEntity round) =>
+    round.number.toString().padLeft(2, '0');
+
+/// `B · $60.00` — the letter and text of an option, `null` when unknown.
+String? _optionLabel(ReviewQuestionEntity question, String? optionId) {
+  if (optionId == null) return null;
+  final List<QuestionOptionEntity> options = question.question.options;
+  for (int i = 0; i < options.length; i++) {
+    if (options[i].id == optionId) {
+      return '${String.fromCharCode(65 + i)} · ${options[i].text}';
+    }
+  }
+  return null;
+}
+
 final class _MistakesToggle extends StatelessWidget {
-  const _MistakesToggle({required this.value, required this.isEnabled});
+  const _MistakesToggle({required this.value});
 
   final bool value;
-  final bool isEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -160,21 +168,21 @@ final class _MistakesToggle extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: 8,
       children: <Widget>[
-        if (!isEnabled) const ProBadge(compact: true),
         Text(
           'Mistakes only',
-          style: AppTextStyles.bodySm.copyWith(
-            color: isEnabled ? AppColors.ink : AppColors.faint,
+          style: AppTextStyles.bodyXs.copyWith(
+            color: AppColors.muted,
             fontWeight: FontWeight.w500,
           ),
         ),
-        Switch(
-          value: value,
-          onChanged: isEnabled
-              ? (bool next) => context.read<BattleResultBloc>().add(
-                  BattleResultMistakesOnlyChanged(next),
-                )
-              : null,
+        Transform.scale(
+          scale: 0.8,
+          child: Switch(
+            value: value,
+            onChanged: (bool next) => context.read<BattleResultBloc>().add(
+              BattleResultMistakesOnlyChanged(next),
+            ),
+          ),
         ),
       ],
     );
@@ -182,7 +190,13 @@ final class _MistakesToggle extends StatelessWidget {
 }
 
 final class _ColumnHeader extends StatelessWidget {
-  const _ColumnHeader();
+  const _ColumnHeader({
+    required this.opponentNickname,
+    required this.mistakesToggle,
+  });
+
+  final String opponentNickname;
+  final Widget? mistakesToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -190,20 +204,28 @@ final class _ColumnHeader extends StatelessWidget {
       fontWeight: FontWeight.w500,
       color: AppColors.muted,
     );
+    final Widget? toggle = mistakesToggle;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         spacing: 16,
         children: <Widget>[
-          const SizedBox(width: 28),
-          const Spacer(),
+          Expanded(
+            child: Align(alignment: Alignment.centerLeft, child: toggle),
+          ),
           SizedBox(
             width: 84,
             child: Text('You', style: style, textAlign: TextAlign.right),
           ),
           SizedBox(
             width: 84,
-            child: Text('Opponent', style: style, textAlign: TextAlign.right),
+            child: Text(
+              opponentNickname,
+              style: style,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -217,6 +239,7 @@ final class _RoundRow extends StatelessWidget {
     required this.myUserId,
     required this.opponentId,
     required this.opponentNickname,
+    required this.isPro,
     required this.isExpanded,
     required this.isReported,
     required this.onTap,
@@ -227,6 +250,7 @@ final class _RoundRow extends StatelessWidget {
   final String myUserId;
   final String opponentId;
   final String opponentNickname;
+  final bool isPro;
   final bool isExpanded;
   final bool isReported;
   final VoidCallback onTap;
@@ -237,11 +261,17 @@ final class _RoundRow extends StatelessWidget {
     final RoundAnswerEntity? mine = round.answerOf(myUserId);
     final RoundAnswerEntity? theirs = round.answerOf(opponentId);
     final String? explanation = round.question.explanation;
+    final bool overtime = round.isOvertime && !isExpanded;
     return DecoratedBox(
       decoration: BoxDecoration(
+        color: overtime ? AppColors.accentRowSurface : AppColors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isExpanded ? AppColors.ink : AppColors.border,
+          color: isExpanded
+              ? AppColors.ink
+              : overtime
+              ? AppColors.accentRowBorder
+              : AppColors.border,
           width: isExpanded ? 1.5 : 1,
         ),
       ),
@@ -253,7 +283,7 @@ final class _RoundRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             semanticValue: isExpanded ? 'Expanded' : 'Collapsed',
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: EdgeInsets.fromLTRB(20, isExpanded ? 20 : 18, 20, 18),
               child: _RoundSummary(
                 round: round,
                 mine: mine,
@@ -264,77 +294,55 @@ final class _RoundRow extends StatelessWidget {
           ),
           if (isExpanded)
             Padding(
-              padding: const EdgeInsets.fromLTRB(64, 0, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 spacing: 14,
                 children: <Widget>[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      AppTag(
-                        label: round.question.question.topicName,
-                        style: AppTextStyles.bodyXs.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      AppTag(
-                        label: round.question.question.difficulty.label,
-                        tone: AppTagTone.neutral,
-                        style: AppTextStyles.bodyXs.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (!round.completed)
-                        AppTag(
-                          label: 'Not finished',
-                          tone: AppTagTone.danger,
-                          style: AppTextStyles.bodyXs.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                    ],
-                  ),
-                  for (
-                    int i = 0;
-                    i < round.question.question.options.length;
-                    i++
-                  )
-                    _ReviewOption(
-                      option: round.question.question.options[i],
-                      letter: String.fromCharCode(65 + i),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 44),
+                    child: _AnswerTags(
+                      question: round.question,
                       mine: mine,
                       theirs: theirs,
-                      correctOptionId: round.question.correctOptionId,
                       opponentNickname: opponentNickname,
+                      isPro: isPro,
+                      completed: round.completed,
                     ),
-                  _Breakdown(answer: mine, overtime: round.isOvertime),
+                  ),
                   if (explanation != null)
-                    Text(
-                      explanation,
-                      style: AppTextStyles.bodyLg.copyWith(
-                        height: 24 / 15,
-                        color: AppColors.inkSoft,
+                    Padding(
+                      padding: const EdgeInsets.only(left: 44),
+                      child: Text(
+                        explanation,
+                        style: AppTextStyles.bodyLg.copyWith(
+                          height: 24 / 15,
+                          color: AppColors.inkSoft,
+                        ),
                       ),
                     ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: isReported
-                        ? Text(
-                            'Reported — thanks.',
-                            style: AppTextStyles.bodySm.copyWith(
-                              color: AppColors.success,
+                  if (!isPro) const Skeleton.ignore(child: _ProLockBar()),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 44),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: isReported
+                          ? Text(
+                              'Reported — thanks.',
+                              style: AppTextStyles.bodySm.copyWith(
+                                color: AppColors.success,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          : AppTextLink(
+                              label: 'Report a problem with this question',
+                              style: AppTextStyles.bodySm.copyWith(
+                                color: AppColors.muted,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              onPressed: onReport,
                             ),
-                          )
-                        : AppTextLink(
-                            label: 'Report a problem with this question',
-                            style: AppTextStyles.bodySm.copyWith(
-                              color: AppColors.muted,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            onPressed: onReport,
-                          ),
+                    ),
                   ),
                 ],
               ),
@@ -360,19 +368,19 @@ final class _RoundSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final TextStyle points = AppTextStyles.monoBodyMd;
     final RoundAnswerEntity? mine = this.mine;
     final RoundAnswerEntity? theirs = this.theirs;
+    final bool overtime = round.isOvertime;
     return Row(
       spacing: 16,
       children: <Widget>[
         SizedBox(
           width: 28,
           child: Text(
-            round.isOvertime ? 'OT' : round.number.toString().padLeft(2, '0'),
+            overtime ? 'OT' : _roundNumber(round),
             style: AppTextStyles.monoBodySm.copyWith(
               fontWeight: FontWeight.w600,
-              color: round.isOvertime ? AppColors.accentText : AppColors.muted,
+              color: overtime ? AppColors.accentDeep : AppColors.muted,
             ),
           ),
         ),
@@ -386,140 +394,170 @@ final class _RoundSummary extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        SizedBox(
-          width: 84,
-          child: Text(
-            mine == null ? '—' : '+${mine.points}',
-            style: points.copyWith(
-              color: (mine?.correct ?? false)
-                  ? AppColors.success
-                  : AppColors.faint,
-            ),
-            textAlign: TextAlign.right,
-          ),
+        _Points(
+          answer: mine,
+          isOvertime: overtime,
+          earnedColor: AppColors.success,
         ),
-        SizedBox(
-          width: 84,
-          child: Text(
-            theirs == null ? '—' : '+${theirs.points}',
-            style: points.copyWith(
-              color: (theirs?.correct ?? false)
-                  ? AppColors.ink
-                  : AppColors.faint,
-            ),
-            textAlign: TextAlign.right,
-          ),
+        _Points(
+          answer: theirs,
+          isOvertime: overtime,
+          earnedColor: AppColors.ink,
         ),
       ],
     );
   }
 }
 
-final class _ReviewOption extends StatelessWidget {
-  const _ReviewOption({
-    required this.option,
-    required this.letter,
-    required this.mine,
-    required this.theirs,
-    required this.correctOptionId,
-    required this.opponentNickname,
+/// One 84 px points column: earned points in color, nothing earned faint.
+final class _Points extends StatelessWidget {
+  const _Points({
+    required this.answer,
+    required this.isOvertime,
+    required this.earnedColor,
   });
 
-  final QuestionOptionEntity option;
-  final String letter;
-  final RoundAnswerEntity? mine;
-  final RoundAnswerEntity? theirs;
-  final String? correctOptionId;
-  final String opponentNickname;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isMine = mine?.selectedOptionId == option.id;
-    final bool isTheirs = theirs?.selectedOptionId == option.id;
-    final bool isCorrect =
-        correctOptionId == option.id || (isMine && (mine?.correct ?? false));
-    final Color tone = isCorrect
-        ? AppColors.success
-        : isMine
-        ? AppColors.danger
-        : AppColors.ink;
-    final List<String> notes = <String>[
-      if (isCorrect && correctOptionId == option.id) 'Correct',
-      if (isMine) 'Your answer',
-      if (isTheirs) opponentNickname,
-    ];
-    return Row(
-      spacing: 12,
-      children: <Widget>[
-        Container(
-          width: 28,
-          height: 28,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: isCorrect
-                ? AppColors.successSurface
-                : isMine
-                ? AppColors.dangerSurface
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Text(
-            letter,
-            style: AppTextStyles.monoBodySm.copyWith(
-              color: tone,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            option.text,
-            style: AppTextStyles.bodyMd.copyWith(
-              color: tone,
-              fontWeight: isMine || isCorrect
-                  ? FontWeight.w600
-                  : FontWeight.w400,
-            ),
-          ),
-        ),
-        if (notes.isNotEmpty)
-          Text(
-            notes.join(' · '),
-            style: AppTextStyles.bodyXs.copyWith(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-final class _Breakdown extends StatelessWidget {
-  const _Breakdown({required this.answer, required this.overtime});
-
   final RoundAnswerEntity? answer;
-  final bool overtime;
+  final bool isOvertime;
+  final Color earnedColor;
 
   @override
   Widget build(BuildContext context) {
     final RoundAnswerEntity? answer = this.answer;
-    final String text = switch (answer) {
-      null => 'Not answered.',
-      RoundAnswerEntity(timedOut: true) => "Time's up — no answer.",
-      RoundAnswerEntity(correct: false) =>
-        'Wrong · answered in ${DisplayFormatters.seconds(answer.elapsed)}',
-      _ when overtime =>
-        'Correct in ${DisplayFormatters.seconds(answer.elapsed)}'
-            '${answer.tieBreakPoints > 0 ? ' · won the tie-break (+1)' : ''}',
-      _ =>
-        '+${answer.points} = ${answer.basePoints} base + ${answer.speedBonus} '
-            'speed + ${answer.streakBonus} streak · '
-            '${DisplayFormatters.seconds(answer.elapsed)}',
-    };
-    return Text(
-      text,
-      style: AppTextStyles.monoBodySm.copyWith(color: AppColors.muted),
+    final int points = answer == null
+        ? 0
+        : isOvertime
+        ? answer.tieBreakPoints
+        : answer.points;
+    final Color color = points <= 0
+        ? AppColors.faint
+        : isOvertime
+        ? AppColors.accentDeep
+        : earnedColor;
+    return SizedBox(
+      width: 84,
+      child: Text(
+        answer == null ? '—' : DisplayFormatters.points(points),
+        style: AppTextStyles.monoBodyMd.copyWith(color: color),
+        textAlign: TextAlign.right,
+      ),
+    );
+  }
+}
+
+/// "Correct: B · $66.00", "You: B · $60.00 · incorrect", "timur.b: correct".
+/// Free readers get only their own choice and both players' correctness.
+final class _AnswerTags extends StatelessWidget {
+  const _AnswerTags({
+    required this.question,
+    required this.mine,
+    required this.theirs,
+    required this.opponentNickname,
+    required this.isPro,
+    required this.completed,
+  });
+
+  final ReviewQuestionEntity question;
+  final RoundAnswerEntity? mine;
+  final RoundAnswerEntity? theirs;
+  final String opponentNickname;
+  final bool isPro;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) {
+    final RoundAnswerEntity? mine = this.mine;
+    final RoundAnswerEntity? theirs = this.theirs;
+    final String? correct = isPro
+        ? _optionLabel(question, question.correctOptionId)
+        : null;
+    final String? myPick = _optionLabel(question, mine?.selectedOptionId);
+    final String? theirPick = _optionLabel(question, theirs?.selectedOptionId);
+    final bool myCorrect = mine?.correct ?? false;
+    final bool theirCorrect = theirs?.correct ?? false;
+    final List<(String, bool)> tags = <(String, bool)>[
+      if (correct != null) ('Correct: $correct', true),
+      if (correct == null || !myCorrect)
+        (
+          myPick == null
+              ? 'You: no answer'
+              : correct != null
+              ? 'You: $myPick'
+              : 'You: $myPick · ${myCorrect ? 'correct' : 'incorrect'}',
+          myCorrect,
+        ),
+      if (theirs != null)
+        (
+          theirCorrect || theirPick == null
+              ? '$opponentNickname: '
+                    '${theirs.timedOut
+                        ? 'no answer'
+                        : theirCorrect
+                        ? 'correct'
+                        : 'incorrect'}'
+              : '$opponentNickname: $theirPick',
+          theirCorrect,
+        ),
+      if (!completed) ('Not finished', false),
+    ];
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        for (final (String label, bool good) in tags)
+          AppTag(
+            label: label,
+            tone: good ? AppTagTone.success : AppTagTone.danger,
+            foregroundColor: good ? null : AppColors.dangerText,
+            style: AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w500),
+          ),
+      ],
+    );
+  }
+}
+
+/// Free: the grey bar that sells the correct answer and explanation.
+final class _ProLockBar extends StatelessWidget {
+  const _ProLockBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          spacing: 10,
+          children: <Widget>[
+            const AppSvgIcon(
+              AppIcons.lock,
+              width: 14,
+              height: 14,
+              color: AppColors.muted,
+            ),
+            Expanded(
+              child: Text(
+                'Correct answer, explanation and similar practice are in Pro.',
+                style: AppTextStyles.bodySm.copyWith(
+                  height: 18 / 13,
+                  color: AppColors.inkSoft,
+                ),
+              ),
+            ),
+            AppTextLink(
+              label: 'Unlock',
+              style: AppTextStyles.bodySm.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppColors.accentDeep,
+              ),
+              onPressed: context.goPro,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

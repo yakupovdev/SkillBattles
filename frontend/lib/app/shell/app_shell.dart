@@ -17,7 +17,8 @@ final class AppShell extends StatelessWidget {
 
   /// Tab highlighted for the route [name] (a `GoRoute.name`).
   static AppNavTab? tabFor(String? name) {
-    if (name == AppRoutes.profile.name) return AppNavTab.profile;
+    if (name == AppRoutes.profile.name) return AppNavTab.stats;
+    if (name == AppRoutes.history.name) return AppNavTab.history;
     if (name == AppRoutes.leaderboard.name) return AppNavTab.leaderboard;
     if (name == AppRoutes.home.name ||
         name == AppRoutes.rankedSearch.name ||
@@ -64,7 +65,8 @@ final class AppShell extends StatelessWidget {
                 switch (tab) {
                   AppNavTab.play => AppRoutes.home,
                   AppNavTab.leaderboard => AppRoutes.leaderboard,
-                  AppNavTab.profile => AppRoutes.profile,
+                  AppNavTab.stats => AppRoutes.profile,
+                  AppNavTab.history => AppRoutes.history,
                 }.name,
               ),
             ),

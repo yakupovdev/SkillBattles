@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -10,7 +12,6 @@ import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart
 import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/presentation/extensions/play_failure_message.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
-import 'package:skill_battles/core/presentation/widgets/app_countdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
@@ -18,6 +19,7 @@ import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_entry_entity.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_status.dart';
 import 'package:skill_battles/features/matchmaking/domain/usecases/cancel_queue_entry_usecase.dart';
@@ -48,6 +50,7 @@ final class RankedSearchScreen extends StatelessWidget
             cancelEntry: dependencies.getDep<CancelQueueEntryUsecase>(),
             watchEntry: dependencies.getDep<WatchQueueEntryUsecase>(),
             watchConnection: dependencies.getDep<WatchConnectionUsecase>(),
+            getStatistics: dependencies.getDep<GetStatisticsUsecase>(),
           )..add(
             RankedSearchStarted(
               disciplineCode: disciplineCode,
@@ -144,65 +147,72 @@ final class _Searching extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final QueueEntryEntity? entry = state.entry;
-    final TextStyle muted = AppTextStyles.bodyMd.copyWith(
-      color: AppColors.muted,
-    );
     final bool matched = state.status == RankedSearchStatus.matched;
     final Failure? cancelFailure = state.cancelFailure;
     return Column(
-      spacing: 28,
+      spacing: 32,
       children: <Widget>[
-        _SearchRings(
-          label: entry == null
-              ? null
-              : matched
-              ? 'Go!'
-              : null,
-          since: entry?.createdAt,
+        _SearchRings(label: matched ? 'Go!' : null, since: entry?.createdAt),
+        Column(
+          spacing: 20,
+          children: <Widget>[
+            if (entry != null && !matched)
+              _RatingRange(window: entry.ratingWindow, rating: state.rating)
+            else
+              Text(
+                matched ? 'Opening the ready check…' : 'Joining the queue…',
+                style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
+              ),
+            if (cancelFailure != null)
+              AppInlineError(cancelFailure.userMessage),
+            if (!matched)
+              AppButton(
+                label: state.cancelStatus.isLoading
+                    ? 'Cancelling…'
+                    : 'Cancel search',
+                variant: AppButtonVariant.outline,
+                size: AppButtonSize.medium,
+                onPressed: state.cancelStatus.isLoading
+                    ? null
+                    : () => context.read<RankedSearchBloc>().add(
+                        const RankedSearchCancelRequested(),
+                      ),
+              ),
+          ],
         ),
-        if (entry != null && !matched)
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              Text('Rating window', style: muted),
-              AppTag(
-                label: '± ${entry.ratingWindow}',
-                tone: AppTagTone.neutral,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                style: AppTextStyles.monoBodyMd,
-              ),
-              Text('· widens while you wait · gives up in', style: muted),
-              AppCountdownText(
-                target: entry.expiresAt,
-                style: AppTextStyles.monoBodyMd,
-              ),
-            ],
-          )
-        else
-          Text(
-            matched ? 'Opening the ready check…' : 'Joining the queue…',
-            style: muted,
-          ),
-        if (cancelFailure != null) AppInlineError(cancelFailure.userMessage),
-        if (!matched)
-          AppButton(
-            label: state.cancelStatus.isLoading
-                ? 'Cancelling…'
-                : 'Cancel search',
-            variant: AppButtonVariant.outline,
-            size: AppButtonSize.medium,
-            onPressed: state.cancelStatus.isLoading
-                ? null
-                : () => context.read<RankedSearchBloc>().add(
-                    const RankedSearchCancelRequested(),
-                  ),
-          ),
+      ],
+    );
+  }
+}
+
+/// "Rating range [984 – 1384] · widening while you wait"; "± 200" until the
+/// own rating is known.
+final class _RatingRange extends StatelessWidget {
+  const _RatingRange({required this.window, required this.rating});
+
+  final int window;
+  final int? rating;
+
+  @override
+  Widget build(BuildContext context) {
+    final int? rating = this.rating;
+    final TextStyle muted = AppTextStyles.bodyMd.copyWith(
+      color: AppColors.muted,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 8,
+      children: <Widget>[
+        Text(rating == null ? 'Rating window' : 'Rating range', style: muted),
+        AppTag(
+          label: rating == null
+              ? '± $window'
+              : '${math.max(0, rating - window)} – ${rating + window}',
+          tone: AppTagTone.neutral,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          style: AppTextStyles.monoBodyMd,
+        ),
+        Text('· widening while you wait', style: muted),
       ],
     );
   }

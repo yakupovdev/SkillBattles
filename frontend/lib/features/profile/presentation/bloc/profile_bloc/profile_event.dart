@@ -24,15 +24,3 @@ final class ProfileDisciplineSelected extends ProfileEvent {
   @override
   List<Object?> get props => <Object?>[code];
 }
-
-/// A new history page or filter.
-final class ProfileHistoryChanged extends ProfileEvent {
-  const ProfileHistoryChanged({this.page = 0, this.mode, this.disciplineCode});
-
-  final int page;
-  final BattleMode? mode;
-  final String? disciplineCode;
-
-  @override
-  List<Object?> get props => <Object?>[page, mode, disciplineCode];
-}

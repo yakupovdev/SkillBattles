@@ -10,6 +10,7 @@ final class RankedSearchState extends Equatable {
     this.failure,
     this.cancelStatus = LoadStatus.initial,
     this.cancelFailure,
+    this.statistics,
   });
 
   final RankedSearchStatus status;
@@ -20,6 +21,15 @@ final class RankedSearchState extends Equatable {
   final Failure? failure;
   final LoadStatus cancelStatus;
   final Failure? cancelFailure;
+
+  /// Own ratings; `null` until loaded or when they could not be loaded.
+  final StatisticsEntity? statistics;
+
+  /// Own rating in the searched discipline, when known.
+  int? get rating {
+    final String? code = entry?.disciplineCode ?? disciplineCode;
+    return code == null ? null : statistics?.forDiscipline(code)?.rating;
+  }
 
   bool get isOver =>
       status == RankedSearchStatus.matched ||
@@ -35,6 +45,7 @@ final class RankedSearchState extends Equatable {
     Failure? failure,
     LoadStatus? cancelStatus,
     Failure? cancelFailure,
+    StatisticsEntity? statistics,
     bool resetFailure = false,
   }) {
     return RankedSearchState(
@@ -44,6 +55,7 @@ final class RankedSearchState extends Equatable {
       failure: resetFailure ? null : failure ?? this.failure,
       cancelStatus: cancelStatus ?? this.cancelStatus,
       cancelFailure: cancelFailure ?? this.cancelFailure,
+      statistics: statistics ?? this.statistics,
     );
   }
 
@@ -55,5 +67,6 @@ final class RankedSearchState extends Equatable {
     failure,
     cancelStatus,
     cancelFailure,
+    statistics,
   ];
 }

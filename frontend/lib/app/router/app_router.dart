@@ -10,6 +10,7 @@ import 'package:skill_battles/features/auth/presentation/screens/forgot_password
 import 'package:skill_battles/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:skill_battles/features/battle/presentation/screens/battle_screen.dart';
 import 'package:skill_battles/features/battle_result/presentation/screens/battle_result_screen.dart';
+import 'package:skill_battles/features/history/presentation/screens/history_screen.dart';
 import 'package:skill_battles/features/home/presentation/screens/home_screen.dart';
 import 'package:skill_battles/features/leaderboard/presentation/screens/leaderboard_screen.dart';
 import 'package:skill_battles/features/matchmaking/presentation/screens/ranked_search_screen.dart';
@@ -107,6 +108,11 @@ GoRouter createAppRouter({
             wrappedBuilder: (_, GoRouterState state) => LeaderboardScreen(
               disciplineCode: _query(state, AppRoutes.disciplineParam),
             ),
+          ),
+          GoRouteExtension.wrappedRoute(
+            name: AppRoutes.history.name,
+            path: AppRoutes.history.path,
+            wrappedBuilder: (_, _) => const HistoryScreen(),
           ),
           GoRouteExtension.wrappedRoute(
             name: AppRoutes.pro.name,

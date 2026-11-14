@@ -40,7 +40,7 @@ final class BattleResultSummary extends StatelessWidget {
         me.score < opponent.score;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 32,
+      spacing: 36,
       children: <Widget>[
         _Headline(result: result, disciplineName: disciplineName),
         if (wonOnFewerPoints)
@@ -50,13 +50,18 @@ final class BattleResultSummary extends StatelessWidget {
                 'played.',
           ),
         _ScoreRow(me: me, opponent: opponent),
-        _RatingRow(result: result, me: me, disciplineName: disciplineName),
+        if (result.mode == BattleMode.ranked)
+          _RatingRow(result: result, me: me, disciplineName: disciplineName)
+        else
+          _PrivateNote(result: result),
         if (result.mode == BattleMode.private)
           RematchPanel(
             myUserId: result.myUserId,
             opponentNickname: opponent.nickname,
-          ),
-        _Actions(result: result),
+            disciplineCode: result.disciplineCode,
+          )
+        else
+          _Actions(result: result),
       ],
     );
   }
@@ -97,18 +102,6 @@ final class _Headline extends StatelessWidget {
             title,
             style: AppTextStyles.displayXl.copyWith(color: color),
           ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            if (result.overtimePlayed)
-              const AppTag(label: 'Overtime played', tone: AppTagTone.neutral),
-            AppTag(
-              label: DisplayFormatters.dateTime(result.finishedAt),
-              tone: AppTagTone.neutral,
-            ),
-          ],
         ),
       ],
     );
@@ -201,15 +194,11 @@ final class _PlayerScore extends StatelessWidget {
           ],
         ),
         Text(
-          '${player.score}',
+          DisplayFormatters.grouped(player.score),
           style: AppTextStyles.monoXl.copyWith(
             fontWeight: FontWeight.w600,
             color: color,
           ),
-        ),
-        Text(
-          '${player.correctCount} correct',
-          style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
         ),
       ],
     );
@@ -229,18 +218,13 @@ final class _RatingRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool ranked = result.mode == BattleMode.ranked && me.kFactor > 0;
+    final bool ranked = me.kFactor > 0;
     final int delta = me.ratingDelta;
-    final String? season = result.seasonId;
-    final String kLine = !ranked
-        ? 'Private duels never change your rating.'
-        : <String>[
-            'K ${me.kFactor}',
-            if (me.calibrationMatchesRemaining > 0)
-              'Calibration ×2 Elo · ${me.calibrationMatchesRemaining} '
-                  '${me.calibrationMatchesRemaining == 1 ? 'match' : 'matches'} left',
-            if (season != null) 'Season $season',
-          ].join(' · ');
+    final int calibration = me.calibrationMatchesRemaining;
+    final String? note = calibration > 0
+        ? 'Calibration ×2 Elo · $calibration '
+              '${calibration == 1 ? 'match' : 'matches'} left'
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 8,
@@ -319,10 +303,12 @@ final class _RatingRow extends StatelessWidget {
             ),
           ],
         ),
-        Text(
-          kLine,
-          style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
-        ),
+        if (result.overtimePlayed) _TieBreakLine(result: result),
+        if (note != null)
+          Text(
+            note,
+            style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
+          ),
       ],
     );
   }
@@ -340,17 +326,75 @@ final class _Actions extends StatelessWidget {
       runSpacing: 12,
       children: <Widget>[
         AppButton(
-          label: result.mode == BattleMode.ranked
-              ? 'Play ranked again'
-              : 'New private duel',
-          onPressed: () => result.mode == BattleMode.ranked
-              ? context.goRankedSearch(disciplineCode: result.disciplineCode)
-              : context.goPrivateDuel(disciplineCode: result.disciplineCode),
+          label: 'Play again',
+          onPressed: () =>
+              context.goRankedSearch(disciplineCode: result.disciplineCode),
         ),
         AppButton(
           label: 'Back to home',
           variant: AppButtonVariant.outline,
           onPressed: context.goHome,
+        ),
+      ],
+    );
+  }
+}
+
+/// Private duel: the overtime outcome and that ratings stay as they were
+/// (Paper: "18 Result — Private, Overtime, Rematch").
+final class _PrivateNote extends StatelessWidget {
+  const _PrivateNote({required this.result});
+
+  final BattleResultEntity result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 8,
+      children: <Widget>[
+        if (result.overtimePlayed) _TieBreakLine(result: result),
+        Text(
+          "Private duel · ratings don't change",
+          style: AppTextStyles.bodySm.copyWith(
+            color: AppColors.muted,
+            height: 18 / 13,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// "+1 TIE-BREAK  Won the sudden-death round in overtime."
+final class _TieBreakLine extends StatelessWidget {
+  const _TieBreakLine({required this.result});
+
+  final BattleResultEntity result;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool won = result.myOutcome == BattleOutcome.win;
+    final String text = switch (result.myOutcome) {
+      BattleOutcome.win => 'You won the sudden-death round in overtime.',
+      BattleOutcome.loss => 'Your opponent won the sudden-death round.',
+      _ => 'Overtime could not break the tie.',
+    };
+    return Row(
+      spacing: 10,
+      children: <Widget>[
+        if (won)
+          AppTag(
+            label: '+1 TIE-BREAK',
+            tone: AppTagTone.accent,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            style: AppTextStyles.outcome,
+          ),
+        Flexible(
+          child: Text(
+            text,
+            style: AppTextStyles.bodyMd.copyWith(height: 20 / 14),
+          ),
         ),
       ],
     );

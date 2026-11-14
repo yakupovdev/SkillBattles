@@ -12,7 +12,8 @@ import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 enum AppNavTab {
   play('Play'),
   leaderboard('Leaderboard'),
-  profile('Profile');
+  stats('Stats'),
+  history('History');
 
   const AppNavTab(this.label);
 

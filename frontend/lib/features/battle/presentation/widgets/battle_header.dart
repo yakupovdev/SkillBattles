@@ -185,7 +185,7 @@ final class _PlayerBlock extends StatelessWidget {
             ),
           )
         : null;
-    final Widget info = Flexible(
+    final Widget info = Expanded(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: isYou
@@ -215,8 +215,8 @@ final class _PlayerBlock extends StatelessWidget {
     return Row(
       spacing: 14,
       children: isYou
-          ? <Widget>[avatar, info, const Spacer(), score]
-          : <Widget>[score, const Spacer(), info, avatar],
+          ? <Widget>[avatar, info, score]
+          : <Widget>[score, info, avatar],
     );
   }
 }

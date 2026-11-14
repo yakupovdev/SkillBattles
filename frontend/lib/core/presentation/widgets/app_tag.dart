@@ -36,6 +36,7 @@ final class AppTag extends StatelessWidget {
     this.padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     this.style,
     this.leading,
+    this.foregroundColor,
     super.key,
   });
 
@@ -51,11 +52,14 @@ final class AppTag extends StatelessWidget {
   /// Optional icon before the label (6 px gap).
   final Widget? leading;
 
+  /// Replaces the tone's text color ("You: B · $60.00 · incorrect").
+  final Color? foregroundColor;
+
   @override
   Widget build(BuildContext context) {
     final TextStyle textStyle =
         (style ?? AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w600))
-            .copyWith(color: tone.foreground);
+            .copyWith(color: foregroundColor ?? tone.foreground);
     final Widget? icon = leading;
 
     return DecoratedBox(

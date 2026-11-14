@@ -187,6 +187,9 @@ final class _Review extends StatelessWidget {
             child: RoundReviewList(
               key: ValueKey<int>(review?.answerAccess.entitlementVersion ?? -1),
               review: review ?? BattleResultSkeletonData.review,
+              disciplineName: result == null
+                  ? ''
+                  : formatDisciplineCode(result.disciplineCode),
               opponentNickname: result?.opponent.nickname ?? '',
               opponentId:
                   result?.opponent.id ??
