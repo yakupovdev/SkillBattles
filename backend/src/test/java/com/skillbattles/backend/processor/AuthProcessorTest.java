@@ -17,7 +17,23 @@ class AuthProcessorTest {
     @Mock UserService users;
     @Mock RefreshTokenService refreshTokens;
     @Mock TokenService tokens;
+    @Mock RatingService ratings;
     @InjectMocks AuthProcessorImpl processor;
+
+    @Test
+    void registrationInitializesRatingsBeforeIssuingTokens() {
+        RegisterDto registration = new RegisterDto();
+        UserDto user = new UserDto();
+        UUID id = UUID.randomUUID();
+        user.setId(id);
+        when(users.register(registration)).thenReturn(user);
+        when(tokens.issue(id)).thenReturn(new TokenPairDto("access", "refresh", 900, 604800, Instant.MAX));
+        processor.register(registration);
+        InOrder order = inOrder(users, ratings, tokens);
+        order.verify(users).register(registration);
+        order.verify(ratings).initialize(id);
+        order.verify(tokens).issue(id);
+    }
 
     @Test
     void refreshConsumesOldHashBeforeIssuingNewPair() {

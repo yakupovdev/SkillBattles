@@ -1,0 +1,198 @@
+[
+  {
+    "externalKey": "test-math-1",
+    "contentVersion": 1,
+    "subject": "MATH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: MATH question 1. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-math-2",
+    "contentVersion": 1,
+    "subject": "MATH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: MATH question 2. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-math-3",
+    "contentVersion": 1,
+    "subject": "MATH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: MATH question 3. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-english-1",
+    "contentVersion": 1,
+    "subject": "ENGLISH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: ENGLISH question 1. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-english-2",
+    "contentVersion": 1,
+    "subject": "ENGLISH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: ENGLISH question 2. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-english-3",
+    "contentVersion": 1,
+    "subject": "ENGLISH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: ENGLISH question 3. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  },
+  {
+    "externalKey": "test-english-4",
+    "contentVersion": 1,
+    "subject": "ENGLISH",
+    "topic": "Test fixture only",
+    "difficulty": "MEDIUM",
+    "prompt": "TEST ONLY: ENGLISH question 4. Not reviewed production content.",
+    "options": [
+      {
+        "key": "A",
+        "text": "TEST ONLY: option A"
+      },
+      {
+        "key": "B",
+        "text": "TEST ONLY: option B"
+      },
+      {
+        "key": "C",
+        "text": "TEST ONLY: option C"
+      },
+      {
+        "key": "D",
+        "text": "TEST ONLY: option D"
+      }
+    ],
+    "correctOptionKey": "A",
+    "explanation": "TEST ONLY: A is the fixture answer."
+  }
+]

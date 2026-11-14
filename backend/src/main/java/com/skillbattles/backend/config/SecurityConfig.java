@@ -3,6 +3,7 @@ package com.skillbattles.backend.config;
 import com.skillbattles.backend.handler.SecurityErrorHandler;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,6 +25,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain refreshChain(HttpSecurity http, SecurityErrorHandler errors) throws Exception {
         // These endpoints validate refresh JWT themselves, without the access-token filter.
         http.securityMatcher(new OrRequestMatcher(
@@ -35,6 +37,7 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain apiChain(HttpSecurity http, SecurityErrorHandler errors,
             @Qualifier("accessJwtDecoder") JwtDecoder decoder) throws Exception {
         common(http, errors);

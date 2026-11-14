@@ -14,9 +14,14 @@ public class AuthProcessorImpl implements AuthProcessor {
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
     private final TokenService tokenService;
+    private final RatingService ratingService;
 
     @Override
-    public AuthDto register(RegisterDto dto) { return issue(userService.register(dto)); }
+    public AuthDto register(RegisterDto dto) {
+        UserDto user = userService.register(dto);
+        ratingService.initialize(user.getId());
+        return issue(user);
+    }
 
     @Override
     public AuthDto login(LoginDto dto) { return issue(userService.authenticate(dto)); }

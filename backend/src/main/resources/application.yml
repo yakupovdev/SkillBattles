@@ -13,6 +13,7 @@ spring:
       ddl-auto: validate
     properties:
       hibernate.jdbc.time_zone: UTC
+      hibernate.type.java_time_use_direct_jdbc: true
   flyway:
     enabled: true
   jackson:
@@ -30,6 +31,16 @@ server:
     include-message: never
     include-stacktrace: never
 app:
+  battle:
+    math:
+      question-count: ${MATH_QUESTION_COUNT:3}
+      question-limit-seconds: ${MATH_QUESTION_LIMIT_SECONDS:95}
+    english:
+      question-count: ${ENGLISH_QUESTION_COUNT:4}
+      question-limit-seconds: ${ENGLISH_QUESTION_LIMIT_SECONDS:70}
+    ready-timeout-seconds: ${READY_TIMEOUT_SECONDS:30}
+    countdown-seconds: ${COUNTDOWN_SECONDS:3}
+    reveal-seconds: ${REVEAL_SECONDS:5}
   jwt:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:skillbattles}

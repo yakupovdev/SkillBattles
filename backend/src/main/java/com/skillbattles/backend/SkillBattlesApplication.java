@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class SkillBattlesApplication {
     public static void main(String[] args) {
-        SpringApplication.run(SkillBattlesApplication.class, args);
+        var context = SpringApplication.run(SkillBattlesApplication.class, args);
+        if (context.getEnvironment().matchesProfiles("question-import")) context.close();
     }
 }
