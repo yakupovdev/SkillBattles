@@ -62,8 +62,9 @@ class RealtimePostgresTest {
     private final List<NativeStompClient> clients = new ArrayList<>();
 
     @BeforeEach void setup() throws Exception {
+        uniformTiming(jdbc, 60);
         clock.set(START);
-        jdbc.execute("TRUNCATE battles, questions");
+        jdbc.execute("TRUNCATE ranked_usage, battles, questions");
         questions.importQuestions(files.read(Path.of(Objects.requireNonNull(getClass().getResource("/fixtures/stage2-questions-test-only.json")).toURI())), false);
     }
     @AfterEach void cleanup() throws Exception {
@@ -75,7 +76,7 @@ class RealtimePostgresTest {
 
     @Test void realConnectAndSubscribeEstablishPresenceAndReadiness() throws Exception {
         AuthDto first = register(), second = register();
-        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), Subject.MATH, BattleMode.RANKED));
+        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), "SAT_MATH", BattleMode.RANKED));
         NativeStompClient a = connect(first, false);
         assertThat(sessions.current(first.getUser().getId())).isEmpty();
         rest("POST", "/api/v1/battles/" + id + "/readiness", first, Map.of("ready", true), 409);
@@ -83,13 +84,13 @@ class RealtimePostgresTest {
         online(first);
         NativeStompClient b = connect(second, true);
         rest("POST", "/api/v1/battles/" + id + "/readiness", first, Map.of("ready", true), 200);
-        JsonNode event = b.event(item -> item.path("data").path("players").get(0).path("ready").asBoolean());
+        JsonNode event = b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("data").path("players").get(0).path("ready").asBoolean());
         assertThat(event.path("type").asText()).isEqualTo("BATTLE_CHANGED");
         assertThat(event.path("resourceId").asText()).isEqualTo(id.toString());
         assertThat(event.path("version").asInt()).isEqualTo(event.path("data").path("version").asInt());
         assertThat(UUID.fromString(event.path("eventId").asText())).isNotNull();
         rest("POST", "/api/v1/battles/" + id + "/readiness", second, Map.of("ready", true), 200);
-        a.event(item -> "COUNTDOWN".equals(item.path("data").path("phase").asText()));
+        a.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "COUNTDOWN".equals(item.path("data").path("phase").asText()));
     }
 
     @Test void invalidRefreshAndMissingJwtReturnUniformErrorAndCloseRealSocket() throws Exception {
@@ -111,7 +112,7 @@ class RealtimePostgresTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/queue/events", "/queue/events-user-other", "/topic/battles", "/user/another-user/queue/events", "/user/queue/other", "/app/answers"})
+    @ValueSource(strings = {"/queue/events", "/queue/events-user-other", "/topicName/battles", "/user/another-user/queue/events", "/user/queue/other", "/app/answers"})
     void foreignAndDirectDestinationsAreRejected(String destination) throws Exception {
         var user = register();
         var client = connect(user, false);
@@ -153,10 +154,10 @@ class RealtimePostgresTest {
     @Test void privatePreStartCancellationIsDeliveredToBothPlayersWithoutRatingChange() throws Exception {
         AuthDto first = register(), second = register();
         var a = connect(first, true); var b = connect(second, true);
-        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), Subject.MATH, BattleMode.PRIVATE));
+        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), "SAT_MATH", BattleMode.PRIVATE));
         rest("POST", "/api/v1/battles/" + id + "/surrender", first, null, 200);
-        var cancellation = a.event(item -> "CANCELLED".equals(item.path("data").path("phase").asText()));
-        b.event(item -> "CANCELLED".equals(item.path("data").path("phase").asText()));
+        var cancellation = a.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "CANCELLED".equals(item.path("data").path("phase").asText()));
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "CANCELLED".equals(item.path("data").path("phase").asText()));
         assertThat(cancellation.path("data").path("result").path("reason").asText()).isEqualTo("SURRENDER");
         assertThat(processor.result(id, first.getUser().getId()).getPlayers()).allSatisfy(player -> assertThat(player.getRatingDelta()).isZero());
     }
@@ -173,8 +174,8 @@ class RealtimePostgresTest {
         JsonNode receipt = rest("POST", "/api/v1/battles/" + id + "/answers", first, answer, 200);
         assertThat(receipt.has("correct")).isFalse();
         int version = battles.lock(id).getVersion();
-        var own = a.event(item -> item.path("version").asInt() == version);
-        var opponent = b.event(item -> item.path("version").asInt() == version);
+        var own = a.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == version);
+        var opponent = b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == version);
         assertThat(own.path("data").path("round").path("mySelectedOptionId").asText()).isEqualTo(answer.getOptionId().toString());
         assertThat(opponent.path("data").path("round").path("mySelectedOptionId").isNull()).isTrue();
         assertThat(opponent.path("data").path("round").path("reveal").isNull()).isTrue();
@@ -184,9 +185,9 @@ class RealtimePostgresTest {
         assertThat(opponent.path("data").path("serverTime").isTextual()).isTrue();
         assertThat(c.hasMessage(Duration.ofMillis(200))).isFalse();
         rest("POST", "/api/v1/battles/" + id + "/answers", second, answer(state, false), 200);
-        JsonNode reveal = b.event(item -> "REVEAL".equals(item.path("data").path("phase").asText()));
+        JsonNode reveal = b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "REVEAL".equals(item.path("data").path("phase").asText()));
         assertThat(reveal.path("data").path("round").path("reveal").path("answers").size()).isEqualTo(2);
-        assertThat(reveal.path("data").path("round").path("reveal").path("correctOptionId").asText()).isEqualTo(answer.getOptionId().toString());
+        assertThat(reveal.path("data").path("round").path("reveal").path("correctOptionId").isNull()).isTrue();
         assertThat(c.hasMessage(Duration.ofMillis(200))).isFalse();
     }
 
@@ -195,8 +196,8 @@ class RealtimePostgresTest {
         var a = connect(first, true); var b = connect(second, true);
         UUID id = create(first, second);
         int initial = battles.lock(id).getVersion();
-        a.event(item -> item.path("version").asInt() == initial);
-        b.event(item -> item.path("version").asInt() == initial);
+        a.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == initial);
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == initial);
         a.drain(); b.drain();
         TransactionTemplate transaction = new TransactionTemplate(transactionManager);
         transaction.executeWithoutResult(status -> {
@@ -205,8 +206,8 @@ class RealtimePostgresTest {
             catch (Exception error) { throw new IllegalStateException(error); }
         });
         int committed = battles.lock(id).getVersion();
-        a.event(item -> item.path("version").asInt() == committed);
-        b.event(item -> item.path("version").asInt() == committed);
+        a.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == committed);
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("version").asInt() == committed);
         a.drain(); b.drain();
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
             processor.ready(id, second.getUser().getId());
@@ -230,7 +231,7 @@ class RealtimePostgresTest {
         connect(second, true);
         UUID id = create(first, second);
         rest("POST", "/api/v1/battles/" + id + "/readiness", first, Map.of("ready", true), 200);
-        replacement.event(item -> item.path("data").path("players").get(0).path("ready").asBoolean());
+        replacement.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("data").path("players").get(0).path("ready").asBoolean());
     }
 
     @Test void reconnectRestoresOwnAcceptedAnswerWithoutResettingRoundDeadline() throws Exception {
@@ -244,10 +245,10 @@ class RealtimePostgresTest {
         Instant originalDeadline = round(saved).getDeadline();
         a.close();
         await().atMost(Duration.ofSeconds(5)).until(() -> sessions.current(first.getUser().getId()).isEmpty());
-        b.event(item -> !item.path("data").path("players").get(0).path("connected").asBoolean());
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && !item.path("data").path("players").get(0).path("connected").asBoolean());
         clock.set(START.plusSeconds(10));
         var resumed = connect(first, true);
-        resumed.event(item -> item.path("data").path("players").get(0).path("connected").asBoolean());
+        resumed.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("data").path("players").get(0).path("connected").asBoolean());
         JsonNode snapshot = rest("GET", "/api/v1/battles/" + id, first, null, 200);
         assertThat(snapshot.path("round").path("deadline").asText()).isEqualTo(originalDeadline.toString());
         assertThat(snapshot.path("round").path("mySelectedOptionId").asText()).isEqualTo(answer.getOptionId().toString());
@@ -263,15 +264,16 @@ class RealtimePostgresTest {
         clock.set(START.plusSeconds(4));
         a.close();
         await().atMost(Duration.ofSeconds(5)).until(() -> sessions.current(first.getUser().getId()).isEmpty());
-        b.event(item -> !item.path("data").path("players").get(0).path("connected").asBoolean());
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && !item.path("data").path("players").get(0).path("connected").asBoolean());
         clock.set(START.plusSeconds(34));
         processor.tick(id);
         var result = processor.result(id, first.getUser().getId());
         assertThat(result.getReason()).isEqualTo(CompletionReason.DISCONNECT);
-        assertThat(result.getPlayers().getFirst().getRatingDelta()).isEqualTo(-16);
-        b.event(item -> "FINISHED".equals(item.path("data").path("phase").asText()));
+        assertThat(result.getPlayers().getFirst().getRatingDelta()).isEqualTo(-32);
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "FINISHED".equals(item.path("data").path("phase").asText()));
         processor.tick(id); processor.tick(id);
-        assertThat(jdbc.queryForObject("select rating from ratings where user_id = ? and subject = 'MATH'", Integer.class, first.getUser().getId())).isEqualTo(984);
+        assertThat(jdbc.queryForObject("select rating from ratings where user_id = ? and discipline_code = 'SAT_MATH'", Integer.class, first.getUser().getId())).isEqualTo(968);
+        assertThat(jdbc.queryForObject("select calibration_completed_matches from ratings where user_id=? and discipline_code='SAT_MATH'",Integer.class,first.getUser().getId())).isEqualTo(1);
     }
 
     @Test void accessExpiryClosesRealSocketAndRestRefreshAllowsNewConnection() throws Exception {
@@ -309,7 +311,7 @@ class RealtimePostgresTest {
         UUID id = create(first, second); start(id, first, second);
         clock.set(START.plusSeconds(4)); a.close();
         await().atMost(Duration.ofSeconds(5)).until(() -> sessions.current(first.getUser().getId()).isEmpty());
-        b.event(item -> !item.path("data").path("players").get(0).path("connected").asBoolean());
+        b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && !item.path("data").path("players").get(0).path("connected").asBoolean());
         clock.set(START.plusSeconds(10));
         var claims = JwtClaimsSet.builder().issuer(jwtProperties.getIssuer()).subject(first.getUser().getId().toString())
                 .audience(List.of("skillbattles-access")).issuedAt(START.plusSeconds(10)).expiresAt(START.plusSeconds(15))
@@ -317,7 +319,7 @@ class RealtimePostgresTest {
         var resumed = open();
         resumed.connect(encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue());
         resumed.await("CONNECTED"); resumed.startHeartbeats(); resumed.subscribe("/user/queue/events"); online(first);
-        resumed.event(item -> item.path("data").path("players").get(0).path("connected").asBoolean());
+        resumed.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && item.path("data").path("players").get(0).path("connected").asBoolean());
         clock.set(START.plusSeconds(15));
         processor.tick(id);
         assertThat(battles.lock(id).getState().getPlayers().getFirst().getReconnectDeadline()).isEqualTo(START.plusSeconds(45));
@@ -327,7 +329,7 @@ class RealtimePostgresTest {
     }
 
     private UUID create(AuthDto first, AuthDto second) {
-        return processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), Subject.MATH, BattleMode.RANKED));
+        return processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), "SAT_MATH", BattleMode.RANKED));
     }
     private void start(UUID id, AuthDto first, AuthDto second) throws Exception {
         rest("POST", "/api/v1/battles/" + id + "/readiness", first, Map.of("ready", true), 200);

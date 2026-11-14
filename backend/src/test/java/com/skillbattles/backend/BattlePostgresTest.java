@@ -75,10 +75,11 @@ class BattlePostgresTest {
 
     @BeforeEach
     void setup() throws Exception {
+        uniformTiming(jdbc, 10);
         clock.set(START);
         presence.clear();
         events.values.clear();
-        jdbc.execute("TRUNCATE TABLE battles, questions");
+        jdbc.execute("TRUNCATE TABLE ranked_usage, battles, questions");
         questions.importQuestions(fixture(), false);
     }
 
@@ -86,8 +87,8 @@ class BattlePostgresTest {
     void freezesContentAndShowsSameQuestionOrderAndDeadlinesToBothPlayers() throws Exception {
         Match match = create(BattleMode.RANKED, true);
         BattleDto saved = battles.lock(match.id());
-        assertThat(saved.getState().getRounds()).hasSize(2);
-        assertThat(saved.getState().getRounds().stream().map(round -> round.getQuestion().getId()).distinct().count()).isEqualTo(2);
+        assertThat(saved.getState().getRounds()).hasSize(5);
+        assertThat(saved.getState().getRounds().stream().map(round -> round.getQuestion().getId()).distinct().count()).isEqualTo(5);
         UUID originalId = saved.getState().getRounds().getFirst().getQuestion().getId();
         String key = jdbc.queryForObject("select external_key from questions where id = ?", String.class, originalId);
         var revised = fixture().stream().filter(item -> item.getExternalKey().equals(key)).findFirst().orElseThrow();
@@ -188,7 +189,7 @@ class BattlePostgresTest {
         var stored = battles.lock(match.id());
         assertThat(stored.getPhase()).isEqualTo(BattlePhase.REVEAL);
         assertThat(round(stored).getAnswers()).hasSize(2);
-        assertThat(stored.getState().getPlayers().getFirst().getScore()).isEqualTo(1090);
+        assertThat(stored.getState().getPlayers().getFirst().getScore()).isEqualTo(980);
     }
 
     @Test
@@ -202,16 +203,16 @@ class BattlePostgresTest {
         var result = processor.result(match.id(), match.firstId());
         assertThat(result.getReason()).isEqualTo(CompletionReason.NORMAL);
         assertThat(result.getMyOutcome()).isEqualTo(Outcome.WIN);
-        assertThat(result.getPlayers()).extracting(BattleResultPlayerDto::getRatingDelta).containsExactly(16, -16);
-        assertRating(match.firstId(), Subject.MATH, 1016);
-        assertRating(match.secondId(), Subject.MATH, 984);
-        assertRating(match.firstId(), Subject.ENGLISH, 1000);
+        assertThat(result.getPlayers()).extracting(BattleResultPlayerDto::getRatingDelta).containsExactly(32, -32);
+        assertRating(match.firstId(), "SAT_MATH", 1032);
+        assertRating(match.secondId(), "SAT_MATH", 968);
+        assertRating(match.firstId(), "SAT_RW", 1000);
         var before = jdbc.queryForMap("select version, updated_at, result::text, settled_at from battles where id = ?", match.id());
         int eventCount = events.values.size();
         for (int i = 0; i < 3; i++) { processor.tick(match.id()); processor.surrender(match.id(), match.secondId()); }
         assertThat(jdbc.queryForMap("select version, updated_at, result::text, settled_at from battles where id = ?", match.id())).isEqualTo(before);
         assertThat(events.values).hasSize(eventCount);
-        assertThat(statistics.getForUser(match.firstId()).getSubjects().getFirst().getRanked().getWins()).isEqualTo(1);
+        assertThat(statistics.getForUser(match.firstId()).getDisciplines().getFirst().getRanked().getWins()).isEqualTo(1);
     }
 
     @Test
@@ -223,12 +224,12 @@ class BattlePostgresTest {
         doThrow(new IllegalStateException("Test-only persistence failure")).when(battles).save(any());
         assertThatThrownBy(() -> processor.surrender(match.id(), match.firstId())).isInstanceOf(IllegalStateException.class);
         assertThat(battles.lock(match.id()).getPhase()).isEqualTo(BattlePhase.QUESTION);
-        assertRating(match.firstId(), Subject.MATH, 1000);
-        assertRating(match.secondId(), Subject.MATH, 1000);
+        assertRating(match.firstId(), "SAT_MATH", 1000);
+        assertRating(match.secondId(), "SAT_MATH", 1000);
         assertThat(events.values).isEmpty();
         doCallRealMethod().when(battles).save(any());
         processor.surrender(match.id(), match.firstId());
-        assertRating(match.firstId(), Subject.MATH, 984);
+        assertRating(match.firstId(), "SAT_MATH", 968);
         assertThat(events.values).hasSize(1);
     }
 
@@ -245,7 +246,7 @@ class BattlePostgresTest {
         })).isInstanceOf(IllegalStateException.class);
         assertThat(events.values).isEmpty();
         assertThat(battles.lock(match.id()).getPhase()).isEqualTo(BattlePhase.QUESTION);
-        assertRating(match.firstId(), Subject.MATH, 1000);
+        assertRating(match.firstId(), "SAT_MATH", 1000);
     }
 
     @Test
@@ -255,18 +256,24 @@ class BattlePostgresTest {
         playToFinalReveal(draw, true);
         clock.set(round(battles.lock(draw.id())).getRevealEndsAt());
         processor.tick(draw.id());
+        assertThat(round(battles.lock(draw.id())).isOvertimeRound()).isTrue();
+        clock.set(round(battles.lock(draw.id())).getDeadline());
+        processor.tick(draw.id());
+        clock.set(round(battles.lock(draw.id())).getRevealEndsAt());
+        processor.tick(draw.id());
         assertThat(processor.result(draw.id(), draw.firstId()).getMyOutcome()).isEqualTo(Outcome.DRAW);
-        assertRating(draw.firstId(), Subject.MATH, 1000);
+        assertThat(ratings.getByUserId(draw.firstId()).stream().filter(r -> r.getDisciplineCode().equals("SAT_MATH")).findFirst().orElseThrow().getCalibrationCompletedMatches()).isEqualTo(1);
+        assertRating(draw.firstId(), "SAT_MATH", 1000);
         clock.set(START.plusSeconds(100));
         Match privateMatch = createWith(draw.first(), draw.second(), BattleMode.PRIVATE, true);
         start(privateMatch);
         processor.surrender(privateMatch.id(), privateMatch.secondId());
-        assertRating(draw.firstId(), Subject.MATH, 1000);
+        assertRating(draw.firstId(), "SAT_MATH", 1000);
         assertThat(processor.result(privateMatch.id(), privateMatch.firstId()).getPlayers())
                 .allSatisfy(player -> assertThat(player.getRatingDelta()).isZero());
         Match cancelled = createWith(draw.first(), draw.second(), BattleMode.RANKED, true);
         processor.surrender(cancelled.id(), cancelled.firstId());
-        var stats = statistics.getForUser(draw.firstId()).getSubjects().getFirst();
+        var stats = statistics.getForUser(draw.firstId()).getDisciplines().getFirst();
         assertThat(stats.getRanked().getPlayed()).isEqualTo(1);
         assertThat(stats.getRanked().getDraws()).isEqualTo(1);
         assertThat(stats.getPrivateMatches().getPlayed()).isEqualTo(1);
@@ -282,7 +289,7 @@ class BattlePostgresTest {
         start(active);
         recovery.recover();
         assertThat(processor.result(active.id(), active.firstId()).getReason()).isEqualTo(CompletionReason.SERVER_INTERRUPTION);
-        assertRating(active.firstId(), Subject.MATH, 1000);
+        assertRating(active.firstId(), "SAT_MATH", 1000);
         recovery.recover();
         assertThat(jdbc.queryForMap("select version, result::text from battles where id = ?", completed.id())).isEqualTo(frozen);
     }
@@ -344,11 +351,11 @@ class BattlePostgresTest {
         UUID a = register().getUser().getId(), b = register().getUser().getId();
         UUID other = register().getUser().getId();
         UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(30), List.of(q1), 1);
-        history(other, b, Subject.MATH, BattleMode.PRIVATE, START.minusSeconds(10), List.of(q2), 1);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(30), List.of(q1), 1);
+        history(other, b, "SAT_MATH", BattleMode.PRIVATE, START.minusSeconds(10), List.of(q2), 1);
         for (BattleMode mode : BattleMode.values()) {
-            UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, mode));
-            assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactly(q3, q1);
+            UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", mode));
+            assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactly(q3, q1);
             processor.interrupt(id);
         }
     }
@@ -357,11 +364,11 @@ class BattlePostgresTest {
     void unshownRoundsAndBattlesThatNeverStartedDoNotCountAsSeen() {
         UUID a = register().getUser().getId(), b = register().getUser().getId(), other = register().getUser().getId();
         UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(20), List.of(q1, q2), 1);
-        history(a, other, Subject.MATH, BattleMode.PRIVATE, START.minusSeconds(1), List.of(q3), 0);
-        assertThat(battles.recentQuestionShows(a, Subject.MATH, 1)).extracting(QuestionSeenDto::getQuestionId).containsExactly(q1);
-        UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.RANKED));
-        assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactlyInAnyOrder(q2, q3);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(20), List.of(q1, q2), 1);
+        history(a, other, "SAT_MATH", BattleMode.PRIVATE, START.minusSeconds(1), List.of(q3), 0);
+        assertThat(battles.recentQuestionShows(a, "SAT_MATH", 1)).extracting(QuestionSeenDto::getQuestionId).containsExactly(q1);
+        UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.RANKED));
+        assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactlyInAnyOrder(q2, q3);
     }
 
     @Test
@@ -370,17 +377,17 @@ class BattlePostgresTest {
         UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
         // Insert in reverse start order; all fixture createdAt values are identical.
         for (int i = 1; i <= 6; i++) {
-            history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(i * 100L), List.of(i == 6 ? q1 : q2), 1);
+            history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(i * 100L), List.of(i == 6 ? q1 : q2), 1);
         }
         for (int i = 1; i <= 6; i++) {
-            history(a, other, Subject.ENGLISH, BattleMode.PRIVATE, START.minusSeconds(i), List.of(questionId("test-english-1")), 1);
+            history(a, other, "SAT_RW", BattleMode.PRIVATE, START.minusSeconds(i), List.of(questionId("test-english-1")), 1);
         }
         assertThat(properties.getQuestionHistoryBattles()).isEqualTo(5);
-        assertThat(battles.recentQuestionShows(a, Subject.MATH, 5)).hasSize(5)
+        assertThat(battles.recentQuestionShows(a, "SAT_MATH", 5)).hasSize(5)
                 .extracting(QuestionSeenDto::getQuestionId).containsOnly(q2);
-        UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.RANKED));
-        assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactlyInAnyOrder(q1, q3);
-        assertThat(battles.recentQuestionShows(a, Subject.ENGLISH, 5)).hasSize(5)
+        UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.RANKED));
+        assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactlyInAnyOrder(q1, q3);
+        assertThat(battles.recentQuestionShows(a, "SAT_RW", 5)).hasSize(5)
                 .extracting(QuestionSeenDto::getQuestionId).containsOnly(questionId("test-english-1"));
     }
 
@@ -388,20 +395,20 @@ class BattlePostgresTest {
     void configuredWindowAndBothSnapshotTimestampFormatsAreHonoured() {
         UUID a = register().getUser().getId(), b = register().getUser().getId(), other = register().getUser().getId();
         UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(30), List.of(q1), 1);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(30), List.of(q1), 1);
         Instant latest = START.minusSeconds(10).plusNanos(123456000);
-        UUID recent = history(a, other, Subject.MATH, BattleMode.PRIVATE, latest, List.of(q2, q3), 2);
+        UUID recent = history(a, other, "SAT_MATH", BattleMode.PRIVATE, latest, List.of(q2, q3), 2);
         jdbc.update("update battles set state = jsonb_set(state, '{rounds,0,startedAt}', to_jsonb(CAST(? AS text))) where id = ?", latest.toString(), recent);
-        var shows = battles.recentQuestionShows(a, Subject.MATH, 1);
+        var shows = battles.recentQuestionShows(a, "SAT_MATH", 1);
         assertThat(shows).extracting(QuestionSeenDto::getQuestionId).containsExactlyInAnyOrder(q2, q3);
         assertThat(shows.stream().filter(show -> show.getQuestionId().equals(q2)).findFirst().orElseThrow().getShownAt()).isEqualTo(latest);
         try {
             properties.setQuestionHistoryBattles(1);
             clearInvocations(battles);
-            UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.RANKED));
-            assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactly(q1, q2);
-            verify(battles).recentQuestionShows(a, Subject.MATH, 1);
-            verify(battles).recentQuestionShows(b, Subject.MATH, 1);
+            UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.RANKED));
+            assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactly(q1, q2);
+            verify(battles).recentQuestionShows(a, "SAT_MATH", 1);
+            verify(battles).recentQuestionShows(b, "SAT_MATH", 1);
         } finally { properties.setQuestionHistoryBattles(5); }
     }
 
@@ -409,63 +416,63 @@ class BattlePostgresTest {
     void fallbackUsesLatestShowToEitherPlayerAndOldestQuestionFirst() {
         UUID a = register().getUser().getId(), b = register().getUser().getId(), other = register().getUser().getId();
         UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(40), List.of(q1), 1);
-        history(a, other, Subject.MATH, BattleMode.PRIVATE, START.minusSeconds(30), List.of(q2), 1);
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(20), List.of(q3), 1);
-        history(other, b, Subject.MATH, BattleMode.PRIVATE, START.minusSeconds(10), List.of(q1), 1);
-        UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.RANKED));
-        assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactly(q2, q3);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(40), List.of(q1), 1);
+        history(a, other, "SAT_MATH", BattleMode.PRIVATE, START.minusSeconds(30), List.of(q2), 1);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(20), List.of(q3), 1);
+        history(other, b, "SAT_MATH", BattleMode.PRIVATE, START.minusSeconds(10), List.of(q1), 1);
+        UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.RANKED));
+        assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactly(q2, q3);
     }
 
     @Test
     void revisionsShareHistoryEvenAfterOldRevisionWasSoftDeleted() throws Exception {
         UUID a = register().getUser().getId(), b = register().getUser().getId(), other = register().getUser().getId();
         UUID old = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(20), List.of(old), 1);
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(20), List.of(old), 1);
         var revision = fixture().stream().filter(item -> item.getExternalKey().equals("test-math-1")).findFirst().orElseThrow();
         revision.setContentVersion(2);
         questions.importQuestions(List.of(revision), false);
         jdbc.update("update questions set deleted = true where id = ?", old);
         UUID current = questionId("test-math-1");
         assertThat(current).isNotEqualTo(old);
-        var seen = battles.recentQuestionShows(a, Subject.MATH, 5);
-        assertThat(questions.selectForBattle(new QuestionSelectionDto(Subject.MATH, 2, seen)))
+        var seen = battles.recentQuestionShows(a, "SAT_MATH", 5);
+        assertThat(questions.selectForBattle(new QuestionSelectionDto("SAT_MATH", 2, seen)))
                 .extracting(FrozenQuestionDto::getId).containsExactlyInAnyOrder(q2, q3);
-        assertThat(questions.selectForBattle(new QuestionSelectionDto(Subject.MATH, 3, seen)))
+        assertThat(questions.selectForBattle(new QuestionSelectionDto("SAT_MATH", 3, seen)))
                 .extracting(FrozenQuestionDto::getId).containsExactlyInAnyOrder(current, q2, q3);
         jdbc.update("update questions set active = false where id in (?,?)", q2, q3);
-        assertThat(questions.selectForBattle(new QuestionSelectionDto(Subject.MATH, 1, seen)))
+        assertThat(questions.selectForBattle(new QuestionSelectionDto("SAT_MATH", 1, seen)))
                 .extracting(FrozenQuestionDto::getId).containsExactly(current);
-        assertThatThrownBy(() -> questions.selectForBattle(new QuestionSelectionDto(Subject.MATH, 2, seen)))
+        assertThatThrownBy(() -> questions.selectForBattle(new QuestionSelectionDto("SAT_MATH", 2, seen)))
                 .isInstanceOfSatisfying(ConflictException.class, error -> assertThat(error.getCode()).isEqualTo("CONTENT_UNAVAILABLE"));
     }
 
     @Test
     void smallBankReusesSeenQuestionsAndOnlyRealContentShortageBlocksCreation() {
         UUID a = register().getUser().getId(), b = register().getUser().getId(), other = register().getUser().getId();
-        UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2");
-        jdbc.update("update questions set active = false where external_key = 'test-math-3'");
-        history(a, other, Subject.MATH, BattleMode.RANKED, START.minusSeconds(20), List.of(q1, q2), 2);
-        history(other, b, Subject.MATH, BattleMode.PRIVATE, START.minusSeconds(10), List.of(q2, q1), 2);
-        UUID id = processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.PRIVATE));
-        assertThat(battles.lock(id).getState().getRounds()).extracting(round -> round.getQuestion().getId()).containsExactly(q2, q1);
+        UUID q1 = questionId("test-math-1"), q2 = questionId("test-math-2"), q3 = questionId("test-math-3");
+        jdbc.update("update questions set active = false where discipline_code = 'SAT_MATH' and external_key not in ('test-math-1','test-math-2','test-math-3','test-math-easy-1','test-math-easy-2','test-math-hard-1')");
+        history(a, other, "SAT_MATH", BattleMode.RANKED, START.minusSeconds(20), List.of(q1, q2, q3), 3);
+        history(other, b, "SAT_MATH", BattleMode.PRIVATE, START.minusSeconds(10), List.of(q2, q1, q3), 3);
+        UUID id = processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.PRIVATE));
+        assertThat(battles.lock(id).getState().getRounds().stream().filter(r -> r.getQuestion().getDifficulty() == Difficulty.MEDIUM).toList()).extracting(round -> round.getQuestion().getId()).containsExactly(q2, q1);
         processor.interrupt(id);
         jdbc.update("update questions set active = false where id = ?", q1);
         int before = jdbc.queryForObject("select count(*) from battles", Integer.class);
-        assertThatThrownBy(() -> processor.create(new CreateBattleDto(a, b, Subject.MATH, BattleMode.RANKED)))
+        assertThatThrownBy(() -> processor.create(new CreateBattleDto(a, b, "SAT_MATH", BattleMode.RANKED)))
                 .isInstanceOfSatisfying(ConflictException.class, error -> assertThat(error.getCode()).isEqualTo("CONTENT_UNAVAILABLE"));
         assertThat(jdbc.queryForObject("select count(*) from battles", Integer.class)).isEqualTo(before);
     }
 
-    private UUID history(UUID first, UUID second, Subject subject, BattleMode mode, Instant at, List<UUID> ids, int shown) {
+    private UUID history(UUID first, UUID second, String disciplineCode, BattleMode mode, Instant at, List<UUID> ids, int shown) {
         BattleDto battle = waiting(ids.size(), mode, 1000, 1000);
-        battle.setSubject(subject);
+        battle.setDisciplineCode(disciplineCode);
         battle.getState().getPlayers().get(0).setId(first);
         battle.getState().getPlayers().get(1).setId(second);
         for (int i = 0; i < ids.size(); i++) {
             var round = battle.getState().getRounds().get(i);
             round.getQuestion().setId(ids.get(i));
-            round.getQuestion().setSubject(subject);
+            round.getQuestion().setDisciplineCode(disciplineCode);
             if (i < shown) { round.setStartedAt(at.plusSeconds(i)); round.setDeadline(at.plusSeconds(i + 10)); }
         }
         battle.getState().setCurrentRoundIndex(shown - 1);
@@ -483,7 +490,7 @@ class BattlePostgresTest {
             presence.connect(first.getUser().getId(), clock.instant());
             presence.connect(second.getUser().getId(), clock.instant());
         }
-        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), Subject.MATH, mode));
+        UUID id = processor.create(new CreateBattleDto(first.getUser().getId(), second.getUser().getId(), "SAT_MATH", mode));
         return new Match(id, first, second);
     }
     private void start(Match match) {
@@ -493,12 +500,12 @@ class BattlePostgresTest {
         processor.tick(match.id());
     }
     private void playToFinalReveal(Match match, boolean tie) {
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 5; i++) {
             BattleDto current = battles.lock(match.id());
             clock.set(round(current).getStartedAt().plusSeconds(1));
             processor.answer(match.id(), match.firstId(), answer(current, true), clock.instant());
             processor.answer(match.id(), match.secondId(), answer(current, tie), clock.instant());
-            if (i == 0) {
+            if (i < 4) {
                 clock.set(round(battles.lock(match.id())).getRevealEndsAt());
                 processor.tick(match.id());
             }
@@ -513,8 +520,8 @@ class BattlePostgresTest {
         command.setEmail(suffix + "@example.com"); command.setNickname("Test_" + suffix); command.setPassword("ExamplePass123!");
         return auth.register(command);
     }
-    private void assertRating(UUID userId, Subject subject, int expected) {
-        assertThat(ratings.getByUserId(userId).stream().filter(item -> item.getSubject() == subject).findFirst().orElseThrow().getRating()).isEqualTo(expected);
+    private void assertRating(UUID userId, String disciplineCode, int expected) {
+        assertThat(ratings.getByUserId(userId).stream().filter(item -> item.getDisciplineCode().equals(disciplineCode)).findFirst().orElseThrow().getRating()).isEqualTo(expected);
     }
     private <T> List<T> concurrent(Callable<T> first, Callable<T> second) throws Exception {
         CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);

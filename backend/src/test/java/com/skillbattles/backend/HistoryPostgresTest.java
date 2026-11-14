@@ -59,16 +59,17 @@ class HistoryPostgresTest {
     @Autowired EntityManagerFactory entityManagerFactory;
 
     @BeforeEach void setup() throws Exception {
-        clock.set(START); presence.clear(); jdbc.execute("TRUNCATE battles, questions");
+        uniformTiming(jdbc, 10);
+        clock.set(START); presence.clear(); jdbc.execute("TRUNCATE ranked_usage, battles, questions");
         questions.importQuestions(fixture(), false);
     }
 
     @Test void historyUsesSavedCallerRelativeResultAcrossRankedPrivateCancelledAndFilters() throws Exception {
         var a = register(); var b = register(); var outsider = register();
-        UUID ranked = create(a, b, Subject.MATH, BattleMode.RANKED); start(ranked, a, b); finish(ranked, a, b, false);
-        UUID privateId = create(a, b, Subject.ENGLISH, BattleMode.PRIVATE); start(privateId, a, b); finish(privateId, a, b, true);
-        UUID cancelled = create(a, b, Subject.MATH, BattleMode.RANKED); processor.surrender(cancelled, id(a));
-        UUID active = create(a, b, Subject.MATH, BattleMode.RANKED);
+        UUID ranked = create(a, b, "SAT_MATH", BattleMode.RANKED); start(ranked, a, b); finish(ranked, a, b, false);
+        UUID privateId = create(a, b, "SAT_RW", BattleMode.PRIVATE); start(privateId, a, b); finish(privateId, a, b, true);
+        UUID cancelled = create(a, b, "SAT_MATH", BattleMode.RANKED); processor.surrender(cancelled, id(a));
+        UUID active = create(a, b, "SAT_MATH", BattleMode.RANKED);
         JsonNode history = history(a, "");
         assertThat(history.path("pagination").path("totalElements").asInt()).isEqualTo(3);
         assertThat(history.path("pagination").path("size").asInt()).isEqualTo(20);
@@ -86,14 +87,14 @@ class HistoryPostgresTest {
             assertThat(item.path("opponent").path("id")).isEqualTo(opponent.path("id"));
             assertThat(item.path("finishedAt")).isEqualTo(result.path("finishedAt"));
         }
-        assertThat(find(history.path("data"), ranked).path("ratingDelta").asInt()).isEqualTo(16);
+        assertThat(find(history.path("data"), ranked).path("ratingDelta").asInt()).isEqualTo(32);
         assertThat(find(history.path("data"), privateId).path("ratingDelta").asInt()).isZero();
         assertThat(find(history.path("data"), cancelled).path("outcome").asText()).isEqualTo("CANCELLED");
-        assertThat(history(a, "?subject=ENGLISH&mode=PRIVATE").path("data").size()).isEqualTo(1);
-        assertThat(history(a, "?subject=MATH&mode=PRIVATE").path("data").isEmpty()).isTrue();
+        assertThat(history(a, "?disciplineCode=SAT_RW&mode=PRIVATE").path("data").size()).isEqualTo(1);
+        assertThat(history(a, "?disciplineCode=SAT_MATH&mode=PRIVATE").path("data").isEmpty()).isTrue();
         assertThat(history(outsider, "").path("data").isEmpty()).isTrue();
         JsonNode stats = getJson("/api/v1/users/me/statistics", a, 200);
-        JsonNode math = stats.path("subjects").get(0), english = stats.path("subjects").get(1);
+        JsonNode math = stats.path("disciplines").get(0), english = stats.path("disciplines").get(1);
         assertThat(math.path("ranked").path("played").asInt()).isEqualTo(1);
         assertThat(math.path("ranked").path("wins").asInt()).isEqualTo(1);
         assertThat(english.path("privateMatches").path("draws").asInt()).isEqualTo(1);
@@ -103,7 +104,7 @@ class HistoryPostgresTest {
         var a = register(); var b = register();
         List<UUID> ids = new ArrayList<>();
         for (int i = 0; i < 23; i++) {
-            UUID battle = create(a, b, i % 2 == 0 ? Subject.MATH : Subject.ENGLISH, i % 3 == 0 ? BattleMode.PRIVATE : BattleMode.RANKED);
+            UUID battle = create(a, b, i % 2 == 0 ? "SAT_MATH" : "SAT_RW", i % 3 == 0 ? BattleMode.PRIVATE : BattleMode.RANKED);
             processor.surrender(battle, id(a)); ids.add(battle);
         }
         var first = history(a, ""); var second = history(a, "?page=1"); var beyond = history(a, "?page=2");
@@ -114,7 +115,7 @@ class HistoryPostgresTest {
         assertThat(joined).doesNotHaveDuplicates().containsExactlyInAnyOrderElementsOf(ids.stream().map(UUID::toString).toList());
         var ascending = history(a, "?sort=createdAt,asc&size=100").path("data").findValuesAsText("battleId");
         Collections.reverse(joined); assertThat(ascending).containsExactlyElementsOf(joined);
-        assertThat(history(a, "?subject=ENGLISH").path("pagination").path("totalElements").asInt()).isEqualTo(11);
+        assertThat(history(a, "?disciplineCode=SAT_RW").path("pagination").path("totalElements").asInt()).isEqualTo(11);
         var distant = history(a, "?page=2147483647&size=100");
         assertThat(distant.path("data").isEmpty()).isTrue();
         assertThat(distant.path("pagination").path("totalElements").asInt()).isEqualTo(23);
@@ -122,7 +123,7 @@ class HistoryPostgresTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"?page=-1", "?size=0", "?size=101", "?sort=score,desc", "?sort=createdAt", "?sort=createdAt,DESC",
-            "?page=abc", "?page=2147483648", "?subject=SAT", "?mode=SOLO", "?sort=", "?subject=", "?mode=", "?page=", "?size="})
+            "?page=abc", "?page=2147483648", "?disciplineCode=SAT", "?mode=SOLO", "?sort=", "?disciplineCode=", "?mode=", "?page=", "?size="})
     void invalidQueryValuesReturnContractValidationError(String query) throws Exception {
         var user = register();
         assertThat(getJson("/api/v1/users/me/battles" + query, user, 400).path("code").asText()).isEqualTo("VALIDATION_ERROR");
@@ -130,7 +131,7 @@ class HistoryPostgresTest {
 
     @Test void reviewOnlyShowsStartedRoundsAndAcceptedIncompleteAnswersWithoutChangingFinalScores() throws Exception {
         var a = register(); var b = register(); var outsider = register();
-        UUID battleId = create(a, b, Subject.MATH, BattleMode.RANKED); start(battleId, a, b);
+        UUID battleId = create(a, b, "SAT_MATH", BattleMode.RANKED); start(battleId, a, b);
         var first = battles.lock(battleId); Instant deadline = round(first).getDeadline();
         processor.answer(battleId, id(a), answer(first, true), clock.instant());
         clock.set(deadline); processor.tick(battleId); // One accepted answer and one real timeout.
@@ -150,7 +151,7 @@ class HistoryPostgresTest {
         assertThat(incomplete.path("completed").asBoolean()).isFalse(); assertThat(incomplete.path("answers").size()).isEqualTo(1);
         assertThat(incomplete.path("answers").get(0).path("points").asInt()).isEqualTo(1100);
         assertThat(incomplete.path("question").path("explanation").asText()).startsWith("TEST ONLY");
-        assertThat(playerResult(result(a, battleId, 200), id(a)).path("score").asInt()).isEqualTo(1100); // Incomplete round awards nothing.
+        assertThat(playerResult(result(a, battleId, 200), id(a)).path("score").asInt()).isEqualTo(1000); // Incomplete round awards nothing.
         assertThat(getJson("/api/v1/battles/" + battleId + "/review", b, 200)).isEqualTo(review);
         for (int i = 0; i < 3; i++) { result(a, battleId, 200); history(a, ""); getJson("/api/v1/battles/" + battleId + "/review", a, 200); getJson("/api/v1/users/me/statistics", a, 200); }
         assertThat(persisted(battleId)).isEqualTo(before);
@@ -161,7 +162,7 @@ class HistoryPostgresTest {
 
     @Test void cancellationReviewHasNoFutureRoundsAndReadEndpointsDoNotAdvanceOverdueBattle() throws Exception {
         var a = register(); var b = register(); var outsider = register();
-        UUID battleId = create(a, b, Subject.MATH, BattleMode.RANKED);
+        UUID battleId = create(a, b, "SAT_MATH", BattleMode.RANKED);
         var before = persisted(battleId); clock.set(START.plusSeconds(60));
         assertThat(result(a, battleId, 409).path("code").asText()).isEqualTo("BATTLE_NOT_FINISHED");
         assertThat(getJson("/api/v1/battles/" + battleId + "/review", a, 409).path("code").asText()).isEqualTo("BATTLE_NOT_FINISHED");
@@ -181,7 +182,7 @@ class HistoryPostgresTest {
 
     @Test void interruptionAfterStartKeepsIncompleteReviewAndFrozenContentSurvivesRevisionAndUserDeletion() throws Exception {
         var a = register(); var b = register();
-        UUID battleId = create(a, b, Subject.MATH, BattleMode.RANKED); start(battleId, a, b);
+        UUID battleId = create(a, b, "SAT_MATH", BattleMode.RANKED); start(battleId, a, b);
         var saved = battles.lock(battleId); var selected = round(saved).getQuestion();
         processor.answer(battleId, id(a), answer(saved, true), clock.instant()); processor.interrupt(battleId);
         JsonNode original = getJson("/api/v1/battles/" + battleId + "/review", a, 200);
@@ -205,16 +206,16 @@ class HistoryPostgresTest {
 
     @Test void historyReportsActualFlooredRatingDeltaAndDoesNotRecalculateIt() throws Exception {
         var a = register(); var b = register();
-        jdbc.update("UPDATE ratings SET rating=0 WHERE user_id IN (?,?) AND subject='MATH'", id(a), id(b));
-        UUID battleId = create(a, b, Subject.MATH, BattleMode.RANKED); start(battleId, a, b); processor.surrender(battleId, id(a));
+        jdbc.update("UPDATE ratings SET rating=0 WHERE user_id IN (?,?) AND discipline_code='SAT_MATH'", id(a), id(b));
+        UUID battleId = create(a, b, "SAT_MATH", BattleMode.RANKED); start(battleId, a, b); processor.surrender(battleId, id(a));
         assertThat(history(a, "").path("data").get(0).path("ratingDelta").asInt()).isZero();
-        assertThat(history(b, "").path("data").get(0).path("ratingDelta").asInt()).isEqualTo(16);
+        assertThat(history(b, "").path("data").get(0).path("ratingDelta").asInt()).isEqualTo(32);
         assertThat(result(a, battleId, 200).path("myOutcome").asText()).isEqualTo("LOSS");
     }
 
     @Test void historyUsesTwoQueriesForFullPageWithoutLoadingQuestionStateOrOpponentEntities() {
         var a = register(); var b = register();
-        for (int i = 0; i < 23; i++) { var battleId = create(a, b, Subject.MATH, BattleMode.PRIVATE); processor.surrender(battleId, id(a)); }
+        for (int i = 0; i < 23; i++) { var battleId = create(a, b, "SAT_MATH", BattleMode.PRIVATE); processor.surrender(battleId, id(a)); }
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         statistics.setStatisticsEnabled(true); statistics.clear();
         try {
@@ -228,9 +229,9 @@ class HistoryPostgresTest {
         assertThat(indexes).hasSize(2).allSatisfy(sql -> assertThat(sql).contains("created_at DESC", "id DESC", "FINISHED", "CANCELLED"));
     }
 
-    private UUID create(AuthDto a, AuthDto b, Subject subject, BattleMode mode) {
+    private UUID create(AuthDto a, AuthDto b, String disciplineCode, BattleMode mode) {
         presence.connect(id(a), clock.instant()); presence.connect(id(b), clock.instant());
-        return processor.create(new CreateBattleDto(id(a), id(b), subject, mode));
+        return processor.create(new CreateBattleDto(id(a), id(b), disciplineCode, mode));
     }
     private void start(UUID battleId, AuthDto a, AuthDto b) {
         processor.ready(battleId, id(a)); processor.ready(battleId, id(b));
@@ -260,6 +261,9 @@ class HistoryPostgresTest {
     private UUID id(AuthDto user) { return user.getUser().getId(); }
     private AuthDto register() {
         var dto = new RegisterDto(); String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        dto.setEmail(suffix + "@example.com"); dto.setNickname("History_" + suffix); dto.setPassword("ExamplePass123!"); return auth.register(dto);
+        dto.setEmail(suffix + "@example.com"); dto.setNickname("History_" + suffix); dto.setPassword("ExamplePass123!"); var user=auth.register(dto);
+        // Internal fixture: old full-history/revision tests exercise the Pro view. No public switch exists.
+        jdbc.update("UPDATE subscription_accounts SET plan_code='PRO_MONTHLY',status='ACTIVE',paid=true,pro_active=true,current_period_start=?,current_period_end=? WHERE user_id=?",java.sql.Timestamp.from(clock.instant().minusSeconds(1)),java.sql.Timestamp.from(clock.instant().plusSeconds(3600)),id(user));
+        return user;
     }
 }

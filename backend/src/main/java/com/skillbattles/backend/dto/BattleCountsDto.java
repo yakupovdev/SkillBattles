@@ -9,7 +9,7 @@ import java.util.*;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BattleCountsDto {
-    private Subject subject;
+    private String disciplineCode;
     private BattleMode mode;
     private MatchCountsDto counts;
 }

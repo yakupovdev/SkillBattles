@@ -9,11 +9,20 @@ import java.util.*;
 
 @Getter
 @Setter
+@io.swagger.v3.oas.annotations.media.Schema(requiredProperties={"id","rulesVersion","seasonId","overtimePlayed","disciplineCode","format","mode","phase","version","serverTime","questionCount","readyDeadline","countdownEndsAt","nextRoundStartsAt","players","round","result","entitlements"})
 public class BattleSnapshot {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private UUID id;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private String rulesVersion;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED, nullable = true)
+    private String seasonId;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private boolean overtimePlayed;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-    private Subject subject;
+    private String disciplineCode;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private BattleFormat format = BattleFormat.STANDARD;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private BattleMode mode;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
@@ -36,5 +45,6 @@ public class BattleSnapshot {
     private BattleRoundResponse round;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private BattleResultResponse result;
+    private Entitlements entitlements;
 }
 

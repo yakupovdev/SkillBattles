@@ -22,9 +22,10 @@ public class Battle extends BaseEntity {
     private UUID firstUserId;
     @Column(nullable = false)
     private UUID secondUserId;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private Subject subject;
+    @Column(nullable = false, length = 64)
+    private String disciplineCode;
+    @Enumerated(EnumType.STRING) @Column(nullable = false, length = 16)
+    private BattleFormat format = BattleFormat.STANDARD;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private BattleMode mode;
@@ -38,6 +39,7 @@ public class Battle extends BaseEntity {
     private Instant nextRoundStartsAt;
     private Instant nextTransitionAt;
     private Instant settledAt;
+    private Instant finishedAt;
     private UUID winnerUserId;
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")

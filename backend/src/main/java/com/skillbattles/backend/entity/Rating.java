@@ -16,9 +16,16 @@ import java.util.UUID;
 public class Rating extends BaseEntity {
     @Column(nullable = false)
     private UUID userId;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private Subject subject;
+    @Column(nullable = false, length = 64)
+    private String disciplineCode;
     @Column(nullable = false)
     private int rating;
+    @Column(nullable = false)
+    private int calibrationCompletedMatches;
+    @Column(nullable = false, length = 32)
+    private String seasonId;
+    @Column(nullable = false)
+    private int seasonPeakRating = 1000;
+    @Column(nullable = false)
+    private int allTimePeakRating = 1000;
 }

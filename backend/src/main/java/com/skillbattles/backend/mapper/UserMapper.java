@@ -9,6 +9,7 @@ import java.time.*;
 @Mapper(config = CommonMapperConfig.class)
 public interface UserMapper {
     @Mapping(target = "email", source = "emailNormalized")
+    @org.mapstruct.Mapping(target="pro",ignore=true)
     UserDto toDto(User user);
 
     @Mapping(target = "id", ignore = true)

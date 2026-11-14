@@ -1,15 +1,23 @@
 package com.skillbattles.backend.service;
 
-import com.skillbattles.backend.entity.Rank;
+import com.skillbattles.backend.RankFixtures;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.*;
+import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.*;
 
 class RankTest {
-    @ParameterizedTest
-    @CsvSource({"0,Rookie", "1099,Rookie", "1100,Challenger", "1299,Challenger", "1300,Strategist",
-            "1499,Strategist", "1500,Expert", "1799,Expert", "1800,Master", "3000,Master"})
+    static Stream<Arguments> boundaries() {
+        return RankFixtures.tiers().stream().flatMap(t -> Stream.of(Arguments.of(t.getFloorRating(), t.getCode()),
+                Arguments.of(t.getCeilingExclusive() == null ? 100000 : t.getCeilingExclusive() - 1, t.getCode())));
+    }
+    @ParameterizedTest @MethodSource("boundaries")
     void derivesRankAtEveryBoundary(int rating, String expected) {
-        assertThat(Rank.fromRating(rating).getDisplayName()).isEqualTo(expected);
+        assertThat(RankCalculator.fromRating(RankFixtures.tiers(), rating).getCode()).isEqualTo(expected);
+    }
+    @Test void initialRatingAndNegativeInput() {
+        assertThat(RankCalculator.fromRating(RankFixtures.tiers(), 1000).getCode()).isEqualTo("SILVER_I");
+        assertThatThrownBy(() -> RankCalculator.fromRating(RankFixtures.tiers(), -1)).isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -20,11 +20,12 @@ public class Question extends BaseEntity {
     private String externalKey;
     @Column(nullable = false)
     private int contentVersion;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 16)
-    private Subject subject;
+    @Column(nullable = false, length = 64)
+    private String disciplineCode;
+    @Column(nullable = false, length = 64)
+    private String topicCode;
     @Column(nullable = false, length = 200)
-    private String topic;
+    private String topicName;
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16)
     private Difficulty difficulty;

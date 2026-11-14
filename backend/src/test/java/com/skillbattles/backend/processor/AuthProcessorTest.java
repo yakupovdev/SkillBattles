@@ -18,6 +18,8 @@ class AuthProcessorTest {
     @Mock RefreshTokenService refreshTokens;
     @Mock TokenService tokens;
     @Mock RatingService ratings;
+    @Mock SubscriptionService subscriptions;
+    @org.junit.jupiter.api.BeforeEach void subscriptionDefaults(){lenient().when(subscriptions.entitlements(any())).thenReturn(new EntitlementsDto());}
     @InjectMocks AuthProcessorImpl processor;
 
     @Test

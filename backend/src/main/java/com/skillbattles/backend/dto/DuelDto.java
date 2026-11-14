@@ -9,7 +9,9 @@ import java.util.UUID;
 public class DuelDto {
     UUID id;
     String code;
-    Subject subject;
+    String disciplineCode;
+    @lombok.Builder.Default
+    BattleFormat format = BattleFormat.STANDARD;
     DuelStatus status;
     PublicPlayerDto host;
     PublicPlayerDto guest;

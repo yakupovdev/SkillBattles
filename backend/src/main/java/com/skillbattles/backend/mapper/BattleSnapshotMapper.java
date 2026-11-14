@@ -4,6 +4,7 @@ import com.skillbattles.backend.config.CommonMapperConfig;
 import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.entity.*;
 import org.mapstruct.Mapper;
+import com.skillbattles.backend.service.RankCalculator;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -16,16 +17,19 @@ public interface BattleSnapshotMapper {
     BattleResultResponse toResponse(BattleResultDto dto);
     QuestionViewDto question(FrozenQuestionDto dto);
     AnswerViewDto answer(BattleAnswerDto dto);
+    BattleResultPlayerDto copyPlayer(BattleResultPlayerDto dto);
 
     default BattleSnapshotDto snapshot(BattleDto battle, UUID userId, Instant now) {
         BattleSnapshotDto dto = new BattleSnapshotDto();
         dto.setId(battle.getId());
-        dto.setSubject(battle.getSubject());
+        dto.setDisciplineCode(battle.getDisciplineCode());
         dto.setMode(battle.getMode());
         dto.setPhase(battle.getPhase());
         dto.setVersion(battle.getVersion());
         dto.setServerTime(now);
-        dto.setQuestionCount(battle.getState().getRounds().size());
+        dto.setQuestionCount(battle.getState().getMainQuestionCount());
+        dto.setRulesVersion(battle.getState().getRulesVersion());dto.setSeasonId(battle.getState().getSeasonId());
+        dto.setOvertimePlayed(battle.getState().getRounds().stream().anyMatch(BattleRoundDto::isOvertimeRound));
         dto.setReadyDeadline(battle.getReadyDeadline());
         dto.setCountdownEndsAt(battle.getCountdownEndsAt());
         dto.setNextRoundStartsAt(battle.getNextRoundStartsAt());
@@ -36,7 +40,7 @@ public interface BattleSnapshotMapper {
             view.setId(player.getId());
             view.setNickname(player.getNickname());
             view.setRating(player.getRating());
-            view.setRank(Rank.fromRating(player.getRating()).getDisplayName());
+            view.setRankCode(RankCalculator.fromRating(battle.getState().getRankTiers(), player.getRating()).getCode());
             view.setReady(player.isReady());
             view.setConnected(player.isConnected());
             view.setReconnectDeadline(player.getReconnectDeadline());
@@ -50,10 +54,10 @@ public interface BattleSnapshotMapper {
         if (current != null) {
             RoundViewDto round = new RoundViewDto();
             round.setId(current.getId());
-            round.setNumber(current.getNumber());
+            round.setNumber(current.getNumber());round.setOvertimeRound(current.isOvertimeRound());
             round.setStartedAt(current.getStartedAt());
             round.setDeadline(current.getDeadline());
-            round.setLimitSeconds(battle.getState().getLimitSeconds());
+            round.setLimitSeconds(current.getLimitSeconds() > 0 ? current.getLimitSeconds() : battle.getState().getLimitSeconds());
             round.setQuestion(question(current.getQuestion()));
             current.getAnswers().stream().filter(answer -> userId.equals(answer.getUserId())).findFirst()
                     .ifPresent(answer -> round.setMySelectedOptionId(answer.getSelectedOptionId()));
@@ -78,14 +82,15 @@ public interface BattleSnapshotMapper {
         if (battle.getResult() != null) {
             BattleResultDto result = new BattleResultDto();
             result.setBattleId(battle.getId());
-            result.setSubject(battle.getSubject());
+            result.setRulesVersion(battle.getResult().getRulesVersion());result.setSeasonId(battle.getResult().getSeasonId());result.setOvertimePlayed(battle.getResult().isOvertimePlayed());
+            result.setDisciplineCode(battle.getDisciplineCode());
             result.setMode(battle.getMode());
             result.setStatus(battle.getPhase());
             result.setReason(battle.getResult().getReason());
             result.setWinnerUserId(battle.getResult().getWinnerUserId());
             result.setFinishedAt(battle.getResult().getFinishedAt());
             result.setMyOutcome(outcome(battle.getPhase(), result.getWinnerUserId(), userId));
-            result.setPlayers(battle.getResult().getPlayers());
+            result.setPlayers(battle.getResult().getPlayers().stream().map(this::copyPlayer).toList());
             return result;
         }
         return null;

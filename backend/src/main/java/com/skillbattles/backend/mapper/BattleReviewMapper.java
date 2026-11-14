@@ -13,7 +13,8 @@ public interface BattleReviewMapper {
 
     default BattleReviewDto review(BattleDto battle) {
         BattleReviewDto dto = new BattleReviewDto();
-        dto.setBattleId(battle.getId()); dto.setSubject(battle.getSubject()); dto.setMode(battle.getMode());
+        dto.setRulesVersion(battle.getState().getRulesVersion());
+        dto.setBattleId(battle.getId()); dto.setDisciplineCode(battle.getDisciplineCode()); dto.setMode(battle.getMode());
         dto.setRounds(battle.getState().getRounds().stream().filter(item -> item.getStartedAt() != null).map(this::round).toList());
         return dto;
     }

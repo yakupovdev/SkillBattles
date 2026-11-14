@@ -11,6 +11,10 @@ import java.util.*;
 public class BattleRoundDto {
     private UUID id;
     private int number;
+    @com.fasterxml.jackson.annotation.JsonProperty("isOvertimeRound")
+    private boolean overtimeRound;
+    private int limitSeconds;
+    private int basePoints;
     private FrozenQuestionDto question;
     private Instant startedAt;
     private Instant deadline;

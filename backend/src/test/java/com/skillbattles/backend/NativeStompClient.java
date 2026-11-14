@@ -58,6 +58,11 @@ final class NativeStompClient implements WebSocket.Listener, AutoCloseable {
     }
 
     void drain() { frames.clear(); }
+    boolean hasEvent(Predicate<JsonNode> condition,Duration timeout) throws Exception {
+        long until=System.nanoTime()+timeout.toNanos();
+        while(System.nanoTime()<until){Frame frame=frames.poll(25,TimeUnit.MILLISECONDS);if(frame!=null&&frame.command().equals("MESSAGE")&&condition.test(mapper.readTree(frame.body())))return true;}
+        return false;
+    }
     boolean hasMessage(Duration timeout) throws Exception {
         long until = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < until) {

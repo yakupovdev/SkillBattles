@@ -9,10 +9,12 @@ import java.util.*;
 
 @Getter
 @Setter
+@io.swagger.v3.oas.annotations.media.Schema(requiredProperties={"correctOptionId","answers","answerAccess"})
 public class RoundRevealResponse {
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private UUID correctOptionId;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private List<RoundAnswerResponse> answers;
+    private AnswerAccess answerAccess;
 }
 

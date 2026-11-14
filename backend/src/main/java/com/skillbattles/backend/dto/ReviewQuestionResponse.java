@@ -11,13 +11,17 @@ public class ReviewQuestionResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private UUID id;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-    private String topic;
+    private String topicCode;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private Difficulty difficulty;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    private String topicName;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private String prompt;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private List<QuestionOptionResponse> options;
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private UUID correctOptionId;
-    @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private String explanation;
 }

@@ -20,6 +20,7 @@ import java.util.UUID;
 @Tag(name = "Users")
 public class UserController {
     private final UserService service;
+    private final com.skillbattles.backend.processor.AccountProcessor accounts;
     private final UserMapper mapper;
 
     @GetMapping("/me")
@@ -30,6 +31,6 @@ public class UserController {
     @ApiResponse(responseCode = "404", description = "USER_NOT_FOUND: account was deleted", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
-        return mapper.toResponse(service.getById(UUID.fromString(jwt.getSubject())));
+        return mapper.toResponse(accounts.state(UUID.fromString(jwt.getSubject())).getUser());
     }
 }

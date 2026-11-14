@@ -10,7 +10,9 @@ public class QueueEntryDto {
     UUID id;
     UUID userId;
     int rating;
-    Subject subject;
+    String disciplineCode;
+    @lombok.Builder.Default
+    BattleFormat format = BattleFormat.STANDARD;
     QueueStatus status;
     Instant createdAt;
     Instant expiresAt;

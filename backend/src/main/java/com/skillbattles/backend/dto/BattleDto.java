@@ -10,7 +10,9 @@ import java.util.*;
 @AllArgsConstructor
 public class BattleDto {
     private UUID id;
-    private Subject subject;
+    private String disciplineCode;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private BattleFormat format = BattleFormat.STANDARD;
     private BattleMode mode;
     private BattlePhase phase;
     private int version;

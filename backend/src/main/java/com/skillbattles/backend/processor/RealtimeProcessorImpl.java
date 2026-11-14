@@ -21,6 +21,8 @@ import java.util.*;
 @Profile("!question-import")
 public class RealtimeProcessorImpl implements RealtimeProcessor {
     private final BattleService battles;
+    private final BattleAccessProcessor access;
+    private final MatchmakingProcessor matchmaking;
     private final BattleProcessor processor;
     private final BattleSnapshotMapper mapper;
     private final RealtimeSessionService sessions;
@@ -32,7 +34,8 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
 
     public RealtimeProcessorImpl(BattleService battles, BattleProcessor processor, BattleSnapshotMapper mapper,
             RealtimeSessionService sessions, SimpMessagingTemplate messaging, Clock clock, PlatformTransactionManager transactions,
-            ThreadPoolTaskExecutor realtimeEventExecutor, MatchmakingMapper matchmakingMapper) {
+            ThreadPoolTaskExecutor realtimeEventExecutor, MatchmakingMapper matchmakingMapper,BattleAccessProcessor access,MatchmakingProcessor matchmaking) {
+        this.access=access;this.matchmaking=matchmaking;
         this.battles = battles; this.processor = processor; this.mapper = mapper;
         this.sessions = sessions; this.messaging = messaging; this.clock = clock;
         this.executor = realtimeEventExecutor;
@@ -76,7 +79,7 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
                 List<Delivery> result = new ArrayList<>();
                 for (var player : battle.getState().getPlayers()) {
                     sessions.target(player.getId()).ifPresent(target -> {
-                        BattleSnapshot snapshot = mapper.toResponse(mapper.snapshot(battle, player.getId(), clock.instant()));
+                        BattleSnapshot snapshot = mapper.toResponse(access.snapshot(battle, player.getId(), clock.instant()));
                         result.add(new Delivery(target, new RealtimeEvent<>(eventId, "BATTLE_CHANGED", battle.getId(),
                                 snapshot.getVersion(), event.occurredAt(), snapshot)));
                     });
@@ -111,7 +114,7 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
                 } else {
                     var duel = event.duel(); users.add(duel.getHost().getId());
                     if (duel.getGuest() != null) users.add(duel.getGuest().getId());
-                    envelope = new RealtimeEvent<>(UUID.randomUUID(), "PRIVATE_DUEL_CHANGED", duel.getId(), duel.getVersion(), event.occurredAt(), matchmakingMapper.toResponse(duel));
+                    envelope = new RealtimeEvent<>(UUID.randomUUID(), "PRIVATE_DUEL_CHANGED", duel.getId(), duel.getVersion(), event.occurredAt(), matchmakingMapper.toResponse(matchmaking.present(duel)));
                 }
                 for (UUID user : users) sessions.target(user).ifPresent(target -> {
                     SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);

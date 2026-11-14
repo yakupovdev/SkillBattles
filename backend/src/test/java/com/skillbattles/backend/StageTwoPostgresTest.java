@@ -61,17 +61,17 @@ class StageTwoPostgresTest {
         assertThat(ratings.getByUserId(id)).extracting(RatingDto::getRating).containsExactly(1000, 1000);
         String access = session.getTokens().getAccessToken();
         mvc.perform(get("/api/v1/users/me/statistics").header("Authorization", "Bearer " + access))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.subjects.length()").value(2))
-                .andExpect(jsonPath("$.subjects[0].subject").value("MATH"))
-                .andExpect(jsonPath("$.subjects[0].rating").value(1000))
-                .andExpect(jsonPath("$.subjects[0].rank").value("Rookie"))
-                .andExpect(jsonPath("$.subjects[0].ranked.played").value(0))
-                .andExpect(jsonPath("$.subjects[1].subject").value("ENGLISH"))
-                .andExpect(jsonPath("$.subjects[1].privateMatches.wins").value(0));
-        jdbc.update("update ratings set rating = 1800 where user_id = ? and subject = 'ENGLISH'", id);
+                .andExpect(status().isOk()).andExpect(jsonPath("$.disciplines.length()").value(2))
+                .andExpect(jsonPath("$.disciplines[0].disciplineCode").value("SAT_MATH"))
+                .andExpect(jsonPath("$.disciplines[0].rating").value(1000))
+                .andExpect(jsonPath("$.disciplines[0].rank.rankName").value("Silver I"))
+                .andExpect(jsonPath("$.disciplines[0].ranked.played").value(0))
+                .andExpect(jsonPath("$.disciplines[1].disciplineCode").value("SAT_RW"))
+                .andExpect(jsonPath("$.disciplines[1].privateMatches.wins").value(0));
+        jdbc.update("update ratings set rating = 1800 where user_id = ? and discipline_code = 'SAT_RW'", id);
         mvc.perform(get("/api/v1/users/me/statistics").header("Authorization", "Bearer " + access))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.subjects[0].rating").value(1000))
-                .andExpect(jsonPath("$.subjects[1].rating").value(1800)).andExpect(jsonPath("$.subjects[1].rank").value("Master"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.disciplines[0].rating").value(1000))
+                .andExpect(jsonPath("$.disciplines[1].rating").value(1800)).andExpect(jsonPath("$.disciplines[1].rank.rankName").value("Platinum III"));
         for (String path : List.of("/api/v1/users/me/statistics", "/api/v1/battle-modes")) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
             mvc.perform(get(path).header("Authorization", "Bearer " + session.getTokens().getRefreshToken())).andExpect(status().isUnauthorized());
@@ -84,17 +84,17 @@ class StageTwoPostgresTest {
     void dryRunIdempotenceStableOptionsAndAvailability() throws Exception {
         String access = register().getTokens().getAccessToken();
         mvc.perform(get("/api/v1/battle-modes").header("Authorization", "Bearer " + access))
-                .andExpect(status().isOk()).andExpect(jsonPath("$[0].questionCount").value(3))
-                .andExpect(jsonPath("$[0].questionLimitSeconds").value(95)).andExpect(jsonPath("$[0].contentAvailable").value(false))
-                .andExpect(jsonPath("$[1].questionCount").value(4)).andExpect(jsonPath("$[1].contentAvailable").value(false));
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].questionCount").value(5))
+                .andExpect(jsonPath("$[0].baseQuestionSeconds").value(60)).andExpect(jsonPath("$[0].contentAvailable").value(false))
+                .andExpect(jsonPath("$[1].questionCount").value(5)).andExpect(jsonPath("$[1].contentAvailable").value(false));
         List<QuestionImportDto> fixture = fixture();
-        assertThat(questions.importQuestions(fixture, true).getInserted()).isEqualTo(7);
+        assertThat(questions.importQuestions(fixture, true).getInserted()).isEqualTo(19);
         assertThat(questionRepository.count()).isZero();
-        assertThat(questions.importQuestions(fixture, false).getInserted()).isEqualTo(7);
+        assertThat(questions.importQuestions(fixture, false).getInserted()).isEqualTo(19);
         assertThat(Math.abs(jdbc.queryForObject("select extract(epoch from ((now() at time zone 'UTC') - created_at)) from questions limit 1", Double.class))).isLessThan(30);
         var before = jdbc.queryForList("select id, options::text, correct_option_id, updated_at from questions order by external_key");
-        assertThat(questions.importQuestions(fixture, true).getUnchanged()).isEqualTo(7);
-        assertThat(questions.importQuestions(fixture, false).getUnchanged()).isEqualTo(7);
+        assertThat(questions.importQuestions(fixture, true).getUnchanged()).isEqualTo(19);
+        assertThat(questions.importQuestions(fixture, false).getUnchanged()).isEqualTo(19);
         assertThat(jdbc.queryForList("select id, options::text, correct_option_id, updated_at from questions order by external_key")).isEqualTo(before);
         JsonNode options = json.readTree((String) before.getFirst().get("options"));
         assertThat(options.size()).isEqualTo(4);
@@ -109,7 +109,7 @@ class StageTwoPostgresTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].contentAvailable").value(false))
                 .andExpect(jsonPath("$[1].contentAvailable").value(true));
         questions.importQuestions(fixture, false);
-        assertThat(questions.countAvailable(Subject.MATH, Difficulty.MEDIUM)).isEqualTo(2);
+        assertThat(questions.countAvailable("SAT_MATH", Difficulty.MEDIUM)).isEqualTo(2);
     }
 
     @Test
@@ -123,7 +123,7 @@ class StageTwoPostgresTest {
         next.setPrompt("TEST ONLY: revised prompt");
         questions.importQuestions(List.of(next), false);
         assertThat(questionRepository.count()).isEqualTo(2);
-        assertThat(questions.countAvailable(Subject.MATH, Difficulty.MEDIUM)).isEqualTo(1);
+        assertThat(questions.countAvailable("SAT_MATH", Difficulty.MEDIUM)).isEqualTo(1);
         assertThat(jdbc.queryForObject("select options::text from questions where content_version = 2", String.class)).isEqualTo(frozenOptions);
         questions.importQuestions(List.of(fixture().getFirst()), false);
         assertThat(questionRepository.count()).isEqualTo(3);
@@ -145,8 +145,8 @@ class StageTwoPostgresTest {
         conflicting.getFirst().setExternalKey("new-question");
         conflicting.getLast().setPrompt("TEST ONLY: changed without version bump");
         assertThatThrownBy(() -> questions.importQuestions(conflicting, false)).isInstanceOf(ConflictException.class);
-        assertThat(questionRepository.count()).isEqualTo(7);
-        assertThat(jdbc.queryForObject("select count(*) from questions where active = true", Integer.class)).isEqualTo(7);
+        assertThat(questionRepository.count()).isEqualTo(19);
+        assertThat(jdbc.queryForObject("select count(*) from questions where active = true", Integer.class)).isEqualTo(19);
     }
 
     @Test
@@ -172,22 +172,22 @@ class StageTwoPostgresTest {
     @Test
     void databaseEnforcesActiveUniquenessAndSoftDeleteAllowsReuse() throws Exception {
         UUID userId = register().getUser().getId();
-        UUID old = jdbc.queryForObject("select id from ratings where user_id = ? and subject = 'MATH'", UUID.class, userId);
-        String insert = "insert into ratings(id,created_at,updated_at,deleted,user_id,subject,rating) values (?,now(),now(),false,?,'MATH',1000)";
+        UUID old = jdbc.queryForObject("select id from ratings where user_id = ? and discipline_code = 'SAT_MATH'", UUID.class, userId);
+        String insert = "insert into ratings(id,created_at,updated_at,deleted,user_id,discipline_code,rating,season_id) values (?,now(),now(),false,?,'SAT_MATH',1000,'FALL_2026')";
         assertThatThrownBy(() -> jdbc.update(insert, UUID.randomUUID(), userId)).isInstanceOf(DataIntegrityViolationException.class);
         jdbc.update("update ratings set deleted = true where id = ?", old);
         jdbc.update(insert, UUID.randomUUID(), userId);
         assertThat(ratingRepository.findById(old)).isEmpty();
         assertThat(ratings.getByUserId(userId)).hasSize(2);
         questions.importQuestions(List.of(fixture().getFirst()), false);
-        String duplicate = "insert into questions select ?,created_at,updated_at,false,external_key,100,subject,topic,difficulty,prompt,options,correct_option_id,explanation,true from questions limit 1";
+        String duplicate = "insert into questions select ?,created_at,updated_at,false,external_key,100,discipline_code,topic_name,difficulty,prompt,options,correct_option_id,explanation,true,topic_code from questions limit 1";
         assertThatThrownBy(() -> jdbc.update(duplicate, UUID.randomUUID())).isInstanceOf(DataIntegrityViolationException.class);
         UUID oldQuestion = questionRepository.findAll().getFirst().getId();
         jdbc.update("update questions set deleted = true where id = ?", oldQuestion);
-        assertThat(questions.countAvailable(Subject.MATH, Difficulty.MEDIUM)).isZero();
+        assertThat(questions.countAvailable("SAT_MATH", Difficulty.MEDIUM)).isZero();
         questions.importQuestions(List.of(fixture().getFirst()), false);
         assertThat(questionRepository.findById(oldQuestion)).isEmpty();
-        assertThat(questions.countAvailable(Subject.MATH, Difficulty.MEDIUM)).isEqualTo(1);
+        assertThat(questions.countAvailable("SAT_MATH", Difficulty.MEDIUM)).isEqualTo(1);
     }
 
     @Test

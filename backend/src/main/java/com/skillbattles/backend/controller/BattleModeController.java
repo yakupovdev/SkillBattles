@@ -21,9 +21,11 @@ public class BattleModeController {
     private final BattleModeMapper mapper;
 
     @GetMapping
-    @Operation(summary = "Get subject timings and content availability", description = "Returns both subjects. An empty or insufficient bank reports contentAvailable=false. Does not expose questions or answers.", security = @SecurityRequirement(name = "accessBearer"))
-    @ApiResponse(responseCode = "200", description = "Current subject configurations")
+    @Operation(summary = "Get discipline timings and content availability", description = "Returns all active disciplines from the catalogue. An empty or insufficient bank reports contentAvailable=false. Does not expose questions or answers.", security = @SecurityRequirement(name = "accessBearer"))
+    @ApiResponse(responseCode = "200", description = "Current discipline configurations")
     @ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public List<BattleModeResponse> modes() { return processor.getModes().stream().map(mapper::toResponse).toList(); }
+    public List<BattleModeResponse> modes(@org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.oauth2.jwt.Jwt jwt) {
+        return processor.getModes(java.util.UUID.fromString(jwt.getSubject())).stream().map(mapper::toResponse).toList();
+    }
 }

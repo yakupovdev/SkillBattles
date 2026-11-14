@@ -9,6 +9,8 @@ import java.util.*;
 public class ReviewRoundDto {
     private UUID roundId;
     private int number;
+    @com.fasterxml.jackson.annotation.JsonProperty("isOvertimeRound")
+    private boolean overtimeRound;
     private boolean completed;
     private ReviewQuestionDto question;
     private List<AnswerViewDto> answers;

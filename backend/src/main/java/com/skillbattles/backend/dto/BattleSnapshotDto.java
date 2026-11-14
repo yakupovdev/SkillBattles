@@ -10,7 +10,13 @@ import java.util.*;
 @AllArgsConstructor
 public class BattleSnapshotDto {
     private UUID id;
-    private Subject subject;
+    private String rulesVersion;
+    @io.swagger.v3.oas.annotations.media.Schema(nullable = true)
+    private String seasonId;
+    private boolean overtimePlayed;
+    private String disciplineCode;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private BattleFormat format = BattleFormat.STANDARD;
     private BattleMode mode;
     private BattlePhase phase;
     private int version;
@@ -22,5 +28,6 @@ public class BattleSnapshotDto {
     private List<PlayerViewDto> players;
     private RoundViewDto round;
     private BattleResultDto result;
+    private EntitlementsDto entitlements;
 }
 

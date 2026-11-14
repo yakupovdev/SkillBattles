@@ -1,6 +1,7 @@
 package com.skillbattles.backend.config;
 
 import com.skillbattles.backend.service.*;
+import com.skillbattles.backend.processor.QuestionImportProcessor;
 import com.skillbattles.backend.exception.BusinessValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class QuestionImportRunner implements ApplicationRunner {
     private final QuestionImportFileService files;
-    private final QuestionService questions;
+    private final QuestionImportProcessor questions;
 
     @Override
     public void run(ApplicationArguments args) {

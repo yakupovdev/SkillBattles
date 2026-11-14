@@ -12,6 +12,7 @@ public class BattlePlayerDto {
     private UUID id;
     private String nickname;
     private int rating;
+    private int calibrationCompletedMatches;
     private boolean ready;
     private boolean connected;
     private UUID sessionId;

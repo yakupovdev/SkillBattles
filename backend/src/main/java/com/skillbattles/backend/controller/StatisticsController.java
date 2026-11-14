@@ -23,8 +23,8 @@ public class StatisticsController {
     private final StatisticsMapper mapper;
 
     @GetMapping
-    @Operation(summary = "Get current user statistics by subject", description = "Separate subject ratings and ranks with ranked/private counts from finished battles. Cancelled matches never contribute.", security = @SecurityRequirement(name = "accessBearer"))
-    @ApiResponse(responseCode = "200", description = "Statistics for both subjects")
+    @Operation(summary = "Get current user statistics by disciplineCode", description = "Separate disciplineCode ratings and ranks with ranked/private counts from finished battles. Cancelled matches never contribute.", security = @SecurityRequirement(name = "accessBearer"))
+    @ApiResponse(responseCode = "200", description = "Statistics for active disciplines")
     @ApiResponse(responseCode = "401", description = "UNAUTHORIZED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "404", description = "USER_NOT_FOUND: account was deleted", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     @ApiResponse(responseCode = "500", description = "INTERNAL_ERROR", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))

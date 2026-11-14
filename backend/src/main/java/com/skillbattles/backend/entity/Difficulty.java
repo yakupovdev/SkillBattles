@@ -1,3 +1,3 @@
 package com.skillbattles.backend.entity;
 
-public enum Difficulty { MEDIUM }
+public enum Difficulty { EASY, MEDIUM, HARD }

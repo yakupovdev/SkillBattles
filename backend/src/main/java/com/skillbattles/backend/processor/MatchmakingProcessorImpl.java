@@ -22,17 +22,20 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
     private final BattleProcessor processor;
     private final UserService users;
     private final RatingService ratings;
+    private final RatingProcessor ratingProcessor;
+    private final UsageProcessor usage;
+    private final SubscriptionService subscriptions;
     private final QuestionService questions;
-    private final BattleProperties battleProperties;
+    private final DisciplineService disciplines;
     private final MatchmakingProperties properties;
     private final Clock clock;
 
-    @Override public QueueEntryDto search(UUID userId, Subject subject) {
+    @Override public QueueEntryDto search(UUID userId, String disciplineCode) {
         return registry.transact(state -> {
             Instant now = now(); refresh(state, now);
-            ensureIdle(state, userId); users.getById(userId); requireContent(subject);
-            int rating = ratings.getByUserId(userId).stream().filter(item -> item.getSubject() == subject).findFirst().orElseThrow().getRating();
-            QueueEntryDto entry = QueueEntryDto.builder().id(UUID.randomUUID()).userId(userId).rating(rating).subject(subject)
+            ensureIdle(state, userId); users.getById(userId); usage.requireAvailable(userId); requireContent(disciplineCode, userId);
+            int rating = ratings.getByUserId(userId).stream().filter(item -> item.getDisciplineCode().equals(disciplineCode)).findFirst().orElseThrow().getRating();
+            QueueEntryDto entry = QueueEntryDto.builder().id(UUID.randomUUID()).userId(userId).rating(rating).disciplineCode(disciplineCode)
                     .status(QueueStatus.SEARCHING).createdAt(now).expiresAt(now.plusSeconds(properties.getSearchSeconds()))
                     .ratingWindow(100).version(1).build();
             state.getEntries().put(entry.getId(), entry);
@@ -56,18 +59,18 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
         });
     }
 
-    @Override public DuelDto createDuel(UUID userId, Subject subject) {
+    @Override public DuelDto createDuel(UUID userId, String disciplineCode) {
         return registry.transact(state -> {
-            Instant now = now(); refresh(state, now()); ensureIdle(state, userId); requireContent(subject);
+            Instant now = now(); refresh(state, now()); ensureIdle(state, userId); requireContent(disciplineCode, userId);
             UserDto host = users.getById(userId);
             String code;
             do { code = code(); } while (codeExists(state, code)); // Retain terminal codes too: never alias a previous room.
-            DuelDto duel = DuelDto.builder().id(UUID.randomUUID()).code(code).subject(subject).status(DuelStatus.WAITING)
+            DuelDto duel = DuelDto.builder().id(UUID.randomUUID()).code(code).disciplineCode(disciplineCode).status(DuelStatus.WAITING)
                     .host(PublicPlayerDto.builder().id(userId).nickname(host.getNickname()).build())
                     .expiresAt(now.plusSeconds(properties.getDuelSeconds())).version(1).build();
             state.getDuels().put(duel.getId(), duel);
             state.getActivities().put(userId, new ActivityReservationDto(ActivityType.PRIVATE_DUEL, duel.getId()));
-            return duel;
+            return present(duel);
         });
     }
 
@@ -80,20 +83,27 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
             if (duel.getStatus() == DuelStatus.EXPIRED) throw new GoneException("DUEL_EXPIRED", "Duel code has expired.");
             if (duel.getHost().getId().equals(userId)) throw new ConflictException("SELF_JOIN_NOT_ALLOWED", "Cannot join your own duel.");
             if (duel.getStatus() != DuelStatus.WAITING) throw new ConflictException("DUEL_NOT_JOINABLE", "Duel is no longer joinable.");
-            ensureIdle(state, userId); requireContent(duel.getSubject());
+            ensureIdle(state, userId); requireContent(duel.getDisciplineCode(), userId);
             UserDto guest = users.getById(userId);
             // The staged reservation is removed while the same lock remains held through DB commit.
             state.getActivities().remove(duel.getHost().getId());
-            UUID battleId = processor.create(new CreateBattleDto(duel.getHost().getId(), userId, duel.getSubject(), BattleMode.PRIVATE));
+            UUID battleId = processor.create(new CreateBattleDto(duel.getHost().getId(), userId, duel.getDisciplineCode(), BattleMode.PRIVATE));
             DuelDto joined = duel.toBuilder().status(DuelStatus.MATCHED).guest(PublicPlayerDto.builder().id(userId).nickname(guest.getNickname()).build())
                     .battleId(battleId).version(duel.getVersion() + 1).build();
             state.getDuels().put(joined.getId(), joined);
-            return joined;
+            return present(joined);
         });
     }
 
     @Override public DuelDto duel(UUID userId, UUID id) {
-        return registry.transact(state -> { refresh(state, now()); return ownedDuel(state, userId, id, false); });
+        return registry.transact(state -> { refresh(state, now()); return present(ownedDuel(state, userId, id, false)); });
+    }
+
+    @Override public DuelDto present(DuelDto duel) {
+        List<UUID> ids=new ArrayList<>();ids.add(duel.getHost().getId());if(duel.getGuest()!=null)ids.add(duel.getGuest().getId());
+        var flags=subscriptions.proFlags(ids);
+        return duel.toBuilder().host(duel.getHost().toBuilder().pro(flags.getOrDefault(duel.getHost().getId(),false)).build())
+            .guest(duel.getGuest()==null?null:duel.getGuest().toBuilder().pro(flags.getOrDefault(duel.getGuest().getId(),false)).build()).build();
     }
 
     @Override public void cancelDuel(UUID userId, UUID id) {
@@ -122,11 +132,15 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
     }
 
     private void refresh(MatchmakingStateDto state, Instant now) {
-        Map<Subject, Boolean> available = new EnumMap<>(Subject.class);
         for (QueueEntryDto entry : List.copyOf(state.getEntries().values())) {
             if (entry.getStatus() != QueueStatus.SEARCHING) continue;
             if (!entry.getExpiresAt().isAfter(now)) { endEntry(state, entry, QueueStatus.EXPIRED); continue; }
-            if (!available.computeIfAbsent(entry.getSubject(), this::contentAvailable)) { endEntry(state, entry, QueueStatus.CANCELLED); continue; }
+            String disciplineCode=entry.getDisciplineCode();
+            var rating=ratingProcessor.prepare(entry.getUserId()).stream().filter(r -> r.getDisciplineCode().equals(disciplineCode)).findFirst().orElse(null);
+            if(rating!=null && entry.getRating()!=rating.getRating()) {
+                entry=entry.toBuilder().rating(rating.getRating()).version(entry.getVersion()+1).build();state.getEntries().put(entry.getId(),entry);
+            }
+            if (!contentAvailable(entry.getDisciplineCode(), entry.getRating())) { endEntry(state, entry, QueueStatus.CANCELLED); continue; }
             int window = window(entry, now);
             if (window != entry.getRatingWindow()) state.getEntries().put(entry.getId(), entry.toBuilder().ratingWindow(window).version(entry.getVersion() + 1).build());
         }
@@ -141,12 +155,12 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
         for (QueueEntryDto first : ordered) {
             if (state.getEntries().get(first.getId()).getStatus() != QueueStatus.SEARCHING) continue;
             Optional<QueueEntryDto> opponent = ordered.stream().filter(second -> !first.getUserId().equals(second.getUserId())
-                    && second.getSubject() == first.getSubject() && state.getEntries().get(second.getId()).getStatus() == QueueStatus.SEARCHING
+                    && second.getDisciplineCode().equals(first.getDisciplineCode()) && state.getEntries().get(second.getId()).getStatus() == QueueStatus.SEARCHING
                     && Math.abs((long) first.getRating() - second.getRating()) <= Math.min(window(first, now), window(second, now))).findFirst();
             if (opponent.isEmpty()) continue;
             QueueEntryDto second = opponent.get();
             state.getActivities().remove(first.getUserId()); state.getActivities().remove(second.getUserId());
-            UUID battleId = processor.create(new CreateBattleDto(first.getUserId(), second.getUserId(), first.getSubject(), BattleMode.RANKED));
+            UUID battleId = processor.create(new CreateBattleDto(first.getUserId(), second.getUserId(), first.getDisciplineCode(), BattleMode.RANKED));
             for (QueueEntryDto entry : List.of(first, second)) state.getEntries().put(entry.getId(), entry.toBuilder()
                     .status(QueueStatus.MATCHED).battleId(battleId).version(entry.getVersion() + 1).build());
         }
@@ -167,11 +181,20 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
         long seconds = Duration.between(entry.getCreatedAt(), now).getSeconds();
         return seconds < 15 ? 100 : seconds < 30 ? 200 : 400;
     }
-    private void requireContent(Subject subject) {
-        if (subject == null) throw new BusinessValidationException("VALIDATION_ERROR", "Subject is required.");
-        if (!contentAvailable(subject)) throw new ConflictException("CONTENT_UNAVAILABLE", "Not enough suitable questions for a full battle.");
+    private void requireContent(String disciplineCode, UUID userId) {
+        disciplines.requireActive(disciplineCode);
+        ratingProcessor.prepare(userId);
+        int rating = ratings.getByUserId(userId).stream().filter(r -> r.getDisciplineCode().equals(disciplineCode)).findFirst().orElseThrow().getRating();
+        if (!contentAvailable(disciplineCode, rating)) throw new ConflictException("CONTENT_UNAVAILABLE", "Not enough suitable questions for a full battle.");
     }
-    private boolean contentAvailable(Subject subject) { return questions.countAvailable(subject, Difficulty.MEDIUM) >= battleProperties.forSubject(subject).getQuestionCount(); }
+    private boolean contentAvailable(String code, int rating) {
+        DisciplineDto discipline;
+        try { discipline = disciplines.get(code); } catch (ConflictException ex) { return false; }
+        if (!discipline.isActive()) return false;
+        Map<Difficulty, Long> counts = new EnumMap<>(Difficulty.class);
+        for (var difficulty : Difficulty.values()) counts.put(difficulty, questions.countAvailable(code, difficulty));
+        return discipline.getSchedules().stream().anyMatch(s -> s.getMinRating() <= rating && DisciplineContentPolicy.available(s, counts));
+    }
     private void endEntry(MatchmakingStateDto state, QueueEntryDto entry, QueueStatus status) {
         state.getEntries().put(entry.getId(), entry.toBuilder().status(status).version(entry.getVersion() + 1).build());
         state.getActivities().remove(entry.getUserId(), new ActivityReservationDto(ActivityType.QUEUE, entry.getId()));

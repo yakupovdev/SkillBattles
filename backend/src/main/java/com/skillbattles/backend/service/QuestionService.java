@@ -6,6 +6,6 @@ import java.util.List;
 
 public interface QuestionService {
     QuestionImportResultDto importQuestions(List<QuestionImportDto> questions, boolean dryRun);
-    long countAvailable(Subject subject, Difficulty difficulty);
+    long countAvailable(String disciplineCode, Difficulty difficulty);
     List<FrozenQuestionDto> selectForBattle(QuestionSelectionDto selection);
 }

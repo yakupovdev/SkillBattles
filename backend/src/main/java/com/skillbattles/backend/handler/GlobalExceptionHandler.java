@@ -20,8 +20,14 @@ import java.util.List;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private final java.time.Clock clock;
+    public GlobalExceptionHandler(java.time.Clock clock){this.clock=clock;}
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> business(BusinessException ex) {
+        if(ex instanceof com.skillbattles.backend.exception.DailyLimitException limit) {
+            long retry=Math.max(1,java.time.Duration.between(clock.instant(),limit.getResetsAt()).getSeconds());
+            return ResponseEntity.status(ex.getStatus()).header("Retry-After",Long.toString(retry)).body(new ErrorResponse(ex.getCode(),ex.getMessage(),List.of(),limit.getResetsAt()));
+        }
         return ResponseEntity.status(ex.getStatus()).body(ErrorResponse.of(ex.getCode(), ex.getMessage()));
     }
 

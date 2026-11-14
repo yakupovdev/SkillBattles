@@ -29,11 +29,11 @@ public class MatchmakingController {
     private final MatchmakingMapper mapper;
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    @Operation(operationId = "postMatchmakingEntries", summary = "Join ranked search", description = "Search the selected subject rating. A fast match may already return MATCHED and battleId.")
+    @Operation(operationId = "postMatchmakingEntries", summary = "Join ranked search", description = "Search the selected disciplineCode rating. A fast match may already return MATCHED and battleId.")
     @ApiResponse(responseCode = "201", description = "Search created")
     @ApiResponse(responseCode = "409", description = "ACTIVITY_CONFLICT or CONTENT_UNAVAILABLE", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public QueueEntryResponse search(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SubjectRequest request) {
-        return mapper.toResponse(processor.search(UUID.fromString(jwt.getSubject()), request.getSubject()));
+    public QueueEntryResponse search(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DisciplineRequest request) {
+        return mapper.toResponse(processor.search(UUID.fromString(jwt.getSubject()), request.getDisciplineCode()));
     }
 
     @GetMapping("/{id}")

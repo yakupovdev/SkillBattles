@@ -32,6 +32,12 @@ public class BattleProcessorImpl implements BattleProcessor {
     private final ApplicationEventPublisher events;
     private final MatchmakingRegistryService registry;
     private final BattleReviewMapper reviewMapper;
+    private final DisciplineService disciplines;
+    private final RankService ranks;
+    private final RatingProcessor ratingProcessor;
+    private final SeasonService seasons;
+    private final UsageProcessor usage;
+    private final BattleAccessProcessor access;
 
     @Override
     @Transactional(propagation = Propagation.SUPPORTS)
@@ -44,9 +50,9 @@ public class BattleProcessorImpl implements BattleProcessor {
     }
 
     private UUID createLocked(CreateBattleDto command) {
-        if (command.getFirstUserId() == null || command.getSecondUserId() == null || command.getSubject() == null
+        if (command.getFirstUserId() == null || command.getSecondUserId() == null || command.getDisciplineCode() == null
                 || command.getMode() == null || command.getFirstUserId().equals(command.getSecondUserId())) {
-            throw new BusinessValidationException("VALIDATION_ERROR", "Two distinct users, subject and mode are required.");
+            throw new BusinessValidationException("VALIDATION_ERROR", "Two distinct users, disciplineCode and mode are required.");
         }
         Map<UUID, UserDto> users = new HashMap<>();
         // Serialize creation for shared accounts before checking cross-column participant ownership.
@@ -54,37 +60,62 @@ public class BattleProcessorImpl implements BattleProcessor {
         for (UUID id : users.keySet()) {
             if (battleService.hasActiveBattle(id)) throw new ConflictException("ACTIVITY_CONFLICT", "User already participates in an active battle.");
         }
-        var settings = properties.forSubject(command.getSubject());
-        List<QuestionSeenDto> seen = new ArrayList<>(battleService.recentQuestionShows(command.getFirstUserId(), command.getSubject(), properties.getQuestionHistoryBattles()));
-        seen.addAll(battleService.recentQuestionShows(command.getSecondUserId(), command.getSubject(), properties.getQuestionHistoryBattles()));
-        var questions = questionService.selectForBattle(new QuestionSelectionDto(command.getSubject(), settings.getQuestionCount(), seen));
+        var settings = disciplines.requireActive(command.getDisciplineCode());
+        if (command.getFormat() != settings.getFormat()) throw new BusinessValidationException("VALIDATION_ERROR", "Unsupported battle format.");
+        // Lock both accounts' ratings before taking one season cut for the pair.
+        // A quarter boundary between preparing the two players must not mix seasons.
+        users.keySet().stream().sorted().forEach(id -> {ratingService.initialize(id);ratingService.lockForUser(id);});
+        var pairSeason=seasons.current();
+        Map<UUID, RatingDto> playerRatings = new HashMap<>();
+        for (UUID id : users.keySet()) {
+            playerRatings.put(id, ratingProcessor.prepare(id,pairSeason).stream().filter(r -> r.getDisciplineCode().equals(command.getDisciplineCode())).findFirst().orElseThrow());
+        }
+        int lowerRating = playerRatings.values().stream().mapToInt(RatingDto::getRating).min().orElseThrow();
+        var schedule = DisciplineContentPolicy.schedule(settings, lowerRating);
+        List<QuestionSeenDto> seen = new ArrayList<>(battleService.recentQuestionShows(command.getFirstUserId(), command.getDisciplineCode(), properties.getQuestionHistoryBattles()));
+        seen.addAll(battleService.recentQuestionShows(command.getSecondUserId(), command.getDisciplineCode(), properties.getQuestionHistoryBattles()));
+        Map<Difficulty, Integer> needed = new EnumMap<>(Difficulty.class);
+        schedule.getRoundDifficulties().forEach(d -> needed.merge(d, 1, Integer::sum));
+        needed.merge(Difficulty.MEDIUM, 1, Integer::sum);
+        Map<Difficulty, ArrayDeque<FrozenQuestionDto>> pool = new EnumMap<>(Difficulty.class);
+        for (var entry : needed.entrySet()) pool.put(entry.getKey(), new ArrayDeque<>(questionService.selectForBattle(
+                new QuestionSelectionDto(command.getDisciplineCode(), entry.getValue(), seen, entry.getKey()))));
         Instant now = now();
         BattleDto battle = new BattleDto();
-        battle.setSubject(command.getSubject());
+        battle.setDisciplineCode(command.getDisciplineCode());
         battle.setMode(command.getMode());
         battle.setPhase(BattlePhase.WAITING_READY);
         battle.setVersion(1);
         battle.setReadyDeadline(now.plusSeconds(properties.getReadyTimeoutSeconds()));
         BattleStateDto state = new BattleStateDto();
-        state.setLimitSeconds(settings.getQuestionLimitSeconds());
+        state.setLimitSeconds(disciplines.limitSeconds(settings, Difficulty.MEDIUM));
+        state.setRankTiers(ranks.tiers());
+        state.setMainQuestionCount(settings.getQuestionCount());
+        state.setSeasonId(command.getMode()==BattleMode.RANKED?pairSeason.getId():null);
+        state.setOvertimeSeconds(settings.getOvertimeSeconds());
         state.setCountdownSeconds(properties.getCountdownSeconds());
         state.setRevealSeconds(properties.getRevealSeconds());
         state.setReconnectGraceSeconds(properties.getReconnectGraceSeconds());
         for (UUID id : List.of(command.getFirstUserId(), command.getSecondUserId())) {
-            RatingDto rating = ratingService.getByUserId(id).stream().filter(item -> item.getSubject() == command.getSubject()).findFirst().orElseThrow();
+            RatingDto rating = playerRatings.get(id);
             BattlePlayerDto player = new BattlePlayerDto();
             player.setId(id);
             player.setNickname(users.get(id).getNickname());
             player.setRating(rating.getRating());
+            player.setCalibrationCompletedMatches(rating.getCalibrationCompletedMatches());
             state.getPlayers().add(player);
         }
-        for (int i = 0; i < questions.size(); i++) {
+        for (int i = 0; i < schedule.getRoundDifficulties().size(); i++) {
+            Difficulty difficulty = schedule.getRoundDifficulties().get(i);
             BattleRoundDto round = new BattleRoundDto();
             round.setId(UUID.randomUUID());
             round.setNumber(i + 1);
-            round.setQuestion(questions.get(i));
+            round.setQuestion(pool.get(difficulty).removeFirst());
+            round.setLimitSeconds(disciplines.limitSeconds(settings, difficulty));
+            round.setBasePoints(settings.getTimings().stream().filter(t -> t.getDifficulty() == difficulty).findFirst().orElseThrow().getBasePoints());
             state.getRounds().add(round);
         }
+        state.setOvertimeQuestion(pool.get(Difficulty.MEDIUM).removeFirst());
         battle.setState(state);
         synchronize(battle, now);
         battle.setVersion(1);
@@ -100,7 +131,7 @@ public class BattleProcessorImpl implements BattleProcessor {
         Instant now = now();
         synchronize(battle, now);
         persist(battle, version, now);
-        return mapper.snapshot(battle, userId, now);
+        return access.snapshot(battle, userId, now);
     }
 
     @Override
@@ -111,7 +142,7 @@ public class BattleProcessorImpl implements BattleProcessor {
         synchronize(battle, now);
         engine.ready(battle, userId, now);
         persist(battle, version, now);
-        return mapper.snapshot(battle, userId, now);
+        return access.snapshot(battle, userId, now);
     }
 
     @Override
@@ -134,25 +165,25 @@ public class BattleProcessorImpl implements BattleProcessor {
         synchronize(battle, now);
         engine.surrender(battle, userId, now);
         persist(battle, version, now);
-        return mapper.snapshot(battle, userId, now);
+        return access.snapshot(battle, userId, now);
     }
 
     @Override
     @Transactional(readOnly = true)
     public BattleResultDto result(UUID battleId, UUID userId) {
-        return mapper.result(terminalRead(battleId, userId), userId);
+        return access.result(terminalRead(battleId, userId), userId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public BattleReviewDto review(UUID battleId, UUID userId) {
-        return reviewMapper.review(terminalRead(battleId, userId));
+        return access.review(terminalRead(battleId, userId),userId);
     }
 
     private BattleDto terminalRead(UUID battleId, UUID userId) {
         BattleDto battle = battleService.getForParticipant(battleId, userId);
         if (!BattleEngineImpl.terminal(battle)) throw new ConflictException("BATTLE_NOT_FINISHED", "Battle is not finished.");
-        return battle;
+        access.require(battle,userId);return battle;
     }
 
     @Override
@@ -180,7 +211,7 @@ public class BattleProcessorImpl implements BattleProcessor {
         if (battle.getState().getPlayers().stream().noneMatch(player -> player.getId().equals(userId))) {
             throw new NotFoundException("BATTLE_NOT_FOUND", "Battle not found.");
         }
-        return battle;
+        access.require(battle,userId);return battle;
     }
 
     private void synchronize(BattleDto battle, Instant now) {
@@ -188,18 +219,22 @@ public class BattleProcessorImpl implements BattleProcessor {
         Map<UUID, PresenceDto> presence = new HashMap<>();
         battle.getState().getPlayers().forEach(player -> presenceService.observed(player.getId())
                 .ifPresent(value -> presence.put(player.getId(), value)));
-        engine.synchronizePresence(battle, presence, now);
+        engine.synchronizePresence(battle, presence, now,usage::start);
     }
 
     private void persist(BattleDto battle, int previousVersion, Instant now) {
-        if (BattleEngineImpl.terminal(battle) && battle.getSettledAt() == null) {
+        boolean newlySettled=BattleEngineImpl.terminal(battle) && battle.getSettledAt() == null;
+        if (newlySettled) {
+            usage.finish(battle);
             if (battle.getPhase() == BattlePhase.FINISHED && battle.getMode() == BattleMode.RANKED) {
                 ratingService.settle(battle.getResult().getPlayers().stream().map(player ->
-                        new RatingUpdateDto(player.getId(), battle.getSubject(), player.getRatingBefore(), player.getRatingAfter())).toList());
+                        new RatingUpdateDto(player.getId(), battle.getDisciplineCode(), player.getRatingBefore(), player.getRatingAfter(),battle.getState().getSeasonId(),
+                                battle.getState().getPlayers().stream().filter(p -> p.getId().equals(player.getId())).findFirst().orElseThrow().getCalibrationCompletedMatches())).toList());
             }
             battle.setSettledAt(now);
         }
         battleService.save(battle);
+        if(newlySettled) battle.getState().getPlayers().stream().map(BattlePlayerDto::getId).sorted().forEach(ratingProcessor::prepare);
         if (battle.getVersion() != previousVersion) publish(battle);
     }
 

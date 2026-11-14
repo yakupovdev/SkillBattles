@@ -32,15 +32,16 @@ class BattleEngineTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"0,100", "1,99", "99,99", "100,99", "5000,50", "9900,1", "9999,0"})
-    void bonusUsesServerTimeAndFloorWithoutStreakMultiplier(long elapsedMs, int expectedBonus) {
+    @CsvSource({"0,200", "1,199", "99,198", "100,198", "5000,100", "9900,2", "9999,0"})
+    void bonusUsesServerTimeAndFloorWithAdditiveStreakBonus(long elapsedMs, int expectedBonus) {
         BattleDto battle = started(1, BattleMode.RANKED);
         battle.getState().getPlayers().getFirst().setStreak(50);
         Instant accepted = round(battle).getStartedAt().plusMillis(elapsedMs);
         engine.answer(battle, player(battle, 0), answer(battle, true), accepted, accepted);
         BattleAnswerDto saved = round(battle).getAnswers().getFirst();
         assertThat(saved.getSpeedBonus()).isEqualTo(expectedBonus);
-        assertThat(saved.getPoints()).isEqualTo(1000 + expectedBonus);
+        assertThat(saved.getStreakBonus()).isEqualTo(300);
+        assertThat(saved.getPoints()).isEqualTo(1300 + expectedBonus);
         assertThat(battle.getState().getPlayers().getFirst().getScore()).isZero();
     }
 
@@ -119,7 +120,7 @@ class BattleEngineTest {
         engine.answer(battle, second, answer(battle, false), START.plusSeconds(5), START.plusSeconds(5));
         assertThat(battle.getPhase()).isEqualTo(BattlePhase.REVEAL);
         assertThat(mapper.snapshot(battle, second, START.plusSeconds(5)).getRound().getReveal().getAnswers()).hasSize(2);
-        assertThat(battle.getState().getPlayers().getFirst().getScore()).isEqualTo(1090);
+        assertThat(battle.getState().getPlayers().getFirst().getScore()).isEqualTo(1180);
         assertThat(battle.getState().getPlayers().get(1).getScore()).isZero();
     }
 
@@ -300,7 +301,7 @@ class BattleEngineTest {
         engine.answer(battle, player(battle, 0), answer(battle, false), START.plusSeconds(10), START.plusSeconds(10));
         engine.answer(battle, player(battle, 1), answer(battle, true), START.plusSeconds(10), START.plusSeconds(10));
         assertThat(battle.getState().getPlayers().getFirst().getStreak()).isZero();
-        assertThat(battle.getState().getPlayers().getFirst().getScore()).isEqualTo(1090);
+        assertThat(battle.getState().getPlayers().getFirst().getScore()).isEqualTo(1180);
         assertThat(battle.getState().getPlayers().get(1).getStreak()).isEqualTo(1);
     }
 }

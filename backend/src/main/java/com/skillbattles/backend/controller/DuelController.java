@@ -32,8 +32,8 @@ public class DuelController {
     @Operation(operationId = "postDuels", summary = "Create a waiting private duel", description = "Share the six-character code. The room expires in ten minutes.")
     @ApiResponse(responseCode = "201", description = "Waiting duel created")
     @ApiResponse(responseCode = "409", description = "ACTIVITY_CONFLICT or CONTENT_UNAVAILABLE", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
-    public DuelResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody SubjectRequest request) {
-        return mapper.toResponse(processor.createDuel(UUID.fromString(jwt.getSubject()), request.getSubject()));
+    public DuelResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody DisciplineRequest request) {
+        return mapper.toResponse(processor.createDuel(UUID.fromString(jwt.getSubject()), request.getDisciplineCode()));
     }
 
     @PostMapping("/join")

@@ -31,6 +31,20 @@ server:
     include-message: never
     include-stacktrace: never
 app:
+  billing:
+    mode: ${BILLING_MODE:TEST}
+    secret-key: ${STRIPE_SECRET_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+    monthly-price: ${STRIPE_PRICE_PRO_MONTHLY:}
+    annual-price: ${STRIPE_PRICE_PRO_ANNUAL:}
+    success-url: ${BILLING_SUCCESS_URL:}
+    cancel-url: ${BILLING_CANCEL_URL:}
+    portal-return-url: ${BILLING_PORTAL_RETURN_URL:}
+    expiry-scan-ms: 1000
+  season:
+    scan-ms: ${SEASON_SCAN_MS:60000}
+    scheduling:
+      enabled: ${SEASON_SCHEDULING_ENABLED:true}
   matchmaking:
     search-seconds: ${MATCHMAKING_SEARCH_SECONDS:90}
     duel-seconds: ${PRIVATE_DUEL_SECONDS:600}
@@ -40,12 +54,6 @@ app:
     connect-timeout-ms: 10000
     monitor-ms: 500
   battle:
-    math:
-      question-count: ${MATH_QUESTION_COUNT:3}
-      question-limit-seconds: ${MATH_QUESTION_LIMIT_SECONDS:95}
-    english:
-      question-count: ${ENGLISH_QUESTION_COUNT:4}
-      question-limit-seconds: ${ENGLISH_QUESTION_LIMIT_SECONDS:70}
     ready-timeout-seconds: ${READY_TIMEOUT_SECONDS:30}
     countdown-seconds: ${COUNTDOWN_SECONDS:3}
     reveal-seconds: ${REVEAL_SECONDS:5}

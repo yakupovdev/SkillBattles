@@ -25,6 +25,7 @@ import java.util.*;
 @SecurityRequirement(name = "accessBearer")
 public class BattleHistoryController {
     private final BattleService service;
+    private final com.skillbattles.backend.processor.BattleAccessProcessor access;
     private final BattleHistoryMapper mapper;
 
     @GetMapping
@@ -37,13 +38,12 @@ public class BattleHistoryController {
             @Parameter(schema = @Schema(minimum = "0")) @RequestParam(defaultValue = "0") int page,
             @Parameter(schema = @Schema(minimum = "1", maximum = "100")) @RequestParam(defaultValue = "20") int size,
             @Parameter(schema = @Schema(allowableValues = {"createdAt,asc", "createdAt,desc"})) @RequestParam(defaultValue = "createdAt,desc") String sort,
-            @RequestParam(required = false) Subject subject, @RequestParam(required = false) BattleMode mode,
+            @RequestParam(required = false) String disciplineCode, @RequestParam(required = false) BattleMode mode,
             HttpServletRequest request) {
-        for (String name : List.of("page", "size", "sort", "subject", "mode")) {
+        for (String name : List.of("page", "size", "sort", "disciplineCode", "mode")) {
             if (request.getParameterMap().containsKey(name) && request.getParameter(name).isBlank())
                 throw new BusinessValidationException("VALIDATION_ERROR", "History query parameters cannot be blank.");
         }
-        var history = service.history(new BattleHistoryQueryDto(UUID.fromString(jwt.getSubject()), page, size, sort, subject, mode));
-        return new BattleHistoryPage(history.getData().stream().map(mapper::toResponse).toList(), history.getPagination());
+        return access.history(new BattleHistoryQueryDto(UUID.fromString(jwt.getSubject()), page, size, sort, disciplineCode, mode));
     }
 }

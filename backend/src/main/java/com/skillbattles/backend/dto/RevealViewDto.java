@@ -11,5 +11,6 @@ import java.util.*;
 public class RevealViewDto {
     private UUID correctOptionId;
     private List<AnswerViewDto> answers;
+    private AnswerAccessDto answerAccess;
 }
 

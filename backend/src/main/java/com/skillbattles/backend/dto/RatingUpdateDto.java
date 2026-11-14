@@ -10,8 +10,10 @@ import java.util.*;
 @AllArgsConstructor
 public class RatingUpdateDto {
     private UUID userId;
-    private Subject subject;
+    private String disciplineCode;
     private int before;
     private int after;
+    private String seasonId;
+    private int completedMatchesBefore;
 }
 

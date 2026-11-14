@@ -3,7 +3,7 @@ package com.skillbattles.backend.repository;
 import com.skillbattles.backend.entity.*;
 
 public interface BattleStatisticsProjection {
-    Subject getSubject();
+    String getDisciplineCode();
     BattleMode getMode();
     long getWins();
     long getLosses();

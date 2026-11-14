@@ -22,6 +22,10 @@ public class RoundAnswerResponse {
     private int basePoints;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private int speedBonus;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private int streakBonus;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private int tieBreakPoints;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private int points;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

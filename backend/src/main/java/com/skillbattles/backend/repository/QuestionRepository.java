@@ -8,17 +8,17 @@ import java.util.*;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
     List<Question> findAllByExternalKeyIn(Collection<String> externalKeys);
-    long countBySubjectAndDifficultyAndActiveTrue(Subject subject, Difficulty difficulty);
+    long countByDisciplineCodeAndDifficultyAndActiveTrue(String disciplineCode, Difficulty difficulty);
 
-    @Query(value = "select * from questions where subject = :subject and difficulty = 'MEDIUM' and active = true and deleted = false order by random() limit :count", nativeQuery = true)
-    List<Question> selectForBattle(@Param("subject") String subject, @Param("count") int count);
+    @Query(value = "select * from questions where discipline_code = :disciplineCode and difficulty = :difficulty and active = true and deleted = false order by random() limit :count", nativeQuery = true)
+    List<Question> selectForBattle(@Param("disciplineCode") String disciplineCode, @Param("count") int count, @Param("difficulty") String difficulty);
 
-    @Query(value = "select * from questions where subject = :subject and difficulty = 'MEDIUM' and active = true and deleted = false and external_key not in :seenKeys order by random() limit :count", nativeQuery = true)
-    List<Question> selectUnseenForBattle(@Param("subject") String subject, @Param("count") int count,
-                                        @Param("seenKeys") Collection<String> seenKeys);
+    @Query(value = "select * from questions where discipline_code = :disciplineCode and difficulty = :difficulty and active = true and deleted = false and external_key not in :seenKeys order by random() limit :count", nativeQuery = true)
+    List<Question> selectUnseenForBattle(@Param("disciplineCode") String disciplineCode, @Param("count") int count,
+                                        @Param("seenKeys") Collection<String> seenKeys, @Param("difficulty") String difficulty);
 
-    @Query(value = "select * from questions where subject = :subject and difficulty = 'MEDIUM' and active = true and deleted = false and external_key in :seenKeys order by random()", nativeQuery = true)
-    List<Question> selectSeenForBattle(@Param("subject") String subject, @Param("seenKeys") Collection<String> seenKeys);
+    @Query(value = "select * from questions where discipline_code = :disciplineCode and difficulty = :difficulty and active = true and deleted = false and external_key in :seenKeys order by random()", nativeQuery = true)
+    List<Question> selectSeenForBattle(@Param("disciplineCode") String disciplineCode, @Param("seenKeys") Collection<String> seenKeys, @Param("difficulty") String difficulty);
 
     // Historical identities must include inactive and soft-deleted revisions. No foreign aggregate is queried here.
     @Query(value = "select id, external_key AS \"externalKey\" from questions where id in :ids", nativeQuery = true)

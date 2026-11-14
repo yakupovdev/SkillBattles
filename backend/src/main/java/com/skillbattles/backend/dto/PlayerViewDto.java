@@ -10,9 +10,11 @@ import java.util.*;
 @AllArgsConstructor
 public class PlayerViewDto {
     private UUID id;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPro")
+    private boolean pro;
     private String nickname;
     private int rating;
-    private String rank;
+    private String rankCode;
     private boolean ready;
     private boolean connected;
     private Instant reconnectDeadline;

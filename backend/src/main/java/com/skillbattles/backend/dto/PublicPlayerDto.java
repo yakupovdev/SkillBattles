@@ -8,5 +8,7 @@ import java.util.UUID;
 @Value @Builder(toBuilder = true)
 public class PublicPlayerDto {
     UUID id;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPro")
+    boolean pro;
     String nickname;
 }

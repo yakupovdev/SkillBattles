@@ -11,7 +11,8 @@ import java.util.*;
 @Service
 public class BattleEngineImpl implements BattleEngine {
     @Override
-    public void advance(BattleDto battle, Instant now) {
+    public void advance(BattleDto battle, Instant now) {advance(battle,now,(b,at) -> true);}
+    private void advance(BattleDto battle,Instant now,java.util.function.BiPredicate<BattleDto,Instant> startCheck) {
         while (!terminal(battle)) {
             Instant next = nextEvent(battle);
             if (next == null || next.isAfter(now)) break;
@@ -19,14 +20,22 @@ public class BattleEngineImpl implements BattleEngine {
             if (next.equals(phaseDeadline)) {
                 switch (battle.getPhase()) {
                     case WAITING_READY -> finish(battle, CompletionReason.READY_TIMEOUT, null, next, true);
-                    case COUNTDOWN -> startRound(battle, next);
+                    case COUNTDOWN -> {
+                        if(startCheck.test(battle,next)) startRound(battle,next);
+                        else finish(battle,CompletionReason.QUOTA_EXHAUSTED,null,next,true);
+                    }
                     case QUESTION -> reveal(battle, next);
                     case REVEAL -> {
                         if (battle.getState().getCurrentRoundIndex() == battle.getState().getRounds().size() - 1) {
                             var players = battle.getState().getPlayers();
                             UUID winner = players.get(0).getScore() == players.get(1).getScore() ? null
                                     : players.get(players.get(0).getScore() > players.get(1).getScore() ? 0 : 1).getId();
-                            finish(battle, CompletionReason.NORMAL, winner, next, false);
+                            if(currentRound(battle).isOvertimeRound()) {
+                                winner=overtimeWinner(currentRound(battle));
+                                finish(battle,winner==null?CompletionReason.NORMAL:CompletionReason.OVERTIME_WIN,winner,next,false);
+                            } else if(winner==null && battle.getState().getOvertimeQuestion()!=null) {
+                                startOvertime(battle,next);
+                            } else finish(battle, CompletionReason.NORMAL, winner, next, false);
                         } else startRound(battle, next);
                     }
                     default -> throw new IllegalStateException("Unexpected timed battle phase.");
@@ -53,7 +62,8 @@ public class BattleEngineImpl implements BattleEngine {
     }
 
     @Override
-    public void synchronizePresence(BattleDto battle, Map<UUID, PresenceDto> presence, Instant now) {
+    public void synchronizePresence(BattleDto battle, Map<UUID, PresenceDto> presence, Instant now) {synchronizePresence(battle,presence,now,(b,at) -> true);}
+    @Override public void synchronizePresence(BattleDto battle,Map<UUID,PresenceDto> presence,Instant now,java.util.function.BiPredicate<BattleDto,Instant> startCheck) {
         // Process observed transport changes on the same timeline as persisted battle deadlines.
         List<PresenceChange> changes = new ArrayList<>();
         for (BattlePlayerDto player : battle.getState().getPlayers()) {
@@ -72,7 +82,7 @@ public class BattleEngineImpl implements BattleEngine {
             PresenceDto current = change.presence();
             Instant at = change.at();
             if (at.isAfter(now)) continue;
-            advance(battle, at); // Expired grace wins at equality, before applying reconnect.
+            advance(battle, at,startCheck); // Expired grace wins at equality, before applying reconnect.
             if (terminal(battle)) return;
             if (current == null || current.getSessionId() == null || current.getExpiresAt() == null || !current.getExpiresAt().isAfter(at)) {
                 if (player.isConnected()) disconnect(battle, player, at);
@@ -85,7 +95,7 @@ public class BattleEngineImpl implements BattleEngine {
             }
             beginCountdownIfReady(battle, at);
         }
-        advance(battle, now);
+        advance(battle, now,startCheck);
     }
 
     private record PresenceChange(BattlePlayerDto player, PresenceDto presence, Instant at) { }
@@ -144,12 +154,14 @@ public class BattleEngineImpl implements BattleEngine {
         answer.setAcceptedAt(receivedAt);
         answer.setCorrect(command.getOptionId().equals(round.getQuestion().getCorrectOptionId()));
         answer.setElapsedMs(receivedAt.toEpochMilli() - round.getStartedAt().toEpochMilli());
-        if (answer.isCorrect()) {
-            long limitMs = battle.getState().getLimitSeconds() * 1000L;
+        if (answer.isCorrect() && !round.isOvertimeRound()) {
+            long limitMs = limitSeconds(battle, round) * 1000L;
             long remainingMs = Math.clamp(round.getDeadline().toEpochMilli() - receivedAt.toEpochMilli(), 0L, limitMs);
-            answer.setBasePoints(1000);
-            answer.setSpeedBonus((int) (100L * remainingMs / limitMs));
-            answer.setPoints(answer.getBasePoints() + answer.getSpeedBonus());
+            answer.setBasePoints(round.getBasePoints());
+            answer.setSpeedBonus((int) (200L * remainingMs / limitMs));
+            int streak=player(battle,userId).getStreak()+1;
+            answer.setStreakBonus(switch(streak) {case 1 -> 0;case 2 -> 100;case 3 -> 150;case 4 -> 200;default -> 300;});
+            answer.setPoints(answer.getBasePoints() + answer.getSpeedBonus() + answer.getStreakBonus());
         }
         round.getAnswers().add(answer);
         battle.setVersion(battle.getVersion() + 1);
@@ -189,11 +201,26 @@ public class BattleEngineImpl implements BattleEngine {
         state.setCurrentRoundIndex(state.getCurrentRoundIndex() + 1);
         BattleRoundDto round = currentRound(battle);
         round.setStartedAt(at);
-        round.setDeadline(at.plusSeconds(state.getLimitSeconds()));
+        round.setDeadline(at.plusSeconds(limitSeconds(battle, round)));
         battle.setPhase(BattlePhase.QUESTION);
         battle.setCountdownEndsAt(null);
         battle.setNextRoundStartsAt(null);
         battle.setVersion(battle.getVersion() + 1);
+    }
+
+    private void startOvertime(BattleDto battle,Instant at) {
+        var state=battle.getState();
+        var round=new BattleRoundDto();round.setId(UUID.randomUUID());round.setNumber(6);round.setOvertimeRound(true);
+        round.setLimitSeconds(state.getOvertimeSeconds());round.setQuestion(state.getOvertimeQuestion());
+        state.getRounds().add(round);
+        startRound(battle,at);
+    }
+
+    private UUID overtimeWinner(BattleRoundDto round) {
+        var correct=round.getAnswers().stream().filter(BattleAnswerDto::isCorrect).toList();
+        if(correct.size()==1) return correct.getFirst().getUserId();
+        if(correct.size()!=2 || correct.get(0).getElapsedMs().equals(correct.get(1).getElapsedMs())) return null;
+        return correct.get(correct.get(0).getElapsedMs()<correct.get(1).getElapsedMs()?0:1).getUserId();
     }
 
     private void reveal(BattleDto battle, Instant at) {
@@ -208,14 +235,21 @@ public class BattleEngineImpl implements BattleEngine {
                 answer.setTimedOut(true);
                 round.getAnswers().add(answer);
             }
+        }
+        UUID overtimeWinner=round.isOvertimeRound()?overtimeWinner(round):null;
+        for(BattlePlayerDto player:battle.getState().getPlayers()) {
+            var answer=round.getAnswers().stream().filter(a -> a.getUserId().equals(player.getId())).findFirst().orElseThrow();
+            if(player.getId().equals(overtimeWinner)) {answer.setTieBreakPoints(1);answer.setPoints(1);}
             player.setScore(Math.addExact(player.getScore(), answer.getPoints()));
             player.setCorrectCount(player.getCorrectCount() + (answer.isCorrect() ? 1 : 0));
-            player.setStreak(answer.isCorrect() ? player.getStreak() + 1 : 0);
+            if(!round.isOvertimeRound()) player.setStreak(answer.isCorrect() ? player.getStreak() + 1 : 0);
         }
         round.setCompleted(true);
         round.setRevealEndsAt(at.plusSeconds(battle.getState().getRevealSeconds()));
         battle.setPhase(BattlePhase.REVEAL);
-        battle.setNextRoundStartsAt(battle.getState().getCurrentRoundIndex() < battle.getState().getRounds().size() - 1 ? round.getRevealEndsAt() : null);
+        boolean another=battle.getState().getCurrentRoundIndex()<battle.getState().getRounds().size()-1
+                || (!round.isOvertimeRound() && battle.getState().getOvertimeQuestion()!=null && battle.getState().getPlayers().get(0).getScore()==battle.getState().getPlayers().get(1).getScore());
+        battle.setNextRoundStartsAt(another?round.getRevealEndsAt():null);
         battle.setVersion(battle.getVersion() + 1);
     }
 
@@ -225,14 +259,17 @@ public class BattleEngineImpl implements BattleEngine {
         result.setReason(reason);
         result.setWinnerUserId(winner);
         result.setFinishedAt(at);
+        result.setRulesVersion(battle.getState().getRulesVersion()); result.setSeasonId(battle.getState().getSeasonId());
+        result.setOvertimePlayed(battle.getState().getRounds().stream().anyMatch(BattleRoundDto::isOvertimeRound));
         List<BattlePlayerDto> players = battle.getState().getPlayers();
-        int delta = !cancelled && battle.getMode() == BattleMode.RANKED
-                ? eloDelta(players.get(0).getRating(), players.get(1).getRating(), winner == null ? 0.5 : winner.equals(players.get(0).getId()) ? 1 : 0) : 0;
+        boolean ranked=!cancelled && battle.getMode()==BattleMode.RANKED;
         for (int i = 0; i < players.size(); i++) {
             BattlePlayerDto player = players.get(i);
-            int after = Math.max(0, player.getRating() + (i == 0 ? delta : -delta));
-            result.getPlayers().add(new BattleResultPlayerDto(player.getId(), player.getNickname(), player.getScore(), player.getCorrectCount(),
-                    player.getRating(), after, after - player.getRating(), Rank.fromRating(player.getRating()).getDisplayName(), Rank.fromRating(after).getDisplayName()));
+            int k=ranked?(player.getCalibrationCompletedMatches()<5?64:32):0;
+            double actual=winner==null?0.5:winner.equals(player.getId())?1:0;
+            int after = Math.max(0, player.getRating() + eloDelta(player.getRating(),players.get(1-i).getRating(),actual,k));
+            result.getPlayers().add(new BattleResultPlayerDto(player.getId(), false, player.getNickname(), player.getScore(), player.getCorrectCount(),
+                    player.getRating(), after, after - player.getRating(), k, Math.max(0,5-player.getCalibrationCompletedMatches()-(ranked?1:0)), RankCalculator.fromRating(battle.getState().getRankTiers(), player.getRating()).getCode(), RankCalculator.fromRating(battle.getState().getRankTiers(), after).getCode()));
         }
         battle.setResult(result);
         battle.setPhase(cancelled ? BattlePhase.CANCELLED : BattlePhase.FINISHED);
@@ -243,9 +280,12 @@ public class BattleEngineImpl implements BattleEngine {
         battle.setVersion(battle.getVersion() + 1);
     }
 
-    static int eloDelta(int first, int second, double actual) {
+    private int limitSeconds(BattleDto battle, BattleRoundDto round) { return round.getLimitSeconds() > 0 ? round.getLimitSeconds() : battle.getState().getLimitSeconds(); }
+
+    static int eloDelta(int first, int second, double actual) {return eloDelta(first,second,actual,32);}
+    static int eloDelta(int first, int second, double actual,int k) {
         double expected = 1.0 / (1.0 + Math.pow(10.0, ((double) second - first) / 400.0));
-        return BigDecimal.valueOf(32.0 * (actual - expected)).setScale(0, RoundingMode.HALF_UP).intValueExact();
+        return BigDecimal.valueOf(k * (actual - expected)).setScale(0, RoundingMode.HALF_UP).intValueExact();
     }
 
     private void disconnect(BattleDto battle, BattlePlayerDto player, Instant at) {

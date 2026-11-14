@@ -1,6 +1,5 @@
 package com.skillbattles.backend.config;
 
-import com.skillbattles.backend.entity.Subject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -13,10 +12,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "app.battle")
 public class BattleProperties {
-    @Valid @NotNull
-    private SubjectSettings math;
-    @Valid @NotNull
-    private SubjectSettings english;
     @Min(1)
     private int readyTimeoutSeconds;
     @Min(1)
@@ -28,14 +23,4 @@ public class BattleProperties {
     @Min(1)
     private int questionHistoryBattles = 5;
 
-    public SubjectSettings forSubject(Subject subject) { return subject == Subject.MATH ? math : english; }
-
-    @Getter
-    @Setter
-    public static class SubjectSettings {
-        @Min(1)
-        private int questionCount;
-        @Min(1)
-        private int questionLimitSeconds;
-    }
 }

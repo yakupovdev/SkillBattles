@@ -30,6 +30,7 @@ class AuthSecurityTest {
     @Autowired TokenService tokens;
     @MockitoBean AuthProcessor processor;
     @MockitoBean UserService users;
+    @MockitoBean com.skillbattles.backend.processor.AccountProcessor accounts;
 
     @TestConfiguration
     static class TimeConfig {
@@ -54,7 +55,7 @@ class AuthSecurityTest {
         UUID id = UUID.randomUUID();
         com.skillbattles.backend.dto.UserDto user = new com.skillbattles.backend.dto.UserDto();
         user.setId(id);
-        when(users.getById(id)).thenReturn(user);
+        when(accounts.state(id)).thenReturn(new com.skillbattles.backend.dto.AccountStateDto(user,null,null,null));
         mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + tokens.issue(id).getAccessToken()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(header().doesNotExist("Set-Cookie"));

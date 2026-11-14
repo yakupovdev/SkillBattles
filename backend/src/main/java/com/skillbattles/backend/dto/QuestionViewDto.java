@@ -10,7 +10,9 @@ import java.util.*;
 @AllArgsConstructor
 public class QuestionViewDto {
     private UUID id;
-    private String topic;
+    private String topicCode;
+    private Difficulty difficulty;
+    private String topicName;
     private String prompt;
     private List<OptionViewDto> options;
 }

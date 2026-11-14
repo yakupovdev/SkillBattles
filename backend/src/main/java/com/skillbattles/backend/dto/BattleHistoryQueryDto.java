@@ -10,6 +10,6 @@ public class BattleHistoryQueryDto {
     int page;
     int size;
     String sort;
-    Subject subject;
+    String disciplineCode;
     BattleMode mode;
 }

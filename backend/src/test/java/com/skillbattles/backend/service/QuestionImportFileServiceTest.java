@@ -12,7 +12,7 @@ class QuestionImportFileServiceTest {
     @TempDir Path directory;
     private final QuestionImportFileService service = new QuestionImportFileServiceImpl(new ObjectMapper());
     private static final String VALID = """
-            [{"externalKey":"test-only", "contentVersion":1, "subject":"MATH", "topic":"Test",
+            [{"externalKey":"test-only", "contentVersion":1, "disciplineCode":"SAT_MATH", "topicName":"Test",
               "difficulty":"MEDIUM", "prompt":"TEST ONLY", "options":[], "correctOptionKey":"A", "explanation":"TEST ONLY"}]
             """;
 
@@ -20,8 +20,8 @@ class QuestionImportFileServiceTest {
     void rejectsUnknownFieldsEnumsDuplicateJsonKeysAndNumericCoercion() throws Exception {
         List<String> invalid = List.of(
                 VALID.replace("\"contentVersion\":1", "\"contentVersion\":1, \"extra\":true"),
-                VALID.replace("\"MATH\"", "\"SCIENCE\""),
-                VALID.replace("\"MATH\"", "0"),
+                VALID.replace("\"MEDIUM\"", "\"UNSUPPORTED\""),
+                VALID.replace("\"SAT_MATH\"", "0"),
                 VALID.replace("\"contentVersion\":1", "\"contentVersion\":1, \"contentVersion\":2"),
                 VALID.replace("\"contentVersion\":1", "\"contentVersion\":1.5"),
                 VALID.replace("\"contentVersion\":1", "\"contentVersion\":\"1\""),

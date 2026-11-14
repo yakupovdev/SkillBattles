@@ -12,8 +12,16 @@ import java.util.*;
 public class BattleResultResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private UUID battleId;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private String rulesVersion;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED, nullable = true)
+    private String seasonId;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private boolean overtimePlayed;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-    private Subject subject;
+    private String disciplineCode;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private BattleFormat format = BattleFormat.STANDARD;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private BattleMode mode;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = {"FINISHED", "CANCELLED"})

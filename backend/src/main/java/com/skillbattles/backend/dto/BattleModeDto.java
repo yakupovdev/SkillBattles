@@ -1,17 +1,26 @@
 package com.skillbattles.backend.dto;
 
-import com.skillbattles.backend.entity.Subject;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import com.skillbattles.backend.entity.*;
+import lombok.*;
+import java.util.*;
 
-@Getter
-@AllArgsConstructor
+@Getter @Setter
 public class BattleModeDto {
-    private final Subject subject;
-    private final int questionCount;
-    private final int questionLimitSeconds;
-    private final int readyTimeoutSeconds;
-    private final int countdownSeconds;
-    private final int revealSeconds;
-    private final boolean contentAvailable;
+    private String disciplineCode;
+    private String displayName;
+    private String description;
+    private boolean active;
+    private BattleFormat format;
+    private QuestionType questionType;
+    private int optionsCount;
+    private int questionCount;
+    private int baseQuestionSeconds;
+    private List<DifficultyTiming> difficultyTimings;
+    private List<DifficultySchedule> difficultySchedules;
+    private int overtimeSeconds;
+    private int readyTimeoutSeconds;
+    private int countdownSeconds;
+    private int revealSeconds;
+    private int reconnectGraceSeconds;
+    private boolean contentAvailable;
 }

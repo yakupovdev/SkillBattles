@@ -9,17 +9,22 @@ import com.skillbattles.backend.service.PresenceService;
 
 /** Internal-only fixtures; never wired into the production application. */
 public final class BattleFixtures {
+    public static void uniformTiming(org.springframework.jdbc.core.JdbcTemplate jdbc, int seconds) {
+        jdbc.update("UPDATE disciplines SET base_question_seconds=?, timings='[{\"difficulty\":\"EASY\",\"timeMultiplier\":1,\"basePoints\":800},{\"difficulty\":\"MEDIUM\",\"timeMultiplier\":1,\"basePoints\":1000},{\"difficulty\":\"HARD\",\"timeMultiplier\":1,\"basePoints\":1200}]'::jsonb", seconds);
+    }
     public static final Instant START = Instant.parse("2026-11-14T12:00:00Z");
 
     public static BattleDto waiting(int rounds, BattleMode mode, int firstRating, int secondRating) {
         BattleDto battle = new BattleDto();
         battle.setId(UUID.randomUUID());
-        battle.setSubject(Subject.MATH);
+        battle.setDisciplineCode("SAT_MATH");
         battle.setMode(mode);
         battle.setPhase(BattlePhase.WAITING_READY);
         battle.setVersion(1);
         battle.setReadyDeadline(START.plusSeconds(30));
         BattleStateDto state = new BattleStateDto();
+        state.setRankTiers(RankFixtures.tiers());
+        state.setMainQuestionCount(rounds);
         state.setLimitSeconds(10);
         state.setCountdownSeconds(3);
         state.setRevealSeconds(5);
@@ -29,6 +34,7 @@ public final class BattleFixtures {
             player.setId(UUID.randomUUID());
             player.setNickname("TestPlayer" + state.getPlayers().size());
             player.setRating(rating);
+            player.setCalibrationCompletedMatches(5);
             player.setConnected(true);
             player.setSessionId(UUID.randomUUID());
             player.setSessionExpiresAt(START.plusSeconds(3600));
@@ -40,7 +46,9 @@ public final class BattleFixtures {
             BattleRoundDto round = new BattleRoundDto();
             round.setId(UUID.randomUUID());
             round.setNumber(i + 1);
-            round.setQuestion(new FrozenQuestionDto(UUID.randomUUID(), Subject.MATH, "Test only", "TEST ONLY question " + i,
+            round.setBasePoints(1000);
+            round.setLimitSeconds(10);
+            round.setQuestion(new FrozenQuestionDto(UUID.randomUUID(), "SAT_MATH", "Test only", "TEST ONLY question " + i,
                     options, options.getFirst().getId(), "TEST ONLY secret explanation"));
             state.getRounds().add(round);
         }

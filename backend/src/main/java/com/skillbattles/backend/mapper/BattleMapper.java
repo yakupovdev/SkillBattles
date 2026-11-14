@@ -17,6 +17,7 @@ public interface BattleMapper {
     @Mapping(target = "firstUserId", expression = "java(dto.getState().getPlayers().get(0).getId())")
     @Mapping(target = "secondUserId", expression = "java(dto.getState().getPlayers().get(1).getId())")
     @Mapping(target = "winnerUserId", expression = "java(dto.getResult() == null ? null : dto.getResult().getWinnerUserId())")
+    @Mapping(target="finishedAt",expression="java(dto.getResult()==null?null:dto.getResult().getFinishedAt())")
     Battle create(BattleDto dto);
 
     @Mapping(target = "id", ignore = true)
@@ -26,5 +27,6 @@ public interface BattleMapper {
     @Mapping(target = "firstUserId", ignore = true)
     @Mapping(target = "secondUserId", ignore = true)
     @Mapping(target = "winnerUserId", expression = "java(dto.getResult() == null ? null : dto.getResult().getWinnerUserId())")
+    @Mapping(target="finishedAt",expression="java(dto.getResult()==null?null:dto.getResult().getFinishedAt())")
     void update(BattleDto dto, @MappingTarget Battle entity);
 }

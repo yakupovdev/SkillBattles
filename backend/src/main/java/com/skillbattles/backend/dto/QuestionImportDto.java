@@ -14,10 +14,12 @@ public class QuestionImportDto {
     private String externalKey;
     @NotNull @Positive
     private Integer contentVersion;
-    @NotNull
-    private Subject subject;
+    @NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,63}")
+    private String disciplineCode;
+    @NotBlank @Pattern(regexp = "[A-Z][A-Z0-9_]{1,63}")
+    private String topicCode;
     @NotBlank @Size(max = 200)
-    private String topic;
+    private String topicName;
     @NotNull
     private Difficulty difficulty;
     @NotBlank

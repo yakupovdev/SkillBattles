@@ -65,26 +65,29 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public long countAvailable(Subject subject, Difficulty difficulty) {
-        return repository.countBySubjectAndDifficultyAndActiveTrue(subject, difficulty);
+    public long countAvailable(String disciplineCode, Difficulty difficulty) {
+        return repository.countByDisciplineCodeAndDifficultyAndActiveTrue(disciplineCode, difficulty);
     }
 
     @Override
     public List<FrozenQuestionDto> selectForBattle(QuestionSelectionDto selection) {
         if (selection.getCount() < 1) throw new IllegalArgumentException("Question count must be positive.");
+        // Keep all difficulty buckets on one bank revision until the enclosing battle transaction commits.
+        // An import changing a revision's difficulty must not make its externalKey selectable twice.
+        repository.lockImport();
         Map<String, Instant> lastSeen = lastSeen(selection.getRecentlySeen());
-        String subject = selection.getSubject().name();
+        String disciplineCode = selection.getDisciplineCode();
         List<Question> selected = new ArrayList<>(lastSeen.isEmpty()
-                ? repository.selectForBattle(subject, selection.getCount())
-                : repository.selectUnseenForBattle(subject, selection.getCount(), lastSeen.keySet()));
+                ? repository.selectForBattle(disciplineCode, selection.getCount(), selection.getDifficulty().name())
+                : repository.selectUnseenForBattle(disciplineCode, selection.getCount(), lastSeen.keySet(), selection.getDifficulty().name()));
         if (selected.size() < selection.getCount() && !lastSeen.isEmpty()) {
-            List<Question> fallback = new ArrayList<>(repository.selectSeenForBattle(subject, lastSeen.keySet()));
+            List<Question> fallback = new ArrayList<>(repository.selectSeenForBattle(disciplineCode, lastSeen.keySet(), selection.getDifficulty().name()));
             // Stable sort preserves PostgreSQL's randomized order for equal last-show times.
             fallback.sort(Comparator.comparing(question -> lastSeen.get(question.getExternalKey())));
             selected.addAll(fallback.subList(0, Math.min(selection.getCount() - selected.size(), fallback.size())));
         }
         if (selected.size() != selection.getCount()) {
-            throw new ConflictException("CONTENT_UNAVAILABLE", "Not enough active questions are available for this subject.");
+            throw new ConflictException("CONTENT_UNAVAILABLE", "Not enough active questions are available for this disciplineCode.");
         }
         return selected.stream().map(mapper::toFrozenDto).toList();
     }

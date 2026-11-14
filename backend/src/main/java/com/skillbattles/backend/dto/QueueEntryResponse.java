@@ -11,7 +11,9 @@ public class QueueEntryResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private UUID id;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-    private Subject subject;
+    private String disciplineCode;
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private BattleFormat format = BattleFormat.STANDARD;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private QueueStatus status;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

@@ -9,15 +9,18 @@ import java.util.*;
 
 @Getter
 @Setter
+@io.swagger.v3.oas.annotations.media.Schema(requiredProperties={"id","isPro","nickname","rating","rankCode","ready","connected","reconnectDeadline","score","correctCount","streak","answeredCurrentRound"})
 public class BattlePlayerResponse {
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private UUID id;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPro")
+    private boolean pro;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private String nickname;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private int rating;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
-    private String rank;
+    private String rankCode;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private boolean ready;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

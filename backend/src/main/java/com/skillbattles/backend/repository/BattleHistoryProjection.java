@@ -8,7 +8,7 @@ import java.util.UUID;
 /** Metadata and persisted result only: question/round state is not loaded for history. */
 public interface BattleHistoryProjection {
     UUID getBattleId();
-    Subject getSubject();
+    String getDisciplineCode();
     BattleMode getMode();
     BattlePhase getPhase();
     LocalDateTime getCreatedAt();

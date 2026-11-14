@@ -14,6 +14,9 @@ public class BattleRoundResponse {
     private UUID id;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private int number;
+    @com.fasterxml.jackson.annotation.JsonProperty("isOvertimeRound")
+    @io.swagger.v3.oas.annotations.media.Schema(requiredMode = io.swagger.v3.oas.annotations.media.Schema.RequiredMode.REQUIRED)
+    private boolean overtimeRound;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
     private Instant startedAt;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED)

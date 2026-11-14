@@ -11,6 +11,8 @@ import java.util.*;
 public class RoundViewDto {
     private UUID id;
     private int number;
+    @com.fasterxml.jackson.annotation.JsonProperty("isOvertimeRound")
+    private boolean overtimeRound;
     private Instant startedAt;
     private Instant deadline;
     private int limitSeconds;

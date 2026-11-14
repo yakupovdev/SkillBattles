@@ -16,10 +16,11 @@ public interface BattleHistoryMapper {
         var own = result.getPlayers().stream().filter(player -> player.getId().equals(userId)).findFirst().orElseThrow();
         var opponent = result.getPlayers().stream().filter(player -> !player.getId().equals(userId)).findFirst().orElseThrow();
         BattleHistoryItemDto dto = new BattleHistoryItemDto();
-        dto.setBattleId(row.getBattleId()); dto.setSubject(row.getSubject()); dto.setMode(row.getMode());
+        dto.setBattleId(row.getBattleId()); dto.setDisciplineCode(row.getDisciplineCode()); dto.setMode(row.getMode());
         dto.setOutcome(BattleSnapshotMapper.outcome(row.getPhase(), result.getWinnerUserId(), userId));
         dto.setReason(result.getReason()); dto.setMyScore(own.getScore()); dto.setOpponentScore(opponent.getScore());
         dto.setRatingDelta(own.getRatingDelta());
+        dto.setSeasonId(result.getSeasonId());dto.setOvertimePlayed(result.isOvertimePlayed());
         dto.setOpponent(PublicPlayerDto.builder().id(opponent.getId()).nickname(opponent.getNickname()).build());
         dto.setCreatedAt(row.getCreatedAt().toInstant(ZoneOffset.UTC)); dto.setFinishedAt(result.getFinishedAt());
         return dto;

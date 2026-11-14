@@ -18,6 +18,8 @@ public class BattleAnswerDto {
     private Long elapsedMs;
     private int basePoints;
     private int speedBonus;
+    private int streakBonus;
+    private int tieBreakPoints;
     private int points;
     private boolean timedOut;
 }

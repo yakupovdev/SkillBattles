@@ -37,7 +37,7 @@ def main():
     # or frame logging. Only this runner's freshly created database may be used.
     for key in list(env):
         upper = key.upper()
-        if upper.startswith(('SPRING_', 'APP_', 'DB_', 'JWT_', 'LOGGING_')) or upper in {
+        if upper.startswith(('SPRING_', 'APP_', 'DB_', 'JWT_', 'LOGGING_', 'STRIPE_', 'BILLING_')) or upper in {
             'JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS', 'JAVA_OPTS', 'NODE_OPTIONS', 'NODE_USE_ENV_PROXY'
         }:
             env.pop(key)
@@ -88,8 +88,7 @@ def main():
         output = (target / ('e2e-' + label + '.log')).open('w', encoding='utf-8')
         logs.append(output)
         process = subprocess.Popen([java, '-jar', str(jar), '--server.address=127.0.0.1', f'--server.port={port}',
-                                    '--app.battle.math.question-count=2', '--app.battle.math.question-limit-seconds=30',
-                                    '--app.battle.english.question-limit-seconds=30', '--app.battle.countdown-seconds=1',
+                                    '--app.battle.countdown-seconds=1',
                                     '--app.battle.reveal-seconds=1'], cwd=backend, env=env, stdout=output, stderr=subprocess.STDOUT, **hidden)
         until = time.monotonic() + 40
         while time.monotonic() < until:
