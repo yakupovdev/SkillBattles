@@ -1,0 +1,7 @@
+target/
+.cache/
+.git/
+.env*
+AGENTS.md
+BACKEND_SPEC.md
+.agents/

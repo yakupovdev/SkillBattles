@@ -1,0 +1,26 @@
+# Local Codex rules and skills
+AGENTS.md
+AGENTS.override.md
+/.ai/
+/.agents/skills/
+/backend/.agents/skills/
+/START_PROMPT.md
+/AI_SETUP.md
+/codex-backend-kit.zip
+
+# Local product and implementation specifications
+/PROJECT_CONTEXT.md
+/OPENAPI.yaml
+/backend/BACKEND_SPEC.md
+/frontend/FRONTEND_SPEC.md
+
+# Local environment files, keep examples
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Java build output
+/backend/target/
+/backend/.cache/
+
