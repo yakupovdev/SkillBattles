@@ -39,49 +39,66 @@ V1–V7 сохранены, V8 добавляет подписки/receipt, quot
 в этап A; миграция ничего не удаляет. Используйте отдельную чистую dev/test БД,
 не удаляйте существующую БД/volume и не редактируйте применённые миграции.
 
-Для Compose создайте из корневого `.env.example` новый `.env.v03` (только если
-его ещё нет). Укажите, например, `POSTGRES_DB=skillbattles_v03`,
-`POSTGRES_PORT=55432`, `BACKEND_PORT=18083`, случайные POSTGRES_PASSWORD/JWT_SECRET.
-JWT_SECRET — Base64 минимум 32 случайных байт. Генерация в PowerShell:
+## Единая локальная конфигурация
+
+Все способы запуска используют **только корневой `.env`**. Frontend в репозитории
+пока отсутствует. `.env.example` содержит все используемые приложением ENV и
+пояснения; действующих секретов в нём нет. Первичная подготовка из корня:
 
 ```powershell
-$dbSecret = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
-$jwtSecret = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-# Сохраните значения только в локальный .env.v03; не публикуйте их.
-Remove-Variable dbSecret,jwtSecret
+.\backend\scripts\Initialize-LocalEnv.ps1
 ```
 
-Из корня, отдельный project name создаёт отдельный dev volume:
+Скрипт сохраняет имеющиеся значения и генерирует только отсутствующие пароль
+PostgreSQL/JWT secret криптографическим RNG, без вывода значений. JWT_SECRET —
+Base64 минимум 32 случайных байт. Внешние ключи самостоятельно не генерируются.
+Не меняйте пароль уже инициализированного PostgreSQL volume простым редактированием
+ENV: это не изменяет пароль роли в БД. Данные/volumes не удаляйте.
+
+По умолчанию COMPOSE_PROJECT_NAME=`skillbattles-local`, отдельная БД
+`skillbattles_v03`, PostgreSQL публикуется на 127.0.0.1:55432, backend —
+127.0.0.1:8080. Compose автоматически читает корневой `.env` из корня проекта.
+Не передавайте альтернативный ENV-файл и не печатайте раскрытый `compose config`:
 
 ```powershell
-docker compose -p skillbattles-v03 --env-file .env.v03 config --quiet
-docker compose -p skillbattles-v03 --env-file .env.v03 up -d --build
-docker compose -p skillbattles-v03 --env-file .env.v03 logs backend
-docker compose -p skillbattles-v03 --env-file .env.v03 down
+docker compose config --quiet
+docker compose up -d --build
+docker compose ps
+docker compose logs backend
+docker compose down
 ```
 
-Не добавляйте `-v`: dev-данные должны сохраняться. Compose передаёт DB/JWT ENV
-явно; Spring Boot сам `.env` не читает. Все процессы/БД хранят время в UTC.
+Не добавляйте `-v`: dev-данные должны сохраняться. Compose передаёт приложению
+явно перечисленные DB/JWT/billing/игровые ENV; имя БД и credentials берутся из
+POSTGRES_*. В контейнере DB_URL указывает на `postgres:5432`, SERVER_PORT=8080,
+BACKEND_PORT задаёт опубликованный порт. Все процессы/БД хранят время в UTC.
 
-Для JVM загрузите локальный файл ENV, затем **из backend/**:
+Spring Boot сам `.env` не читает. Для JVM используется безопасный parser:
+только KEY=value, комментарии, кавычки и ссылки `${NAME}` внутри этого файла.
+Одинарные кавычки сохраняют `$`/`#` буквально; командная подстановка, dot-source
+ENV и Invoke-Expression не используются. Ссылки на неизвестные ключи/циклы,
+повторы ключей и некорректные строки отклоняются до установки environment.
+Для локальной Java 21 задайте JAVA_HOME, затем **из корня**:
 
 ```powershell
-Get-Content ..\.env.v03 | ForEach-Object {
-    if ($_ -match '^([A-Z][A-Z0-9_]*)=(.*)$') {
-        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
-    }
-}
-$env:DB_URL = "jdbc:postgresql://localhost:$($env:POSTGRES_PORT)/$($env:POSTGRES_DB)"
-$env:DB_USERNAME = $env:POSTGRES_USER
-$env:DB_PASSWORD = $env:POSTGRES_PASSWORD
-$env:SERVER_PORT = $env:BACKEND_PORT
-.\mvnw.cmd spring-boot:run
+docker compose up -d postgres
+.\backend\scripts\Start-Backend.ps1 -Action Check
+.\backend\scripts\Start-Backend.ps1
+# Или уже собранный JAR:
+.\backend\scripts\Start-Backend.ps1 -Action Jar
 ```
 
-DB_URL/DB_USERNAME/DB_PASSWORD обязательны для выбранной JVM-базы; JWT_SECRET —
+Не запускайте контейнер backend и JVM одновременно на одном порту/БД.
+Host launcher формирует DB_URL/DB_USERNAME/DB_PASSWORD из POSTGRES_* (localhost
+и опубликованный порт), SERVER_PORT — из BACKEND_PORT. JWT_SECRET нужен
 для подписи HS256. JWT_ISSUER=`skillbattles`, JWT_ACCESS_TTL=`PT15M` (максимум
 15 минут), JWT_REFRESH_TTL=`P7D`. Java 21 задаётся через JAVA_HOME.
-Swagger: `/swagger-ui.html`, JSON `/v3/api-docs`, без авторизации.
+Swagger: `http://localhost:8080/swagger-ui.html`, JSON `/v3/api-docs`, без авторизации.
+REST: `http://localhost:8080/api/v1`, WebSocket: `ws://localhost:8080/ws/v1/events`.
+Если меняете BACKEND_PORT, обновите три BILLING_*_URL в том же `.env`.
+Frontend получает только явно выбранные публичные URLs, а не серверный ENV;
+API/WebSocket должны идти через same-origin dev proxy с поддержкой Upgrade.
+Wildcard CORS/origins не добавлены. SMTP пока не реализован: SMTP ENV не нужны.
 
 ## Каталог, сетки и конфигурация
 
@@ -140,12 +157,12 @@ reveal-seconds=5, reconnect-grace-seconds=30, question-history-battles=5.
 ## Локальный JSON-импорт
 
 Только локальный профиль `question-import`, без HTTP upload и без автоматического
-импорта при старте сервера. **Из backend/**, ENV выбранной отдельной базы:
+импорта при старте сервера. **Из корня**, с тем же `.env`:
 
 ```powershell
-.\mvnw.cmd -B -ntp verify
-& "$env:JAVA_HOME/bin/java.exe" -jar target/backend-0.0.1-SNAPSHOT.jar --spring.profiles.active=question-import --questions.file=C:/data/questions.json
-& "$env:JAVA_HOME/bin/java.exe" -jar target/backend-0.0.1-SNAPSHOT.jar --spring.profiles.active=question-import --questions.file=C:/data/questions.json --questions.apply=true
+.\backend\scripts\Start-Backend.ps1 -Action Verify
+.\backend\scripts\Start-Backend.ps1 -Action ImportQuestions -QuestionsFile C:/data/questions.json
+.\backend\scripts\Start-Backend.ps1 -Action ImportQuestions -QuestionsFile C:/data/questions.json -Apply
 ```
 
 Сначала dry-run, затем явный apply. В Linux используйте `"$JAVA_HOME/bin/java"`.
@@ -289,8 +306,8 @@ customerId, price ID и return URLs от клиента не принимают�
 
 Без Stripe ENV приложение работает как Free, checkoutAvailable=false,
 Checkout/Portal отвечают 503 BILLING_UNAVAILABLE. Публичной смены тарифа нет.
-Настройки в backend/.env.billing.example; добавьте их в локальный .env.v03
-и загрузите в JVM так же, как DB/JWT ENV, либо передайте через Compose:
+Все настройки находятся в корневом `.env`, полный безопасный шаблон —
+корневой `.env.example`. Отдельных billing/версионных ENV для запуска нет:
 
 | ENV | Значение |
 |---|---|
@@ -299,9 +316,9 @@ Checkout/Portal отвечают 503 BILLING_UNAVAILABLE. Публичной с�
 | STRIPE_WEBHOOK_SECRET | whsec_ конкретного endpoint/Stripe CLI listener |
 | STRIPE_PRICE_PRO_MONTHLY | Test recurring Price: USD 799, month, count=1 |
 | STRIPE_PRICE_PRO_ANNUAL | Test recurring Price: USD 4799, year, count=1 |
-| BILLING_SUCCESS_URL | Доверенный frontend success URL |
-| BILLING_CANCEL_URL | Доверенный frontend cancel URL |
-| BILLING_PORTAL_RETURN_URL | Доверенный frontend URL возврата из Portal |
+| BILLING_SUCCESS_URL | Доверенный success URL; пока локальный Swagger |
+| BILLING_CANCEL_URL | Доверенный cancel URL; пока локальный Swagger |
+| BILLING_PORTAL_RETURN_URL | Доверенный URL возврата из Portal; пока локальный Swagger |
 
 Ключи/URLs — только server ENV. Redirect URLs требуют HTTPS, в localhost dev
 разрешён HTTP. Checkout/Portal — hosted Stripe UI, frontend publishable key
@@ -343,18 +360,66 @@ subscription, limits и streaks. Клиент перечитывает snapshot/
 инвалидирует старую персональную view; версии разных ресурсов не сравниваются.
 Уже увиденные/скопированные ответы технически отозвать невозможно.
 
-Локальный Stripe CLI listener (отдельный test sandbox):
+Настройка только Stripe TEST, **из корня**:
 
 ```powershell
-stripe listen --forward-to http://localhost:18083/api/v1/subscriptions/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,invoice.paid,invoice.payment_failed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted
+npm install -g @stripe/cli
+stripe agent setup
+.\backend\scripts\Initialize-StripeTest.ps1
+.\backend\scripts\Start-StripeListener.ps1
 ```
 
-Подставьте whsec_ именно этого listener в ENV и перезапустите backend.
-Создайте Checkout через авторизованный REST, откройте возвращённый URL и
-используйте только Stripe test payment methods. Для позитивной проверки нужен
-customer, привязанный приложением: случайный stripe trigger с чужим customer
-не должен повышать тариф. При разных sandbox/ключах CLI укажите нужный профиль
-или окружение CLI, не публикуя ключ в истории shell.
+Initialize-StripeTest проверяет test key/account, переиспользует совпадающие
+активные recurring Prices ($7.99/month, $47.99/year, USD; суммы 799/4799 центов),
+иначе создаёт их с постоянными lookup/idempotency keys и сохраняет IDs в `.env`.
+Проверяет default TEST Portal; если его нет — создаёт конфигурацию. Существующий
+default Portal сохраняется; недостающие настройки cancellation/payment methods
+нужно включить в Dashboard. Подписки/Customers/платежи setup-скрипт не создаёт.
+
+Listener получает тот же TEST key через environment, не argv/URL, пересылает
+семь поддерживаемых типов событий на localhost:BACKEND_PORT/api/v1/subscriptions/webhook,
+сохраняет **настоящий** signing secret в корневом `.env` и не выводит сырые
+CLI-логи/секрет. Держите его запущенным в отдельном терминале. После сообщения
+ready перезапустите backend (`docker compose up -d --force-recreate backend`
+либо host launcher), чтобы применить secret. Запуск с другим sandbox недопустим.
+
+На текущем компьютере npm CLI установлен, но **Windows Application Control
+блокирует stripe.exe**. `stripe agent setup`/listener поэтому не запустились;
+MCP `stripe_implementation_planner` в текущей сессии недоступен. Не обходите
+политику: требуется разрешение официального CLI администратором компьютера,
+после чего повторите agent setup/listener. При необходимости разрешите CLI/MCP
+доступ для TEST sandbox в Dashboard. До получения signing secret
+STRIPE_WEBHOOK_SECRET остаётся пустым: Free работает, Checkout/Portal приложения
+возвращают BILLING_UNAVAILABLE. Это не завершённая проверка оплаты/Pro.
+
+Ручной round trip после запуска listener (только отдельный тестовый аккаунт):
+
+1. В Swagger зарегистрируйте тестового пользователя или войдите в существующий
+   demo-аккаунт, задайте access JWT через Authorize. Не вставляйте JWT в URL.
+2. GET /api/v1/subscriptions/plans должен показать checkoutAvailable=true.
+3. POST /api/v1/subscriptions/checkout: `{"planCode":"PRO_MONTHLY","requestId":"<новый UUID>"}`.
+   Откройте `url` из ответа — это ссылка на реальный TEST Checkout, фиксированной
+   публичной ссылки нет. Повторяйте запрос с тем же requestId, чтобы не создавать
+   новые sessions. Цена на форме должна быть $7.99, отметка TEST обязательна.
+4. Оплатите тестовой картой 4242 4242 4242 4242, любой будущей датой и CVC,
+   укажите тестовые данные. Не используйте настоящую карту. Redirect на Swagger
+   не активирует Pro: дождитесь подписанных webhooks и GET /subscriptions/me
+   с ACTIVE/PRO_MONTHLY и оплаченной currentPeriodEnd.
+5. POST /api/v1/subscriptions/portal без тела → откройте `url`, проверьте
+   возврат и cancellation at period end. Проверьте /subscriptions/me ещё раз.
+   Не повторяйте покупку активной подписки; используйте Portal.
+
+До запуска listener связанную с приложением Checkout-ссылку получить нельзя.
+Случайный stripe trigger с чужим customer не должен предоставлять Pro.
+Listener/webhook, оплата, выдача Pro и Portal приложения требуют отдельного
+завершения этой ручной проверки. Не публикуйте ключи, signing secrets и JWT.
+
+Проверки единой конфигурации: безопасный ENV-parser, `docker compose config --quiet`,
+сборка/запуск Docker и host JVM, HTTP 200 для Swagger/OpenAPI/return URLs,
+соответствие runtime ENV, Stripe TEST account/Prices/default Portal и повторный
+setup без новых Prices. Итоговый verify: **306 тестов, 0 ошибок/пропусков**.
+Секретов в tracked/unignored файлах и verify-логе не обнаружено. Полный
+Checkout → webhook → Pro → Portal round trip пока не выполнен из-за блокировки CLI.
 
 Stripe Tax/automatic_tax не включены. Перед реальными платежами нужна отдельная
 [налоговая настройка](https://docs.stripe.com/billing/taxes/collect-taxes);

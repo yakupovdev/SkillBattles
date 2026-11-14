@@ -17,6 +17,7 @@ AGENTS.override.md
 /frontend/FRONTEND_SPEC.md
 
 # Local environment files, keep examples
+/.env
 .env
 .env.*
 !.env.example
