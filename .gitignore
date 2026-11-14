@@ -24,3 +24,5 @@ AGENTS.override.md
 /backend/target/
 /backend/.cache/
 
+# Idea project files
+.idea/
