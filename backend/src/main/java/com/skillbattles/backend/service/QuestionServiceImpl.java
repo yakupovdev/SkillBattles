@@ -69,6 +69,39 @@ public class QuestionServiceImpl implements QuestionService {
         return repository.countBySubjectAndDifficultyAndActiveTrue(subject, difficulty);
     }
 
+    @Override
+    public List<FrozenQuestionDto> selectForBattle(QuestionSelectionDto selection) {
+        if (selection.getCount() < 1) throw new IllegalArgumentException("Question count must be positive.");
+        Map<String, Instant> lastSeen = lastSeen(selection.getRecentlySeen());
+        String subject = selection.getSubject().name();
+        List<Question> selected = new ArrayList<>(lastSeen.isEmpty()
+                ? repository.selectForBattle(subject, selection.getCount())
+                : repository.selectUnseenForBattle(subject, selection.getCount(), lastSeen.keySet()));
+        if (selected.size() < selection.getCount() && !lastSeen.isEmpty()) {
+            List<Question> fallback = new ArrayList<>(repository.selectSeenForBattle(subject, lastSeen.keySet()));
+            // Stable sort preserves PostgreSQL's randomized order for equal last-show times.
+            fallback.sort(Comparator.comparing(question -> lastSeen.get(question.getExternalKey())));
+            selected.addAll(fallback.subList(0, Math.min(selection.getCount() - selected.size(), fallback.size())));
+        }
+        if (selected.size() != selection.getCount()) {
+            throw new ConflictException("CONTENT_UNAVAILABLE", "Not enough active questions are available for this subject.");
+        }
+        return selected.stream().map(mapper::toFrozenDto).toList();
+    }
+
+    private Map<String, Instant> lastSeen(List<QuestionSeenDto> shows) {
+        Map<String, Instant> result = new HashMap<>();
+        if (shows.isEmpty()) return result;
+        Set<UUID> ids = shows.stream().map(QuestionSeenDto::getQuestionId).collect(Collectors.toSet());
+        Map<UUID, String> identities = repository.historicalIdentities(ids).stream()
+                .collect(Collectors.toMap(row -> row.getId(), row -> row.getExternalKey()));
+        for (QuestionSeenDto show : shows) {
+            String key = identities.get(show.getQuestionId());
+            if (key != null) result.merge(key, show.getShownAt(), (first, second) -> first.isAfter(second) ? first : second);
+        }
+        return result;
+    }
+
     private void validate(List<QuestionImportDto> questions) {
         if (questions == null || questions.isEmpty()) invalid("Import must be a nonempty JSON array.");
         Set<Revision> revisions = new HashSet<>();

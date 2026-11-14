@@ -41,6 +41,8 @@ app:
     ready-timeout-seconds: ${READY_TIMEOUT_SECONDS:30}
     countdown-seconds: ${COUNTDOWN_SECONDS:3}
     reveal-seconds: ${REVEAL_SECONDS:5}
+    reconnect-grace-seconds: ${RECONNECT_GRACE_SECONDS:30}
+    question-history-battles: ${QUESTION_HISTORY_BATTLES:5}
   jwt:
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:skillbattles}

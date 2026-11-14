@@ -23,6 +23,10 @@ public class BattleProperties {
     private int countdownSeconds;
     @Min(1)
     private int revealSeconds;
+    @Min(1)
+    private int reconnectGraceSeconds = 30;
+    @Min(1)
+    private int questionHistoryBattles = 5;
 
     public SubjectSettings forSubject(Subject subject) { return subject == Subject.MATH ? math : english; }
 

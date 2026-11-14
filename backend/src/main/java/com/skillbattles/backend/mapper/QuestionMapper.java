@@ -21,6 +21,8 @@ public interface QuestionMapper {
     @Mapping(target = "correctOptionKey", expression = "java(question.getOptions().stream().filter(option -> option.getId().equals(question.getCorrectOptionId())).findFirst().orElseThrow().getKey())")
     QuestionImportDto toImportDto(Question question);
 
+    FrozenQuestionDto toFrozenDto(Question question);
+
     @AfterMapping
     default void setOptions(QuestionImportDto dto, @MappingTarget Question question) {
         question.setOptions(dto.getOptions().stream().map(option -> new QuestionOption(
