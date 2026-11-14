@@ -4,6 +4,9 @@ import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.entity.Subject;
 import com.skillbattles.backend.exception.NotFoundException;
 import com.skillbattles.backend.mapper.BattleMapper;
+import com.skillbattles.backend.mapper.BattleHistoryMapper;
+import com.skillbattles.backend.exception.BusinessValidationException;
+import org.springframework.data.domain.*;
 import com.skillbattles.backend.repository.BattleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,12 +21,33 @@ import java.time.Instant;
 public class BattleServiceImpl implements BattleService {
     private final BattleRepository repository;
     private final BattleMapper mapper;
+    private final BattleHistoryMapper historyMapper;
 
     @Override @Transactional
     public BattleDto create(BattleDto dto) { return mapper.toDto(repository.saveAndFlush(mapper.create(dto))); }
 
     @Override @Transactional
     public BattleDto lock(UUID id) { return mapper.toDto(repository.lockById(id).orElseThrow(BattleServiceImpl::missing)); }
+
+    @Override public BattleDto getForParticipant(UUID id, UUID userId) {
+        return mapper.toDto(repository.findForParticipant(id, userId).orElseThrow(BattleServiceImpl::missing));
+    }
+
+    @Override public PageResponse<BattleHistoryItemDto> history(BattleHistoryQueryDto query) {
+        if (query.getPage() < 0 || query.getSize() < 1 || query.getSize() > 100 || query.getSort() == null
+                || !Set.of("createdAt,asc", "createdAt,desc").contains(query.getSort()))
+            throw new BusinessValidationException("VALIDATION_ERROR", "Invalid history pagination or sort.");
+        if ((long) query.getPage() * query.getSize() > Integer.MAX_VALUE) {
+            // JPA offsets are int32. A valid but distant page is empty, not a server error.
+            long total = repository.countHistory(query.getUserId(), query.getSubject(), query.getMode());
+            int pages = Math.toIntExact((total + query.getSize() - 1) / query.getSize());
+            return new PageResponse<>(List.of(), new PaginationDto(query.getPage(), query.getSize(), total, pages));
+        }
+        Sort.Direction direction = query.getSort().endsWith(",asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        var page = repository.history(query.getUserId(), query.getSubject(), query.getMode(),
+                PageRequest.of(query.getPage(), query.getSize(), Sort.by(direction, "createdAt", "id")));
+        return PageResponse.from(page, row -> historyMapper.history(row, query.getUserId()));
+    }
 
     @Override @Transactional
     public void save(BattleDto dto) {

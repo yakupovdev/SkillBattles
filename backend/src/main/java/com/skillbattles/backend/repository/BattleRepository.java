@@ -1,12 +1,32 @@
 package com.skillbattles.backend.repository;
 
 import com.skillbattles.backend.entity.Battle;
+import com.skillbattles.backend.entity.Subject;
+import com.skillbattles.backend.entity.BattleMode;
+import org.springframework.data.domain.*;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface BattleRepository extends JpaRepository<Battle, UUID> {
+    String HISTORY_FROM = """
+         from Battle b where (b.firstUserId = :userId or b.secondUserId = :userId)
+           and b.phase in (com.skillbattles.backend.entity.BattlePhase.FINISHED, com.skillbattles.backend.entity.BattlePhase.CANCELLED)
+           and (:subject is null or b.subject = :subject) and (:mode is null or b.mode = :mode)
+        """;
+
+    @Query(value = "select b.id as battleId, b.subject as subject, b.mode as mode, b.phase as phase, b.createdAt as createdAt, b.result as result" + HISTORY_FROM,
+           countQuery = "select count(b)" + HISTORY_FROM)
+    Page<BattleHistoryProjection> history(@Param("userId") UUID userId, @Param("subject") Subject subject,
+                                        @Param("mode") BattleMode mode, Pageable pageable);
+
+    @Query("select count(b)" + HISTORY_FROM)
+    long countHistory(@Param("userId") UUID userId, @Param("subject") Subject subject, @Param("mode") BattleMode mode);
+
+    @Query("select b from Battle b where b.id = :id and (b.firstUserId = :userId or b.secondUserId = :userId)")
+    Optional<Battle> findForParticipant(@Param("id") UUID id, @Param("userId") UUID userId);
+
     @Query(value = """
         WITH recent AS (
             SELECT b.id, b.state

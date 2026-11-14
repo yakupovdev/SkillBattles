@@ -11,7 +11,8 @@ springdoc 2.10.0. Maven Wrapper 3.3.4 запускает Maven 3.9.12. Оста�
 [PostgreSQL](https://www.postgresql.org/support/versioning/).
 Boot 3.5.16 — последний OSS-релиз требуемой ветки 3.5.x; переход на другую ветку
 потребует отдельной задачи. Ranked matchmaking, приватные дуэли по коду и текущая
-активность реализованы; полноценные history/review endpoints относятся к этапу 6.
+активность, история и подробный разбор реализованы. Frontend и production-банк
+вопросов в этот backend не входят.
 
 ## Локальная конфигурация
 
@@ -78,7 +79,7 @@ Set-Location backend
 На Linux/macOS эквивалент — `./mvnw -B -ntp verify`.
 Wrapper и Maven скачивают свои файлы при первом запуске: нужен доступ к Maven Central.
 `verify` включает unit/MVC-тесты и PostgreSQL Testcontainers-тесты. При отсутствии
-Docker пропускаются только `AuthPostgresTest`; такой прогон не подтверждает
+Docker пропускаются PostgreSQL Testcontainers-тесты; такой прогон не подтверждает
 миграции и конкурентное поведение БД. H2 не используется.
 
 Для запуска JVM поднимите БД **из корня**: `docker compose up -d postgres`.
@@ -554,6 +555,94 @@ Scheduler использует отдельный поток и начинает
 .\mvnw.cmd -B -ntp verify
 ```
 
+## Этап 6: история и подробный разбор
+
+`GET /api/v1/users/me/battles` возвращает только собственные FINISHED/CANCELLED
+батлы: `data` и `pagination` (page с нуля, size по умолчанию 20, допустимо 1–100).
+Фильтры — `subject=MATH|ENGLISH` и `mode=RANKED|PRIVATE`. Сортировка —
+`createdAt,desc` по умолчанию либо `createdAt,asc`; остальные поля/направления и
+неверные параметры возвращают 400 VALIDATION_ERROR. При одинаковом createdAt
+внутренний порядок по UUID сохраняет стабильную пагинацию. Пустая страница — 200.
+
+История использует сохранённый результат: outcome относительно пользователя,
+reason, opponent (id/nickname), итоговые очки и фактический ratingDelta,
+включая floor рейтинга. CANCELLED показывается явно, PRIVATE/CANCELLED имеют
+нулевой delta. Они не прибавляют ranked-счётчики; CANCELLED исключён из played.
+Запрос не обращается к UserRepository/QuestionRepository: одна проекция метаданных
+и результата плюс count, без N+1 и загрузки всего JSONB-контента вопросов.
+Миграция V4 добавляет индексы истории по обоим участникам, createdAt и id.
+
+`GET /api/v1/battles/{id}/review` доступен только участникам терминального батла.
+До завершения — 409 BATTLE_NOT_FINISHED, чужой/отсутствующий/soft-deleted батл —
+404 BATTLE_NOT_FOUND. Ответ содержит только раунды с startedAt: frozen question,
+варианты в исходном порядке, correctOptionId, explanation и breakdown ответов.
+Незавершённый при surrender/interruption раунд имеет completed=false и только
+реально принятые ответы. Их evaluated points предназначены для разбора и не
+прибавляются к финальному score; будущие раунды и искусственные таймауты не добавляются.
+В завершённых раундах настоящие таймауты имеют null selection/elapsedMs и 0 очков.
+
+`/result`, `/review`, история и statistics читают сохранённый исход без запуска
+переходов, записи state или начисления Elo. Переходы выполняют scheduler и
+существующие игровые операции/snapshot. Изменение/удаление исходной ревизии вопроса
+не меняет старый review; объяснения и nickname берутся из сохранённых снимков.
+Email, хеши, токены и служебные submission/session IDs не выдаются.
+Терминальные данные переживают перезапуск, если сохраняется PostgreSQL.
+
+### Воспроизводимая сквозная проверка
+
+Из `backend/`, Java 21, Docker, Python 3.10+ и Node.js 22+:
+
+```powershell
+.\mvnw.cmd -B -ntp '-Dtest=HistoryPostgresTest' test
+.\mvnw.cmd -B -ntp verify
+python scripts/verify_e2e.py
+```
+
+Runner создаёт отдельный случайно именованный PostgreSQL 17.12 в tmpfs, без
+Docker volumes, и запускает собранный JAR на свободном loopback-порту.
+Он явно импортирует `src/test/resources/fixtures/stage2-questions-test-only.json`
+(dry-run → apply), использует настоящие HTTP и native WebSocket/STOMP, затем
+перезапускает JAR на той же временной БД. Проверяются ranked/private, normal
+completion, surrender, retry/conflict, reconnect/activity, history/review/result,
+privacy, revision freeze, statistics и auth refresh/logout. Обычные scheduler
+включены; для короткой проверки только у этого JAR count Math=2, question limit=30s,
+countdown/reveal=1s. Это тестовая конфигурация, не изменение production defaults.
+
+Runner не читает `.env`, не подключается к пользовательской БД, не выполняет
+volume rm/prune и завершает только созданные им процессы/контейнер. JWT/пароли
+не выводятся. Логи двух запусков и импорта — `target/e2e-*.log`.
+Реальный импорт своего банка выполняйте отдельно по разделу «Локальный импорт JSON»:
+сначала dry-run, затем явный apply; не импортируйте test-only fixture в рабочую БД.
+
+### Короткое ручное демо и подключение frontend
+
+1. Поднять backend/PostgreSQL командами выше, проверить Swagger и `/battle-modes`.
+   Для предметного демо предварительно импортировать проверенный английский контент:
+   минимум 3 уникальных MEDIUM-вопроса MATH и 4 ENGLISH при стандартных настройках.
+2. В двух независимых сессиях зарегистрироваться, сохранить пары JWT, открыть
+   native STOMP `/ws/v1/events`, CONNECT с access Bearer, SUBSCRIBE `/user/queue/events`.
+3. Оба выбирают один subject и POST ranked search; получить battleId, выполнить
+   readiness. Ответить на общие вопросы, дождаться reveal/FINISHED.
+4. Сравнить `/result`, `/users/me/battles`, `/review` и statistics. Создать приватную
+   комнату, присоединиться кодом и повторить; рейтинг должен остаться прежним.
+5. Проверить retry того же submissionId, отключение/reconnect и восстановление
+   через activity → snapshot. Surrender начавшегося батла открывает частичный review.
+
+Frontend использует REST Bearer access/refresh, native STOMP 1.2 без SockJS и
+подписку только на собственный `/user/queue/events`; все игровые действия — REST.
+Сначала подписка, затем activity и нужный GET snapshot; события применяются по
+resourceId/version. Таймеры, очки и рейтинг вычисляет сервер. Для другого origin
+нужен same-origin dev/reverse proxy `/api/**` и WebSocket Upgrade `/ws/**`.
+Полный локальный `FRONTEND_SPEC.md` сейчас отсутствует, сокращённая замена не создана.
+Доступные источники контракта — корневой OPENAPI.yaml, backend/BACKEND_SPEC.md и Swagger.
+
+Ограничения: один процесс, недолговечные события; waiting registry теряется после
+рестарта, активные батлы отменяются SERVER_INTERRUPTION без Elo. Frontend не реализован.
+Production-банка и редакционной проверки контента нет. До демо на настоящих вопросах
+нужны утверждённый банк, успешный dry-run/apply, проверка contentAvailable и две
+подключённые frontend/STOMP-сессии. Техническая проверка test-only данных не заменяет
+предметную проверку вопросов и объяснений человеком.
+
 ## Архитектура и проверки
 
 Пакеты разделены по слоям: `controller`, `dto`, `mapper`, `processor`, `service`,
@@ -563,8 +652,7 @@ Scheduler использует отдельный поток и начинает
 и `unmappedTargetPolicy=ERROR`, служебные поля при создании явно игнорируются.
 `BaseEntity` содержит UUID, аудит `LocalDateTime` в UTC и soft delete.
 `PageResponse<T>` возвращает `data` и `pagination`; базовый размер страницы 20,
-максимум 100. При добавлении списковых API используйте page с нуля и
-сортировку по умолчанию `createdAt,desc`; сейчас списковых endpoints нет.
+максимум 100. История использует page с нуля и сортировку по умолчанию `createdAt,desc`.
 
 Unit/MVC-тесты проверяют purpose/expiry/signature JWT, UTF-8 пароль,
 ошибки Security, валидацию, нормализацию ключей и auth-оркестрацию.
@@ -637,3 +725,16 @@ HTTP auth/API и dry-run `question-import` без HTTP/WebSocket-сервера.
 Bearer security и поля ответов в generated OpenAPI, ranked/private HTTP flow,
 activity и явный dry-run/apply test-only fixtures без web-сервера импорта.
 Временные процессы и БД удалены; публичный контракт 0.2 не изменён.
+
+Для этапа 6 итоговый `verify` — 167 тестов, 0 ошибок и пропусков.
+Добавлены 22 PostgreSQL-проверки: история всех терминальных исходов и фильтров,
+пагинация/некорректные параметры, ownership, завершённые/частичные раунды,
+immutability после ревизии/soft delete источника, фактический rating floor и
+отсутствие мутаций при чтении result/review/history/statistics. Полная страница
+из 20 записей проверена двумя SQL-запросами, без загрузки JPA-сущностей.
+`python scripts/verify_e2e.py` прошёл на Java 21 / PostgreSQL 17.12 / Node.js 24:
+ranked и private через реальные REST/STOMP, retry/conflict, reconnect, surrender,
+consistency, privacy, auth rotation/logout, новая ревизия и реальный restart JAR
+на той же временной БД. Проверены сохранность history/result/review/statistics,
+потеря waiting registry и SERVER_INTERRUPTION без Elo. Временные процессы и
+tmpfs-контейнер удалены; пользовательские данные и Docker volumes не затрагивались.

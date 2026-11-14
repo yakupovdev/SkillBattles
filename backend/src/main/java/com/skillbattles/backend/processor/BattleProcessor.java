@@ -11,6 +11,7 @@ public interface BattleProcessor {
     AnswerReceiptDto answer(UUID battleId, UUID userId, AnswerDto answer, Instant receivedAt);
     BattleSnapshotDto surrender(UUID battleId, UUID userId);
     BattleResultDto result(UUID battleId, UUID userId);
+    BattleReviewDto review(UUID battleId, UUID userId);
     void tick(UUID battleId);
     void interrupt(UUID battleId);
 }

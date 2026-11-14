@@ -65,6 +65,16 @@ public interface BattleSnapshotMapper {
             }
             dto.setRound(round);
         }
+        dto.setResult(result(battle, userId));
+        return dto;
+    }
+
+    static Outcome outcome(BattlePhase phase, UUID winner, UUID userId) {
+        return phase == BattlePhase.CANCELLED ? Outcome.CANCELLED
+                : winner == null ? Outcome.DRAW : userId.equals(winner) ? Outcome.WIN : Outcome.LOSS;
+    }
+
+    default BattleResultDto result(BattleDto battle, UUID userId) {
         if (battle.getResult() != null) {
             BattleResultDto result = new BattleResultDto();
             result.setBattleId(battle.getId());
@@ -74,11 +84,10 @@ public interface BattleSnapshotMapper {
             result.setReason(battle.getResult().getReason());
             result.setWinnerUserId(battle.getResult().getWinnerUserId());
             result.setFinishedAt(battle.getResult().getFinishedAt());
-            result.setMyOutcome(battle.getPhase() == BattlePhase.CANCELLED ? Outcome.CANCELLED
-                    : result.getWinnerUserId() == null ? Outcome.DRAW : userId.equals(result.getWinnerUserId()) ? Outcome.WIN : Outcome.LOSS);
+            result.setMyOutcome(outcome(battle.getPhase(), result.getWinnerUserId(), userId));
             result.setPlayers(battle.getResult().getPlayers());
-            dto.setResult(result);
+            return result;
         }
-        return dto;
+        return null;
     }
 }

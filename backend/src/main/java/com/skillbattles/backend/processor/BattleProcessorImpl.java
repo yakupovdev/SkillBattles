@@ -5,6 +5,7 @@ import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.entity.*;
 import com.skillbattles.backend.exception.*;
 import com.skillbattles.backend.mapper.BattleSnapshotMapper;
+import com.skillbattles.backend.mapper.BattleReviewMapper;
 import com.skillbattles.backend.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,6 +31,7 @@ public class BattleProcessorImpl implements BattleProcessor {
     private final Clock clock;
     private final ApplicationEventPublisher events;
     private final MatchmakingRegistryService registry;
+    private final BattleReviewMapper reviewMapper;
 
     @Override
     @Transactional(propagation = Propagation.SUPPORTS)
@@ -136,10 +138,21 @@ public class BattleProcessorImpl implements BattleProcessor {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public BattleResultDto result(UUID battleId, UUID userId) {
-        BattleSnapshotDto snapshot = snapshot(battleId, userId);
-        if (snapshot.getResult() == null) throw new ConflictException("BATTLE_NOT_FINISHED", "Battle is not finished.");
-        return snapshot.getResult();
+        return mapper.result(terminalRead(battleId, userId), userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BattleReviewDto review(UUID battleId, UUID userId) {
+        return reviewMapper.review(terminalRead(battleId, userId));
+    }
+
+    private BattleDto terminalRead(UUID battleId, UUID userId) {
+        BattleDto battle = battleService.getForParticipant(battleId, userId);
+        if (!BattleEngineImpl.terminal(battle)) throw new ConflictException("BATTLE_NOT_FINISHED", "Battle is not finished.");
+        return battle;
     }
 
     @Override

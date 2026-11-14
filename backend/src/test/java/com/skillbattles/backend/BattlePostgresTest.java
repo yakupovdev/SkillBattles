@@ -119,7 +119,7 @@ class BattlePostgresTest {
     }
 
     @Test
-    void httpContractValidatesTokensOwnershipReadinessAndDoesNotExposeCreationOrReview() throws Exception {
+    void httpContractValidatesTokensOwnershipReadinessAndDoesNotExposeCreation() throws Exception {
         Match match = create(BattleMode.RANKED, false);
         String access = match.first().getTokens().getAccessToken();
         mvc.perform(get("/api/v1/battles/" + match.id())).andExpect(status().isUnauthorized());
@@ -135,7 +135,8 @@ class BattlePostgresTest {
         mvc.perform(get("/api/v1/battles/" + match.id() + "/result").header("Authorization", "Bearer " + access))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("BATTLE_NOT_FINISHED"));
         mvc.perform(post("/api/v1/battles").header("Authorization", "Bearer " + access)).andExpect(status().isNotFound());
-        mvc.perform(get("/api/v1/battles/" + match.id() + "/review").header("Authorization", "Bearer " + access)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/battles/" + match.id() + "/review").header("Authorization", "Bearer " + access))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("BATTLE_NOT_FINISHED"));
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.paths['/api/v1/battles/{id}/answers'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/battles'].post").doesNotExist());

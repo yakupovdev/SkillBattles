@@ -3,6 +3,7 @@ package com.skillbattles.backend.controller;
 import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.handler.BattleRequestTimeFilter;
 import com.skillbattles.backend.mapper.BattleSnapshotMapper;
+import com.skillbattles.backend.mapper.BattleReviewMapper;
 import com.skillbattles.backend.processor.BattleProcessor;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.*;
@@ -30,6 +31,7 @@ import java.util.UUID;
 public class BattleController {
     private final BattleProcessor processor;
     private final BattleSnapshotMapper mapper;
+    private final BattleReviewMapper reviewMapper;
 
     @GetMapping("/{id}")
     @Operation(summary = "Get participant-specific battle state", description = "Shows only the current question. Opponent selection and current-round correctness and points are hidden until reveal.")
@@ -70,5 +72,13 @@ public class BattleController {
     @ApiResponse(responseCode = "409", description = "BATTLE_NOT_FINISHED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     public BattleResultResponse result(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return mapper.toResponse(processor.result(id, UUID.fromString(jwt.getSubject())));
+    }
+
+    @GetMapping("/{id}/review")
+    @Operation(operationId = "getBattlesIdReview", summary = "Review own terminal battle", description = "Started rounds only, using immutable saved question and answer snapshots. Incomplete rounds include only accepted answers; learning breakdown never changes final scores.")
+    @ApiResponse(responseCode = "200", description = "Started-round review")
+    @ApiResponse(responseCode = "409", description = "BATTLE_NOT_FINISHED", content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    public BattleReview review(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return reviewMapper.toResponse(processor.review(id, UUID.fromString(jwt.getSubject())));
     }
 }
