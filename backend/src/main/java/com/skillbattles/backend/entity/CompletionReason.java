@@ -1,0 +1,3 @@
+package com.skillbattles.backend.entity;
+
+public enum CompletionReason { NORMAL, OVERTIME_WIN, SURRENDER, DISCONNECT, READY_TIMEOUT, BOTH_DISCONNECTED, SERVER_INTERRUPTION, QUOTA_EXHAUSTED }
