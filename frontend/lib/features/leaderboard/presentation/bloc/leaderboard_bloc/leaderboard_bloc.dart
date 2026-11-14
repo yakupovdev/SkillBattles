@@ -6,6 +6,11 @@ import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
+import 'package:skill_battles/features/account/domain/entity/season_history_page_entity.dart';
+import 'package:skill_battles/features/account/domain/entity/season_history_params_entity.dart';
+import 'package:skill_battles/features/account/domain/entity/statistics_entity.dart';
+import 'package:skill_battles/features/account/domain/usecases/get_season_history_usecase.dart';
+import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_disciplines_usecase.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entity.dart';
@@ -15,11 +20,15 @@ import 'package:skill_battles/features/leaderboard/domain/usecases/get_leaderboa
 part 'leaderboard_event.dart';
 part 'leaderboard_state.dart';
 
-/// Season leaderboard per discipline; the latest selected tab wins.
+/// Season leaderboard per discipline; the latest selected tab wins. The own
+/// peaks and past seasons of the side panel load once, next to the
+/// catalogue; without them the panel just leaves those lines out.
 final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   LeaderboardBloc({
     required this._getDisciplines,
     required this._getLeaderboard,
+    required this._getStatistics,
+    required this._getSeasonHistory,
   }) : super(const LeaderboardState()) {
     on<LeaderboardStarted>(_onStarted, transformer: droppable());
     on<LeaderboardDisciplineSelected>(_onSelected, transformer: restartable());
@@ -27,15 +36,30 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
 
   final GetDisciplinesUsecase _getDisciplines;
   final GetLeaderboardUsecase _getLeaderboard;
+  final GetStatisticsUsecase _getStatistics;
+  final GetSeasonHistoryUsecase _getSeasonHistory;
 
   Future<void> _onStarted(
     LeaderboardStarted event,
     Emitter<LeaderboardState> emit,
   ) async {
     emit(state.copyWith(boardStatus: LoadStatus.loading));
-    final Either<Failure, List<DisciplineEntity>> result =
-        await _getDisciplines(const NoParams());
+    final (
+      Either<Failure, List<DisciplineEntity>> result,
+      Either<Failure, StatisticsEntity> statistics,
+      Either<Failure, SeasonHistoryPageEntity> seasons,
+    ) = await (
+      _getDisciplines(const NoParams()),
+      _getStatistics(const NoParams()),
+      _getSeasonHistory(const SeasonHistoryParamsEntity()),
+    ).wait;
     if (emit.isDone) return;
+    emit(
+      state.copyWith(
+        statistics: statistics.toNullable(),
+        seasons: seasons.toNullable(),
+      ),
+    );
     final List<DisciplineEntity>? disciplines = result.toNullable();
     if (disciplines == null || disciplines.isEmpty) {
       emit(

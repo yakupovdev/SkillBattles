@@ -7,6 +7,8 @@ final class LeaderboardState extends Equatable {
     this.boardStatus = LoadStatus.initial,
     this.board,
     this.failure,
+    this.statistics,
+    this.seasons,
   });
 
   final List<DisciplineEntity> disciplines;
@@ -15,12 +17,20 @@ final class LeaderboardState extends Equatable {
   final LeaderboardEntity? board;
   final Failure? failure;
 
+  /// Own peaks; `null` when they could not be loaded.
+  final StatisticsEntity? statistics;
+
+  /// Own completed seasons; `null` when they could not be loaded.
+  final SeasonHistoryPageEntity? seasons;
+
   LeaderboardState copyWith({
     List<DisciplineEntity>? disciplines,
     String? selectedCode,
     LoadStatus? boardStatus,
     LeaderboardEntity? board,
     Failure? failure,
+    StatisticsEntity? statistics,
+    SeasonHistoryPageEntity? seasons,
     bool resetBoard = false,
     bool resetFailure = false,
   }) {
@@ -30,6 +40,8 @@ final class LeaderboardState extends Equatable {
       boardStatus: boardStatus ?? this.boardStatus,
       board: resetBoard ? null : board ?? this.board,
       failure: resetFailure ? null : failure ?? this.failure,
+      statistics: statistics ?? this.statistics,
+      seasons: seasons ?? this.seasons,
     );
   }
 
@@ -40,5 +52,7 @@ final class LeaderboardState extends Equatable {
     boardStatus,
     board,
     failure,
+    statistics,
+    seasons,
   ];
 }

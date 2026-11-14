@@ -1,11 +1,6 @@
 import 'package:skeletonizer/skeletonizer.dart';
 
-import 'package:skill_battles/core/domain/entity/battle_mode.dart';
-import 'package:skill_battles/core/domain/entity/battle_outcome.dart';
-import 'package:skill_battles/core/domain/entity/battle_reason.dart';
 import 'package:skill_battles/core/domain/entity/entitlements_entity.dart';
-import 'package:skill_battles/core/domain/entity/page_info_entity.dart';
-import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/match_stats_entity.dart';
@@ -15,8 +10,6 @@ import 'package:skill_battles/features/account/domain/entity/streaks_entity.dart
 import 'package:skill_battles/features/catalog/domain/entity/difficulty_schedule_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/difficulty_timing_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
-import 'package:skill_battles/features/history/domain/entity/history_item_entity.dart';
-import 'package:skill_battles/features/history/domain/entity/history_page_entity.dart';
 
 /// Mock entities rendered as bones while the profile loads. Never
 /// reaches a BLoC or a repository.
@@ -109,38 +102,4 @@ final class ProfileSkeletonData {
         ),
     ],
   );
-
-  static final HistoryPageEntity history = HistoryPageEntity(
-    items: recentBattles,
-    page: const PageInfoEntity(
-      page: 0,
-      size: 10,
-      totalElements: 4,
-      totalPages: 1,
-    ),
-    historyLimit: null,
-  );
-
-  static final List<HistoryItemEntity> recentBattles = <HistoryItemEntity>[
-    for (int i = 0; i < 4; i++)
-      HistoryItemEntity(
-        battleId: 'skeleton-$i',
-        disciplineCode: 'skeleton-0',
-        mode: BattleMode.ranked,
-        outcome: BattleOutcome.win,
-        reason: BattleReason.normal,
-        opponent: PublicPlayerEntity(
-          id: 'skeleton-$i',
-          nickname: BoneMock.name,
-          isPro: false,
-        ),
-        myScore: 4200,
-        opponentScore: 3100,
-        ratingDelta: 16,
-        seasonId: null,
-        overtimePlayed: false,
-        createdAt: DateTime.utc(2026),
-        finishedAt: DateTime.utc(2026),
-      ),
-  ];
 }

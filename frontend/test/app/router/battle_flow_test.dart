@@ -54,6 +54,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
       }
       expect(freeNote, findsOneWidget);
+      expect(find.text('Correct answer'), findsNothing);
       expect(
         find.textContaining('Correct answer:', findRichText: true),
         findsNothing,

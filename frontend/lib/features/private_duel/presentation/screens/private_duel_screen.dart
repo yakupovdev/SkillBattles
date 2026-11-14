@@ -157,10 +157,9 @@ final class _CodeColumn extends StatelessWidget {
         ),
         if (open) _CopyRow(code: duel.code, expiresAt: duel.expiresAt),
         const AppNotice(
-          message:
-              'Private duels never change your rating and are unlimited on '
-              'every plan.',
+          message: 'Private duels never change your rating.',
           tone: AppNoticeTone.warning,
+          hug: true,
         ),
       ],
     );
@@ -181,23 +180,19 @@ final class _CodeTiles extends StatelessWidget {
         spacing: 10,
         children: <Widget>[
           for (final String char in code.split(''))
-            Flexible(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 84),
-                child: Container(
-                  height: 104,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Text(
-                    char,
-                    style: AppTextStyles.monoXxl.copyWith(
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
-                    ),
-                  ),
+            Container(
+              width: 84,
+              height: 104,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Text(
+                char,
+                style: AppTextStyles.monoXxl.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0,
                 ),
               ),
             ),
@@ -221,10 +216,8 @@ final class _CopyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return Row(
       spacing: 12,
-      runSpacing: 12,
       children: <Widget>[
         AppButton(
           label: 'Copy code',
@@ -233,10 +226,17 @@ final class _CopyRow extends StatelessWidget {
           icon: const _CopyIcon(),
           onPressed: () => _copy(context),
         ),
-        AppCountdownText(
-          target: expiresAt,
-          prefix: 'Expires in ',
-          style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
+        Row(
+          children: <Widget>[
+            Text(
+              'Expires in ',
+              style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
+            ),
+            AppCountdownText(
+              target: expiresAt,
+              style: AppTextStyles.monoBodyMd,
+            ),
+          ],
         ),
       ],
     );
@@ -266,6 +266,7 @@ final class _RoomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PublicPlayerEntity? guest = duel.guest;
+    final String discipline = formatDisciplineCode(duel.disciplineCode);
     final String? closed = switch (duel.status) {
       DuelStatus.expired => 'The code expired before anyone joined.',
       DuelStatus.cancelled => 'The room was cancelled.',
@@ -283,12 +284,40 @@ final class _RoomCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: 24,
           children: <Widget>[
-            const Text('Players', style: AppTextStyles.titleLg),
-            _PlayerRow(player: duel.host, isYou: true, status: 'Host'),
-            if (guest == null)
-              const _WaitingRow()
-            else
-              _PlayerRow(player: guest, isYou: false, status: 'Joined'),
+            Row(
+              children: <Widget>[
+                const Expanded(
+                  child: Text('Ready check', style: AppTextStyles.titleLg),
+                ),
+                Text(
+                  '${guest == null ? 1 : 2} of 2 joined',
+                  style: AppTextStyles.monoBodySm.copyWith(
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: 12,
+              children: <Widget>[
+                _PlayerRow(
+                  player: duel.host,
+                  isYou: true,
+                  subtitle: 'Host · $discipline',
+                  status: 'In room',
+                ),
+                if (guest == null)
+                  const _WaitingRow()
+                else
+                  _PlayerRow(
+                    player: guest,
+                    isYou: false,
+                    subtitle: 'Online · joined just now',
+                    status: 'Joined',
+                  ),
+              ],
+            ),
             Text(
               duel.status == DuelStatus.matched
                   ? 'Opening the ready check…'
@@ -336,6 +365,7 @@ final class _RoomCard extends StatelessWidget {
   }
 }
 
+/// The empty guest slot, shaped like a player row.
 final class _WaitingRow extends StatelessWidget {
   const _WaitingRow();
 
@@ -347,18 +377,43 @@ final class _WaitingRow extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
         child: Row(
           spacing: 14,
           children: <Widget>[
             const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
+              dimension: 44,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.muted,
+                  backgroundColor: AppColors.border,
+                ),
+              ),
             ),
-            Text(
-              'Waiting for your friend…',
-              style: AppTextStyles.bodyLg.copyWith(color: AppColors.muted),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 2,
+                children: <Widget>[
+                  Text(
+                    'Your friend',
+                    style: AppTextStyles.bodyLg.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  Text(
+                    'Share the code to invite them',
+                    style: AppTextStyles.bodySm.copyWith(
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
             ),
+            const _RowStatus(label: 'Waiting…', color: AppColors.faint),
           ],
         ),
       ),
@@ -370,15 +425,20 @@ final class _PlayerRow extends StatelessWidget {
   const _PlayerRow({
     required this.player,
     required this.isYou,
+    required this.subtitle,
     required this.status,
   });
 
   final PublicPlayerEntity player;
   final bool isYou;
+  final String subtitle;
   final String status;
 
   @override
   Widget build(BuildContext context) {
+    final TextStyle subtitleStyle = AppTextStyles.bodySm.copyWith(
+      color: AppColors.muted,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         color: isYou ? AppColors.primarySurface : AppColors.accentSurface,
@@ -395,31 +455,75 @@ final class _PlayerRow extends StatelessWidget {
               tone: isYou ? AppAvatarTone.primary : AppAvatarTone.accent,
             ),
             Expanded(
-              child: Row(
-                spacing: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 2,
                 children: <Widget>[
-                  Flexible(
-                    child: Text(
-                      isYou ? '${player.nickname} (you)' : player.nickname,
-                      style: AppTextStyles.bodyLg.copyWith(
-                        fontWeight: FontWeight.w600,
+                  Row(
+                    spacing: 8,
+                    children: <Widget>[
+                      Flexible(
+                        child: Text.rich(
+                          TextSpan(
+                            text: player.nickname,
+                            children: <InlineSpan>[
+                              if (isYou)
+                                TextSpan(
+                                  text: ' (you)',
+                                  style: AppTextStyles.bodyLg.copyWith(
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          style: AppTextStyles.bodyLg.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                      if (player.isPro) const ProBadge(),
+                    ],
                   ),
-                  if (player.isPro) const ProBadge(),
+                  if (isYou)
+                    Text(subtitle, style: subtitleStyle)
+                  else
+                    Row(
+                      spacing: 6,
+                      children: <Widget>[
+                        const AppDot(color: AppColors.success, size: 7),
+                        Flexible(child: Text(subtitle, style: subtitleStyle)),
+                      ],
+                    ),
                 ],
               ),
             ),
-            Text(
-              status,
-              style: AppTextStyles.bodySm.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppColors.success,
-              ),
-            ),
+            _RowStatus(label: status, color: AppColors.success),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The right-hand status of a row, in a fixed 72 px lane.
+final class _RowStatus extends StatelessWidget {
+  const _RowStatus({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 72,
+      child: Text(
+        label,
+        textAlign: TextAlign.right,
+        style: AppTextStyles.bodySm.copyWith(
+          fontWeight: FontWeight.w600,
+          color: color,
         ),
       ),
     );

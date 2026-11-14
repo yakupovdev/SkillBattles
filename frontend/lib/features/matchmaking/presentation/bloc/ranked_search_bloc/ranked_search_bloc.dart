@@ -11,6 +11,8 @@ import 'package:skill_battles/core/presentation/bloc/load_status.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
+import 'package:skill_battles/features/account/domain/entity/statistics_entity.dart';
+import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/join_queue_params_entity.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_entry_entity.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_entry_params_entity.dart';
@@ -34,12 +36,14 @@ final class RankedSearchBloc
     required this._cancelEntry,
     required this._watchEntry,
     required this._watchConnection,
+    required this._getStatistics,
     this.pollInterval = const Duration(seconds: 4),
   }) : super(const RankedSearchState()) {
     on<RankedSearchStarted>(_onStarted, transformer: droppable());
     on<RankedSearchCancelRequested>(_onCancel, transformer: droppable());
     on<_EntryReceived>(_onEntryReceived);
     on<_RefreshTick>(_onRefreshTick, transformer: droppable());
+    on<_StatisticsRequested>(_onStatisticsRequested, transformer: droppable());
   }
 
   final JoinQueueUsecase _joinQueue;
@@ -47,6 +51,7 @@ final class RankedSearchBloc
   final CancelQueueEntryUsecase _cancelEntry;
   final WatchQueueEntryUsecase _watchEntry;
   final WatchConnectionUsecase _watchConnection;
+  final GetStatisticsUsecase _getStatistics;
   final Duration pollInterval;
 
   StreamSubscription<QueueEntryEntity>? _entrySubscription;
@@ -66,8 +71,10 @@ final class RankedSearchBloc
       RankedSearchState(
         status: RankedSearchStatus.joining,
         disciplineCode: event.disciplineCode,
+        statistics: state.statistics,
       ),
     );
+    if (state.statistics == null) add(const _StatisticsRequested());
     final String? resumeId = event.entryId;
     if (resumeId != null) {
       _follow(resumeId);
@@ -122,6 +129,20 @@ final class RankedSearchBloc
         );
       }
     }, (QueueEntryEntity entry) => _apply(entry, emit));
+  }
+
+  /// The own rating turns the ± window into a rating range. The search
+  /// works without it, so a failure only leaves the range out.
+  Future<void> _onStatisticsRequested(
+    _StatisticsRequested event,
+    Emitter<RankedSearchState> emit,
+  ) async {
+    final Either<Failure, StatisticsEntity> result = await _getStatistics(
+      const NoParams(),
+    );
+    if (emit.isDone) return;
+    final StatisticsEntity? statistics = result.toNullable();
+    if (statistics != null) emit(state.copyWith(statistics: statistics));
   }
 
   void _onEntryReceived(_EntryReceived event, Emitter<RankedSearchState> emit) {

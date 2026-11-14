@@ -8,6 +8,9 @@ enum AppAvatarSize {
   /// 24 — next to an answer on the reveal screen.
   xs(24, 11, 14),
 
+  /// 32 — leaderboard rows.
+  row(32, 13, 16),
+
   /// 36 — top bar.
   sm(36, 14, 18),
 
@@ -31,8 +34,8 @@ enum AppAvatarSize {
 }
 
 /// Fill of an [AppAvatar]: blue for the current player, amber for the
-/// opponent.
-enum AppAvatarTone { primary, accent }
+/// opponent; ink and grey tell leaderboard places apart.
+enum AppAvatarTone { primary, accent, ink, neutral }
 
 /// A round avatar with the first letter of a nickname.
 final class AppAvatar extends StatelessWidget {
@@ -55,6 +58,8 @@ final class AppAvatar extends StatelessWidget {
     final (Color background, Color foreground) = switch (tone) {
       AppAvatarTone.primary => (AppColors.primary, AppColors.white),
       AppAvatarTone.accent => (AppColors.accent, AppColors.ink),
+      AppAvatarTone.ink => (AppColors.ink, AppColors.white),
+      AppAvatarTone.neutral => (AppColors.border, AppColors.ink),
     };
 
     return Semantics(

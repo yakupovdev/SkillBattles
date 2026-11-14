@@ -63,6 +63,15 @@ final class _AppCountdownTextState extends State<AppCountdownText> {
     return left.isNegative ? Duration.zero : left;
   }
 
+  @override
+  void didUpdateWidget(AppCountdownText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.target != widget.target ||
+        oldWidget.clockOffset != widget.clockOffset) {
+      _remaining = _compute();
+    }
+  }
+
   void _tick() {
     final Duration next = _compute();
     if (next.inSeconds == _remaining.inSeconds &&

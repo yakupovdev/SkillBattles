@@ -262,10 +262,13 @@ final class _PlanCard extends StatelessWidget {
       PlanCode.proAnnual => _PlanLook.dark,
     };
     final bool isAnnual = plan.interval == PlanInterval.year;
-    final String price = DisplayFormatters.money(
-      isAnnual ? plan.monthlyEquivalentCents : plan.amountCents,
-      plan.currency,
-    );
+    final int priceCents = isAnnual
+        ? plan.monthlyEquivalentCents
+        : plan.amountCents;
+    // "$0" for Free, cents for the paid plans.
+    final String price = priceCents == 0
+        ? DisplayFormatters.money(0, plan.currency).replaceAll('.00', '')
+        : DisplayFormatters.money(priceCents, plan.currency);
     final String caption = isCurrent
         ? 'Your current plan'
         : switch (plan.interval) {
@@ -298,7 +301,7 @@ final class _PlanCard extends StatelessWidget {
                   children: <Widget>[
                     Expanded(
                       child: Text(
-                        plan.name,
+                        plan.code.label,
                         style: AppTextStyles.buttonMd.copyWith(
                           color: look.text,
                         ),
@@ -325,9 +328,7 @@ final class _PlanCard extends StatelessWidget {
                     if (plan.interval != PlanInterval.none)
                       Text(
                         '/ month',
-                        style: AppTextStyles.bodyMd.copyWith(
-                          color: look.muted,
-                        ),
+                        style: AppTextStyles.bodyMd.copyWith(color: look.muted),
                       ),
                   ],
                 ),

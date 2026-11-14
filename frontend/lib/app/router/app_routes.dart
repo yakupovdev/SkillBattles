@@ -12,6 +12,7 @@ enum AppRoutes {
   profile('/profile'),
   editProfile('/profile/edit'),
   leaderboard('/leaderboard'),
+  history('/history'),
   pro('/pro'),
   billingReturn('/billing/return');
 

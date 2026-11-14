@@ -100,17 +100,6 @@ abstract final class DisplayFormatters {
         '${_months[local.month - 1]}';
   }
 
-  /// `2,048`; negative values keep a true minus sign (`−1,032`).
-  static String thousands(int value) {
-    final String digits = value.abs().toString();
-    final StringBuffer buffer = StringBuffer(value < 0 ? '−' : '');
-    for (int i = 0; i < digits.length; i++) {
-      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
-      buffer.write(digits[i]);
-    }
-    return buffer.toString();
-  }
-
   /// `Nov 2026`.
   static String monthYear(DateTime value) {
     final DateTime local = value.toLocal();

@@ -9,12 +9,6 @@ final class ProfileState extends Equatable {
     this.ranks,
     this.seasons,
     this.selectedCode,
-    this.historyStatus = LoadStatus.initial,
-    this.history,
-    this.historyFailure,
-    this.historyParams = const HistoryParamsEntity(
-      size: ProfileBloc.historyPageSize,
-    ),
   });
 
   final LoadStatus loadStatus;
@@ -24,10 +18,6 @@ final class ProfileState extends Equatable {
   final RankLadderEntity? ranks;
   final SeasonHistoryPageEntity? seasons;
   final String? selectedCode;
-  final LoadStatus historyStatus;
-  final HistoryPageEntity? history;
-  final Failure? historyFailure;
-  final HistoryParamsEntity historyParams;
 
   ProfileState copyWith({
     LoadStatus? loadStatus,
@@ -37,12 +27,7 @@ final class ProfileState extends Equatable {
     RankLadderEntity? ranks,
     SeasonHistoryPageEntity? seasons,
     String? selectedCode,
-    LoadStatus? historyStatus,
-    HistoryPageEntity? history,
-    Failure? historyFailure,
-    HistoryParamsEntity? historyParams,
     bool resetFailure = false,
-    bool resetHistoryFailure = false,
   }) {
     return ProfileState(
       loadStatus: loadStatus ?? this.loadStatus,
@@ -52,12 +37,6 @@ final class ProfileState extends Equatable {
       ranks: ranks ?? this.ranks,
       seasons: seasons ?? this.seasons,
       selectedCode: selectedCode ?? this.selectedCode,
-      historyStatus: historyStatus ?? this.historyStatus,
-      history: history ?? this.history,
-      historyFailure: resetHistoryFailure
-          ? null
-          : historyFailure ?? this.historyFailure,
-      historyParams: historyParams ?? this.historyParams,
     );
   }
 
@@ -70,9 +49,5 @@ final class ProfileState extends Equatable {
     ranks,
     seasons,
     selectedCode,
-    historyStatus,
-    history,
-    historyFailure,
-    historyParams,
   ];
 }
