@@ -5,6 +5,13 @@ leaderboards and SkillBattles Pro (Stripe **test mode** only).
 
 ## Run
 
+From the repository root, `docker compose up -d --build` builds the real release
+web app with Flutter 3.50.0 / Dart 3.14.0 and starts PostgreSQL, backend and nginx.
+Open http://localhost:8081 (see the root README for ENV, imports and ports).
+The Compose build disables mocks and proxies `/api/v1`, `/ws/v1/events`, Swagger
+and OpenAPI to the backend service. Browser requests stay on the current origin.
+Server secrets are never frontend build arguments.
+
 ```sh
 # Against the backend (same-origin proxy for REST and the WebSocket Upgrade):
 flutter run -d chrome \
@@ -16,7 +23,10 @@ flutter run -d chrome \
 flutter run -d chrome --dart-define=DEV_MOCKS=true
 ```
 
-Defaults: `http://localhost:8080/api/v1` and `ws://localhost:8080/ws/v1/events`.
+Web defaults: `/api/v1` and `/ws/v1/events` on the page's origin, using `ws` for
+HTTP and `wss` for HTTPS. Explicit absolute defines remain supported. Desktop
+defaults remain `http://localhost:8080/api/v1` and `ws://localhost:8080/ws/v1/events`.
+Defines apply at build time; container runtime ENV does not change the compiled app.
 Paths use the path URL strategy, so the server-configured return URLs
 `/billing/return?success=true|false` and `/auth/reset?token=…` open directly.
 
@@ -25,7 +35,7 @@ Paths use the path URL strategy, so the server-configured return URLs
 ```sh
 dart run build_runner build --delete-conflicting-outputs   # after model changes
 flutter analyze
-flutter test
+flutter test --dart-define=OUT=/tmp  # existing scratch screenshot tests write PNGs here
 ```
 
 Architecture and conventions: `.claude/rules/` and `.claude/docs/`.

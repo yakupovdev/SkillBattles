@@ -14,9 +14,14 @@ public class AuthProcessorImpl implements AuthProcessor {
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
     private final TokenService tokenService;
+    private final RatingService ratingService;
+    private final SubscriptionService subscriptions;
 
     @Override
-    public AuthDto register(RegisterDto dto) { return issue(userService.register(dto)); }
+    public AuthDto register(RegisterDto dto) {
+        UserDto user = userService.register(dto);
+        return issue(user);
+    }
 
     @Override
     public AuthDto login(LoginDto dto) { return issue(userService.authenticate(dto)); }
@@ -43,6 +48,7 @@ public class AuthProcessorImpl implements AuthProcessor {
     }
 
     private AuthDto issue(UserDto user) {
+        ratingService.initialize(user.getId());subscriptions.initialize(user.getId());user.setPro(subscriptions.entitlements(user.getId()).isPro());
         TokenPairDto tokens = tokenService.issue(user.getId());
         refreshTokenService.store(new RefreshTokenDto(user.getId(), tokenService.hash(tokens.getRefreshToken()), tokens.getRefreshExpiresAt()));
         return new AuthDto(tokens, user);

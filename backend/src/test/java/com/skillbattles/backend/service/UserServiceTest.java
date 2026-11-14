@@ -16,6 +16,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+    @Mock AgePolicy agePolicy;
     @Mock UserRepository repository;
     @Mock UserMapper mapper;
     @Mock PasswordEncoder passwordEncoder;
@@ -23,7 +24,7 @@ class UserServiceTest {
 
     @Test
     void registrationNormalizesBusinessKeysAndHashesUntrimmedPassword() {
-        RegisterDto dto = new RegisterDto();
+        RegisterDto dto = new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1);
         dto.setEmail(" Alex@Example.COM ");
         dto.setNickname("Alex_One");
         dto.setPassword(" password ");
@@ -39,7 +40,7 @@ class UserServiceTest {
 
     @Test
     void duplicateNicknameHasStableConflictAndDoesNotWrite() {
-        RegisterDto dto = new RegisterDto();
+        RegisterDto dto = new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1);
         dto.setEmail("alex@example.com");
         dto.setNickname("Alex_One");
         when(repository.existsByNicknameNormalized("alex_one")).thenReturn(true);

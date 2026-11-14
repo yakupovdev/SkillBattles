@@ -45,7 +45,7 @@ def main():
     email = f"smoke-{suffix}@example.com"
     password = "LocalSmokePass123!"
     auth = request("POST", "/api/v1/auth/register", 201,
-                   {"email": f" {email.upper()} ", "nickname": f"Smoke_{suffix}", "password": password})
+                   {"birthYear": 2000, "birthMonth": 1, "email": f" {email.upper()} ", "nickname": f"Smoke_{suffix}", "password": password})
     profile = request("GET", "/api/v1/users/me", 200, token=auth["accessToken"])
     if profile["email"] != email or not profile["createdAt"].endswith("Z") or "passwordHash" in profile:
         raise RuntimeError("Unexpected profile representation")

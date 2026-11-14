@@ -3,6 +3,7 @@ package com.skillbattles.backend.config;
 import com.skillbattles.backend.handler.SecurityErrorHandler;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -24,9 +25,11 @@ public class SecurityConfig {
 
     @Bean
     @Order(1)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain refreshChain(HttpSecurity http, SecurityErrorHandler errors) throws Exception {
         // These endpoints validate refresh JWT themselves, without the access-token filter.
         http.securityMatcher(new OrRequestMatcher(
+                PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/api/v1/subscriptions/webhook"),
                 PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/refresh"),
                 PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/logout")));
         common(http, errors);
@@ -35,14 +38,16 @@ public class SecurityConfig {
 
     @Bean
     @Order(2)
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain apiChain(HttpSecurity http, SecurityErrorHandler errors,
             @Qualifier("accessJwtDecoder") JwtDecoder decoder) throws Exception {
         common(http, errors);
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(jwt -> List.of());
         return http.authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/ws/v1/events","/api/v1/subscriptions/plans").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(decoder).jwtAuthenticationConverter(converter))
                         .authenticationEntryPoint(errors).accessDeniedHandler(errors))

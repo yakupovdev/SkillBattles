@@ -14,11 +14,21 @@ final class AppConfig {
     required this.useDevMocks,
   });
 
-  factory AppConfig.fromEnvironment() => const AppConfig(
-    apiBaseUrl: AppApi.baseUrl,
-    eventsUrl: AppApi.eventsUrl,
-    useDevMocks: bool.fromEnvironment('DEV_MOCKS'),
-  );
+  factory AppConfig.fromEnvironment() {
+    final Uri events = Uri.parse(AppApi.eventsUrl);
+    // The WebSocket package requires an absolute ws/wss URI on web.
+    final Uri base = Uri.base;
+    return AppConfig(
+      apiBaseUrl: AppApi.baseUrl,
+      eventsUrl: events.hasScheme
+          ? events.toString()
+          : base
+                .resolveUri(events)
+                .replace(scheme: base.scheme == 'https' ? 'wss' : 'ws')
+                .toString(),
+      useDevMocks: const bool.fromEnvironment('DEV_MOCKS'),
+    );
+  }
 
   final String apiBaseUrl;
   final String eventsUrl;

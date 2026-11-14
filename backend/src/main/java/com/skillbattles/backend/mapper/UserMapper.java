@@ -9,6 +9,7 @@ import java.time.*;
 @Mapper(config = CommonMapperConfig.class)
 public interface UserMapper {
     @Mapping(target = "email", source = "emailNormalized")
+    @org.mapstruct.Mapping(target="pro",ignore=true)
     UserDto toDto(User user);
 
     @Mapping(target = "id", ignore = true)
@@ -21,6 +22,8 @@ public interface UserMapper {
     User toEntity(RegisterDto dto);
 
     UserResponse toResponse(UserDto dto);
+    PublicPlayer toPublicResponse(PublicPlayerDto dto);
+    ProfileUpdateDto toDto(UpdateProfileRequest request);
 
     default Instant toUtc(LocalDateTime value) {
         return value == null ? null : value.toInstant(ZoneOffset.UTC);

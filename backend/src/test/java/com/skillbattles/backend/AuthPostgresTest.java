@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = "app.jwt.secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+@SpringBootTest(properties = {"app.jwt.secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", "app.battle.scheduling.enabled=false"})
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 class AuthPostgresTest {
@@ -95,11 +95,11 @@ class AuthPostgresTest {
         JsonNode auth = register();
         String email = auth.path("user").path("email").asText();
         String nickname = auth.path("user").path("nickname").asText();
-        String payload = json.writeValueAsString(Map.of("email", email.toUpperCase(Locale.ROOT), "nickname", nickname, "password", "ExamplePass123!"));
+        String payload = json.writeValueAsString(Map.of("birthYear",2000,"birthMonth",1,"email", email.toUpperCase(Locale.ROOT), "nickname", nickname, "password", "ExamplePass123!"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"));
         mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(
-                Map.of("email", "other-" + email, "nickname", nickname.toUpperCase(Locale.ROOT), "password", "ExamplePass123!"))))
+                Map.of("birthYear",2000,"birthMonth",1,"email", "other-" + email, "nickname", nickname.toUpperCase(Locale.ROOT), "password", "ExamplePass123!"))))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NICKNAME_ALREADY_EXISTS"));
         UUID id = UUID.fromString(auth.path("user").path("id").asText());
         processor.deleteUser(id);
@@ -130,7 +130,7 @@ class AuthPostgresTest {
 
     private JsonNode register() throws Exception {
         String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-        String payload = json.writeValueAsString(Map.of("email", "  " + suffix + "@Example.COM ", "password", "ExamplePass123!", "nickname", "User_" + suffix));
+        String payload = json.writeValueAsString(Map.of("birthYear",2000,"birthMonth",1,"email", "  " + suffix + "@Example.COM ", "password", "ExamplePass123!", "nickname", "User_" + suffix));
         return body(mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isCreated()).andReturn());
     }

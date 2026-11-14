@@ -1,16 +1,18 @@
+import 'package:flutter/foundation.dart';
+
 /// Every API path, header name and hand-written request key.
 abstract final class AppApi {
   /// Set with `--dart-define=API_BASE_URL=...`.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/api/v1',
+    defaultValue: kIsWeb ? '/api/v1' : 'http://localhost:8080/api/v1',
   );
 
   /// STOMP 1.2 endpoint (native WebSocket), set with
   /// `--dart-define=EVENTS_URL=...`. Not under `/api/v1`.
   static const String eventsUrl = String.fromEnvironment(
     'EVENTS_URL',
-    defaultValue: 'ws://localhost:8080/ws/v1/events',
+    defaultValue: kIsWeb ? '/ws/v1/events' : 'ws://localhost:8080/ws/v1/events',
   );
 
   /// The only subscription the server allows.

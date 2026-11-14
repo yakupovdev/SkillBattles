@@ -1,0 +1,3 @@
+package com.skillbattles.backend.service;
+import org.junit.jupiter.api.Test;import static com.skillbattles.backend.BattleFixtures.*;import static org.assertj.core.api.Assertions.*;import com.skillbattles.backend.exception.RateLimitedException;
+class RequestRateLimiterTest {@Test void limitIsIndependentOfAccountExistenceAndExpiresAtExactBoundary(){var clock=new MutableClock();var limiter=new RequestRateLimiter(clock);for(String key:java.util.List.of("existing","unknown")){limiter.check(key,1);assertThatThrownBy(()->limiter.check(key,1)).isInstanceOfSatisfying(RateLimitedException.class,e->assertThat(e.getRetryAfter()).isEqualTo(1200));}clock.set(START.plusSeconds(1200));assertThatCode(()->limiter.check("existing",1)).doesNotThrowAnyException();}}

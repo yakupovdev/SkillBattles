@@ -46,14 +46,18 @@ void main() {
       expect(find.textContaining('Answer locked in'), findsOneWidget);
 
       // The bot answers within 10 s, then the round reveals for 5 s.
-      final Finder freeNote = find.text(
-        'Correct answers and explanations come with Pro.',
+      final Finder freeNote = find.textContaining(
+        'The correct option stays hidden on Free.',
+        findRichText: true,
       );
       for (int i = 0; i < 24 && freeNote.evaluate().isEmpty; i++) {
         await tester.pump(const Duration(milliseconds: 500));
       }
       expect(freeNote, findsOneWidget);
-      expect(find.text('Correct answer'), findsNothing);
+      expect(
+        find.textContaining('Correct answer:', findRichText: true),
+        findsNothing,
+      );
 
       await finishApp(tester, deps);
     },

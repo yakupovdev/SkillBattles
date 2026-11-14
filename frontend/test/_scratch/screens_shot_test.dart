@@ -59,11 +59,11 @@ void main() {
   testWidgets('auth day + restricted', (WidgetTester tester) async {
     final AppDependencies deps = await pumpApp(tester);
     await settle(tester, 6);
-    await tester.tap(find.text('Month'));
+    await tester.tap(find.byType(DropdownButtonFormField<int>).first);
     await settle(tester, 2);
     await tester.tap(find.text('January').last);
     await settle(tester, 2);
-    await tester.tap(find.text('YYYY'));
+    await tester.tap(find.byType(DropdownButtonFormField<int>).last);
     await settle(tester, 2);
     await tester.tap(find.text('2020').last);
     await settle(tester, 2);
@@ -78,14 +78,19 @@ void main() {
     await settle(tester, 6);
     final DateTime now = DateTime.now();
     const List<String> months = <String>['January','February','March','April','May','June','July','August','September','October','November','December'];
-    await tester.tap(find.text('Month'));
-    await settle(tester, 2);
-    await tester.tap(find.text(months[now.month - 1]).last);
-    await settle(tester, 2);
-    await tester.tap(find.text('YYYY'));
+    await tester.tap(find.byType(DropdownButtonFormField<int>).first);
     await settle(tester, 2);
     await tester.dragUntilVisible(
-      find.text('${now.year - 13}').last,
+      find.text(months[now.month - 1]),
+      find.byType(Scrollable).last,
+      const Offset(0, -100),
+    );
+    await tester.tap(find.text(months[now.month - 1]).last);
+    await settle(tester, 2);
+    await tester.tap(find.byType(DropdownButtonFormField<int>).last);
+    await settle(tester, 2);
+    await tester.dragUntilVisible(
+      find.text('${now.year - 13}'),
       find.byType(Scrollable).last,
       const Offset(0, -200),
     );

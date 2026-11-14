@@ -9,6 +9,7 @@ import java.util.UUID;
 @Setter
 public class UserDto {
     private UUID id;
+    @com.fasterxml.jackson.annotation.JsonProperty("isPro") private boolean pro;
     private String email;
     private String nickname;
     private LocalDateTime createdAt;

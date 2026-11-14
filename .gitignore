@@ -12,9 +12,12 @@ AGENTS.override.md
 /PROJECT_CONTEXT.md
 /OPENAPI.yaml
 /backend/BACKEND_SPEC.md
+/backend/SKILLBATTLES_BACKEND_V0_3.md
+/backend/OPENAPI_V0_3.yaml
 /frontend/FRONTEND_SPEC.md
 
 # Local environment files, keep examples
+/.env
 .env
 .env.*
 !.env.example
@@ -26,3 +29,8 @@ AGENTS.override.md
 
 # Idea project files
 .idea/
+
+# Root macOS metadata; Flutter rules remain in frontend/.gitignore.
+.DS_Store
+__pycache__/
+*.pyc
