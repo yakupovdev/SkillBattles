@@ -34,6 +34,7 @@ public class BattleServiceImpl implements BattleService {
 
     @Override public boolean hasActiveBattle(UUID userId) { return repository.hasActiveBattle(userId); }
     @Override public List<UUID> activeIds() { return repository.activeIds(); }
+    @Override public List<UUID> activeIdsForUser(UUID userId) { return repository.activeIdsForUser(userId); }
 
     @Override
     public List<QuestionSeenDto> recentQuestionShows(UUID userId, Subject subject, int battleLimit) {

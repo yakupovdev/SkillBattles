@@ -203,6 +203,49 @@ class BattleEngineTest {
     }
 
     @Test
+    void delayedDisconnectUsesObservedTimeInsteadOfExtendingGrace() {
+        BattleDto battle = started(5, BattleMode.RANKED);
+        engine.synchronizePresence(battle, Map.of(
+                player(battle, 0), new PresenceDto(null, null, START.plusSeconds(4)),
+                player(battle, 1), new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600))), START.plusSeconds(34));
+        assertThat(battle.getResult().getReason()).isEqualTo(CompletionReason.DISCONNECT);
+        assertThat(battle.getResult().getFinishedAt()).isEqualTo(START.plusSeconds(34));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"33,false", "34,true", "40,true"})
+    void rapidReconnectKeepsMissedDisconnectAndUsesItsActualArrivalTime(long reconnectAt, boolean finished) {
+        BattleDto battle = started(5, BattleMode.RANKED);
+        var reconnected = new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600),
+                START.plusSeconds(reconnectAt), START.plusSeconds(4));
+        engine.synchronizePresence(battle, Map.of(player(battle, 0), reconnected,
+                player(battle, 1), new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600))), START.plusSeconds(40));
+        if (finished) {
+            assertThat(battle.getResult().getReason()).isEqualTo(CompletionReason.DISCONNECT);
+            assertThat(battle.getResult().getFinishedAt()).isEqualTo(START.plusSeconds(34));
+        } else {
+            assertThat(battle.getResult()).isNull();
+            assertThat(battle.getState().getPlayers().getFirst().isConnected()).isTrue();
+            int version = battle.getVersion();
+            engine.synchronizePresence(battle, Map.of(player(battle, 0), reconnected,
+                    player(battle, 1), new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600))), START.plusSeconds(40));
+            assertThat(battle.getVersion()).isEqualTo(version);
+            assertThat(battle.getState().getRounds().getFirst().getDeadline()).isEqualTo(START.plusSeconds(13));
+        }
+    }
+
+    @Test
+    void sessionReplacementObservedBeforeOldJwtExpiryPreventsFalseForfeit() {
+        BattleDto battle = started(5, BattleMode.RANKED);
+        battle.getState().getPlayers().getFirst().setSessionExpiresAt(START.plusSeconds(4));
+        engine.synchronizePresence(battle, Map.of(
+                player(battle, 0), new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600), START.plusMillis(3999)),
+                player(battle, 1), new PresenceDto(UUID.randomUUID(), START.plusSeconds(3600))), START.plusSeconds(40));
+        assertThat(battle.getResult()).isNull();
+        assertThat(battle.getState().getPlayers().getFirst().isConnected()).isTrue();
+    }
+
+    @Test
     void normalCompletionBeforeLaterDisconnectExpiryWinsAndPrivateNeverRates() {
         BattleDto battle = started(1, BattleMode.PRIVATE);
         engine.synchronizePresence(battle, Map.of(), START.plusSeconds(4));

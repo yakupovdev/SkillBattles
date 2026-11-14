@@ -34,6 +34,9 @@ public interface BattleRepository extends JpaRepository<Battle, UUID> {
     @Query("select b.id from Battle b where b.phase not in (com.skillbattles.backend.entity.BattlePhase.FINISHED, com.skillbattles.backend.entity.BattlePhase.CANCELLED) order by b.id")
     List<UUID> activeIds();
 
+    @Query("select b.id from Battle b where (b.firstUserId = :userId or b.secondUserId = :userId) and b.phase not in (com.skillbattles.backend.entity.BattlePhase.FINISHED, com.skillbattles.backend.entity.BattlePhase.CANCELLED)")
+    List<UUID> activeIdsForUser(@Param("userId") UUID userId);
+
     @Query("select count(b) > 0 from Battle b where (b.firstUserId = :userId or b.secondUserId = :userId) and b.phase not in (com.skillbattles.backend.entity.BattlePhase.FINISHED, com.skillbattles.backend.entity.BattlePhase.CANCELLED)")
     boolean hasActiveBattle(@Param("userId") UUID userId);
 

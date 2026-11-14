@@ -10,6 +10,7 @@ public interface BattleService {
     void save(BattleDto dto);
     boolean hasActiveBattle(UUID userId);
     List<UUID> activeIds();
+    List<UUID> activeIdsForUser(UUID userId);
     List<BattleCountsDto> statistics(UUID userId);
     List<QuestionSeenDto> recentQuestionShows(UUID userId, Subject subject, int battleLimit);
 }

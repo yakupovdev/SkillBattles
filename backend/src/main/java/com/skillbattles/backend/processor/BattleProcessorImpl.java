@@ -106,7 +106,8 @@ public class BattleProcessorImpl implements BattleProcessor {
         BattleDto battle = owned(battleId, userId);
         int version = battle.getVersion();
         Instant now = now();
-        AnswerReceiptDto receipt = engine.answer(battle, userId, command, receivedAt, now);
+        synchronize(battle, receivedAt);
+        AnswerReceiptDto receipt = engine.answer(battle, userId, command, receivedAt, receivedAt);
         synchronize(battle, now);
         persist(battle, version, now);
         return receipt;
@@ -161,7 +162,8 @@ public class BattleProcessorImpl implements BattleProcessor {
     private void synchronize(BattleDto battle, Instant now) {
         if (BattleEngineImpl.terminal(battle)) return;
         Map<UUID, PresenceDto> presence = new HashMap<>();
-        battle.getState().getPlayers().forEach(player -> presenceService.current(player.getId()).ifPresent(value -> presence.put(player.getId(), value)));
+        battle.getState().getPlayers().forEach(player -> presenceService.observed(player.getId())
+                .ifPresent(value -> presence.put(player.getId(), value)));
         engine.synchronizePresence(battle, presence, now);
     }
 

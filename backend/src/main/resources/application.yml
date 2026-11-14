@@ -31,6 +31,11 @@ server:
     include-message: never
     include-stacktrace: never
 app:
+  realtime:
+    heartbeat-ms: 5000
+    read-timeout-ms: 10000
+    connect-timeout-ms: 10000
+    monitor-ms: 500
   battle:
     math:
       question-count: ${MATH_QUESTION_COUNT:3}

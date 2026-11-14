@@ -1,6 +1,6 @@
 # SkillBattles backend
 
-Каркас, авторизация, вопросы/импорт и движок батлов: Java 21, Spring Boot 3.5.16, Spring MVC / JPA /
+Авторизация, вопросы/импорт, движок батлов и realtime: Java 21, Spring Boot 3.5.16, Spring MVC / JPA /
 Security Resource Server, PostgreSQL 17.12, Flyway, Validation, Lombok, MapStruct 1.6.3,
 springdoc 2.10.0. Maven Wrapper 3.3.4 запускает Maven 3.9.12. Остальные зависимости
 зафиксированы BOM Spring Boot; их версии не переопределяются вручную.
@@ -10,7 +10,7 @@ springdoc 2.10.0. Maven Wrapper 3.3.4 запускает Maven 3.9.12. Оста�
 [MapStruct](https://mapstruct.org/documentation/stable/reference/html/),
 [PostgreSQL](https://www.postgresql.org/support/versioning/).
 Boot 3.5.16 — последний OSS-релиз требуемой ветки 3.5.x; переход на другую ветку
-потребует отдельной задачи. Matchmaking, WebSocket и полноценные history/review endpoints пока не реализованы.
+потребует отдельной задачи. Matchmaking, комнаты по коду, `/users/me/activity` и полноценные history/review endpoints пока не реализованы.
 
 ## Локальная конфигурация
 
@@ -315,15 +315,14 @@ Surrender до первой QUESTION отменяет матч; после ст�
 
 ### Граница realtime/presence
 
-`PresenceService.current(userId)` должен возвращать только актуальное
+`PresenceService.current(userId)` возвращает только актуальное
 аутентифицированное realtime-соединение с активной подпиской, sessionId и сроком JWT.
-**Пока используется закрытый adapter: все offline.** Readiness без реального
-adapter возвращает REALTIME_CONNECTION_REQUIRED. Проверки запускают матч
-через внутренние компоненты с test-only presence; это не production-режим.
+Реальный in-memory adapter подключается в обычном серверном профиле. До успешного
+CONNECT и SUBSCRIBE readiness возвращает REALTIME_CONNECTION_REQUIRED.
 
-Будущий transport adapter заменяет PresenceService и вызывает `BattleProcessor.tick`
-при смене актуальной сессии/presence. Отложенные disconnect callbacks должны
-обновлять только соответствующую текущую generation в adapter; движок читает
+Transport adapter вызывает `BattleProcessor.tick` через отдельный executor
+при смене актуальной сессии/presence. Отложенные disconnect callbacks
+обновляют только соответствующую текущую generation в adapter; движок читает
 его актуальное состояние, а не доверяет sessionId от HTTP-клиента.
 Батл хранит текущую session identity и срок JWT; после истечения токена или
 потери соединения начинается grace 30 секунд. Таймеры вопросов не останавливаются;
@@ -332,7 +331,7 @@ DISCONNECT с поражением, если оппонент online; оба off
 без Elo. До старта используется отмена. При запуске приложения все сохранённые
 нетерминальные матчи отменяются с SERVER_INTERRUPTION без изменения рейтингов.
 Ранее завершённые матчи сохраняются. Профиль question-import не запускает
-scheduler/recovery и не прерывает активные батлы работающего сервера.
+scheduler/recovery, WebSocket и presence-monitor и не прерывает активные батлы работающего сервера.
 
 Дополнительные настройки:
 
@@ -345,8 +344,8 @@ scheduler/recovery и не прерывает активные батлы раб
 
 Scheduler начинает обработку после recovery. Ошибка одного батла не останавливает
 остальные; повторный poll повторяет транзакцию. Обработка рассчитана на один
-экземпляр приложения согласно MVP. Очередь, комнаты по коду и игровой WebSocket
-появятся следующими этапами; открытой игровой демо-сессии сейчас нет.
+экземпляр приложения согласно MVP. Очередь и комнаты по коду появятся следующими
+этапами; создание матчей пока доступно внутренним компонентам и тестовым fixtures.
 
 Проверки **из backend/**:
 
@@ -360,6 +359,120 @@ Unit-тесты используют управляемое время без sl
 снимки, персональное сокрытие ответов, HTTP-валидацию, гонки ответов/дедлайна,
 повторы scheduler, surrender/finalization, отдельные рейтинги и статистику,
 rollback после flush рейтинга и отсутствие событий при rollback.
+
+## Этап 4: realtime и восстановление
+
+Native WebSocket: `ws://localhost:8080/ws/v1/events` (за TLS — `wss://<host>/ws/v1/events`),
+STOMP 1.2, встроенный simple broker. SockJS и внешний брокер не используются.
+HTTP handshake публичный, без токенов в URL. Все query parameters запрещены.
+Единственная подписка — `/user/queue/events`, `ack:auto`, одна на gameplay-сеанс.
+SUBSCRIBE на чужие user destinations, `/queue/**`, `/topic/**` и клиентские SEND
+запрещены. Действия игрока выполняются через существующий REST API.
+
+CONNECT и SUBSCRIBE (обозначение `^@` заменяется настоящим байтом NULL):
+
+```text
+CONNECT
+accept-version:1.2
+host:localhost
+heart-beat:5000,5000
+Authorization:Bearer <accessToken>
+
+^@
+```
+
+После CONNECTED:
+
+```text
+SUBSCRIBE
+id:events
+destination:/user/queue/events
+ack:auto
+
+^@
+```
+
+Access JWT проверяется в ChannelInterceptor тем же decoder, что и REST:
+подпись, issuer, audience, purpose, срок действия. Refresh JWT для CONNECT
+запрещён. Авторизация устанавливается для конкретной STOMP-сессии, заголовок
+с токеном удаляется до передачи сообщения обработчикам. Cookie-сессий нет.
+Message-level CSRF намеренно не включён: используется собственный token-only
+interceptor без `@EnableWebSocketSecurity`/`CsrfChannelInterceptor`.
+Это отдельно от servlet CSRF; проверка origin на handshake сохранена.
+Ошибки протокола/авторизации отправляются как STOMP ERROR с JSON ErrorResponse,
+затем соединение закрывается. Не включайте логирование STOMP frames с credentials.
+
+Heartbeat в обе стороны — 5 секунд (`heart-beat:5000,5000`); клиент должен предлагать
+положительные интервалы не больше 5000 мс. После 10 секунд без входящих данных
+monitor обнаруживает потерю, после неё даётся 30 секунд reconnect grace.
+Проверка выполняется каждые 500 мс. CONNECT должен поступить за 10 секунд.
+Настройки находятся в `app.realtime` в application.yml; grace — в `app.battle`.
+Новый CONNECT с успешной подпиской заменяет старый gameplay-сеанс и закрывает
+старое соединение. Поздний disconnect старой сессии не отключает новую.
+UNSUBSCRIBE также снимает presence. Таймеры батла и сохранённые ответы продолжают
+действовать при потере соединения. Время обнаружения disconnect и поступления
+reconnect учитывается даже при задержке обработки блокировкой БД.
+
+Соединение закрывается при истечении access JWT. Клиент получает новый access
+через `POST /api/v1/auth/refresh` с refresh Bearer и повторяет CONNECT/SUBSCRIBE.
+Истёкший access не продлевает авторизацию уже открытого соединения.
+
+Событие BATTLE_CHANGED содержит полный персональный BattleSnapshot в `data`.
+Например, уведомление о готовности первого участника:
+
+```json
+{
+  "eventId": "f2055366-92cf-4ff2-a0e0-55e69107ac9d",
+  "type": "BATTLE_CHANGED",
+  "resourceId": "ef704725-47b7-4aa7-9309-06fb82095062",
+  "version": 2,
+  "occurredAt": "2026-11-14T12:00:01Z",
+  "data": {
+    "id": "ef704725-47b7-4aa7-9309-06fb82095062",
+    "subject": "MATH",
+    "mode": "RANKED",
+    "phase": "WAITING_READY",
+    "version": 2,
+    "serverTime": "2026-11-14T12:00:01Z",
+    "questionCount": 3,
+    "readyDeadline": "2026-11-14T12:00:30Z",
+    "countdownEndsAt": null,
+    "nextRoundStartsAt": null,
+    "players": [
+      {"id": "32c21096-2666-4c78-a7dc-81cb0e14abcc", "nickname": "PlayerOne", "rating": 1000, "rank": "Rookie", "ready": true, "connected": true, "score": 0, "correctCount": 0, "streak": 0, "answeredCurrentRound": false, "reconnectDeadline": null},
+      {"id": "0bd4bf21-e05b-44e4-aada-5959b6d6f1f9", "nickname": "PlayerTwo", "rating": 1000, "rank": "Rookie", "ready": false, "connected": true, "score": 0, "correctCount": 0, "streak": 0, "answeredCurrentRound": false, "reconnectDeadline": null}
+    ],
+    "round": null,
+    "result": null
+  }
+}
+```
+
+Readiness, countdown, начало вопроса, принятие ответа, reveal, presence,
+завершение и отмена порождают уведомления только после успешного commit.
+Проекция строится отдельно для каждого игрока из закоммиченного состояния.
+До REVEAL она скрывает выбор соперника, правильность и начисления текущего ответа.
+БД и отправка по сети разделены: отправка не удерживает транзакцию результата/Elo.
+События не являются durable log: возможны повторы, пропуски и объединение быстрых
+изменений в актуальный snapshot. Для восстановления:
+
+1. Подключиться и подписаться на `/user/queue/events`, начать буферизовать события.
+2. Выполнить `GET /api/v1/battles/{id}` с access JWT.
+3. Применить snapshot и буфер по `resourceId`/`version`: состояние заменяется
+   только более новой версией. `serverTime` используется для синхронизации часов.
+4. После REST-мутаций и reconnect снова запросить snapshot; принятый ответ и
+   исходный дедлайн сохраняются. `/users/me/activity` появится следующим этапом.
+
+Same-origin остаётся обязательным для браузера. Frontend dev server должен
+проксировать `/api/**` и WebSocket upgrade `/ws/**` к backend, согласованно
+передавая Host/Origin. В production reverse proxy должен поддерживать Upgrade
+и Connection и не обрывать heartbeat-соединения. Wildcard origins не открываются.
+
+Дополнительная проверка реального транспорта **из backend/** (нужен Docker):
+
+```powershell
+.\mvnw.cmd -B -ntp '-Dtest=RealtimePostgresTest' test
+```
 
 ## Архитектура и проверки
 
@@ -412,12 +525,23 @@ HTTP smoke на порту 18080. Временный Compose-проект и е�
 однократное Elo и rollback после flush рейтинга. На отдельной временной
 PostgreSQL запущен обычный JAR с включённым scheduler/recovery, проверены
 реальные HTTP auth/API и профиль импорта без HTTP-сервера. Процесс и временная
-БД после проверки удалены. Проверки движка используют только внутреннее
-создание матча и test-only presence; production readiness остаётся закрытым
-до реализации realtime adapter.
+БД после проверки удалены. На этом этапе проверки движка использовали внутреннее
+создание матча и test-only presence. Реальный adapter добавлен на этапе 4.
 
 Защита от недавних повторов проверена итоговым `verify`: 92 теста, без ошибок
 и пропусков. Добавлены 3 unit-теста приоритетов/случайных равных давностей
 и 7 PostgreSQL-сценариев: оба участника и режима, окно начавшихся батлов,
 предметы, непоказанные раунды, настраиваемый размер окна, fallback,
 неактивные/soft-deleted ревизии и маленький банк. Формат публичного API не изменён.
+
+Для этапа 4 итоговый `verify` — 117 тестов, 0 ошибок и пропусков.
+Из новых: 20 PostgreSQL-сценариев с настоящими native WebSocket/STOMP-подключениями
+и 5 проверок границ presence в чистом движке. Проверены JWT/refresh/expiry,
+запрет подписок и SEND, same-origin, изоляция игроков и сокрытие ответов,
+readiness, commit/rollback, замена сеанса, unsubscribe/DISCONNECT, reconnect,
+heartbeat timeout и однократное Elo. Heartbeat/expiry и опрос БД работают
+на отдельных scheduler; уведомления обрабатываются отдельным executor.
+Дополнительно проверен собранный Java 21 JAR: обычный запуск с scheduler/recovery,
+HTTP auth/API и dry-run `question-import` без HTTP/WebSocket-сервера.
+Временные процессы и PostgreSQL после проверки удалены. Публичный контракт,
+порядок вопросов и защита от недавних повторов сохранены.

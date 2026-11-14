@@ -54,12 +54,28 @@ public class BattleEngineImpl implements BattleEngine {
 
     @Override
     public void synchronizePresence(BattleDto battle, Map<UUID, PresenceDto> presence, Instant now) {
-        advance(battle, now); // Expired grace wins over a reconnect at equality.
-        if (terminal(battle)) return;
+        // Process observed transport changes on the same timeline as persisted battle deadlines.
+        List<PresenceChange> changes = new ArrayList<>();
         for (BattlePlayerDto player : battle.getState().getPlayers()) {
             PresenceDto current = presence.get(player.getId());
-            if (current == null || current.getSessionId() == null || current.getExpiresAt() == null || !current.getExpiresAt().isAfter(now)) {
-                if (player.isConnected()) disconnect(battle, player, now);
+            // A rapid disconnect/reconnect may complete before the asynchronous callback gets the row lock.
+            // Keep the missed disconnect so a late reconnect cannot erase an already expired grace.
+            if (current != null && player.isConnected() && !Objects.equals(player.getSessionId(), current.getSessionId())
+                    && current.getPreviousDisconnectAt() != null && current.getPreviousDisconnectAt().isBefore(observedAt(current, now))) {
+                changes.add(new PresenceChange(player, null, current.getPreviousDisconnectAt()));
+            }
+            changes.add(new PresenceChange(player, current, observedAt(current, now)));
+        }
+        changes.sort(Comparator.comparing(PresenceChange::at));
+        for (PresenceChange change : changes) {
+            BattlePlayerDto player = change.player();
+            PresenceDto current = change.presence();
+            Instant at = change.at();
+            if (at.isAfter(now)) continue;
+            advance(battle, at); // Expired grace wins at equality, before applying reconnect.
+            if (terminal(battle)) return;
+            if (current == null || current.getSessionId() == null || current.getExpiresAt() == null || !current.getExpiresAt().isAfter(at)) {
+                if (player.isConnected()) disconnect(battle, player, at);
             } else {
                 if (!player.isConnected()) battle.setVersion(battle.getVersion() + 1);
                 player.setConnected(true);
@@ -67,9 +83,15 @@ public class BattleEngineImpl implements BattleEngine {
                 player.setSessionExpiresAt(current.getExpiresAt());
                 player.setReconnectDeadline(null);
             }
+            beginCountdownIfReady(battle, at);
         }
-        beginCountdownIfReady(battle, now);
         advance(battle, now);
+    }
+
+    private record PresenceChange(BattlePlayerDto player, PresenceDto presence, Instant at) { }
+
+    private Instant observedAt(PresenceDto presence, Instant fallback) {
+        return presence == null || presence.getObservedAt() == null ? fallback : presence.getObservedAt();
     }
 
     @Override
@@ -131,7 +153,11 @@ public class BattleEngineImpl implements BattleEngine {
         }
         round.getAnswers().add(answer);
         battle.setVersion(battle.getVersion() + 1);
-        if (round.getAnswers().size() == 2) reveal(battle, now.isBefore(round.getDeadline()) ? now : round.getDeadline());
+        if (round.getAnswers().size() == 2) {
+            Instant lastReceivedAt = round.getAnswers().stream().map(BattleAnswerDto::getAcceptedAt).max(Comparator.naturalOrder()).orElseThrow();
+            Instant closedAt = now.isAfter(lastReceivedAt) ? now : lastReceivedAt;
+            reveal(battle, closedAt.isBefore(round.getDeadline()) ? closedAt : round.getDeadline());
+        }
         advance(battle, now);
         return receipt(battle, answer);
     }
