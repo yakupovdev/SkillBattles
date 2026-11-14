@@ -95,14 +95,22 @@ def main():
         base = 'http://127.0.0.1:' + port
         wait_ready()
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       "select count(*) from flyway_schema_history where success") == '11'
+                       "select max(version::int) from flyway_schema_history where success") == '13'
+        assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
+                       "select count(*) from flyway_schema_history where success and type='SQL'") == '13'
+        assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
+                       'select count(*) from questions where active and not deleted') == '240'
         fixture = root / 'backend/src/test/resources/fixtures/stage2-questions-test-only.json'
         import_questions(fixture, False)
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       'select count(*) from questions') == '0'
+                       'select count(*) from questions') == '240'
+        # Only this new test project's DB is changed. Keep all seeded rows but
+        # activate only the deterministic fixture for the gameplay assertions.
+        command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
+                'update questions set active=false')
         import_questions(fixture, True)
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       'select count(*) from questions') == str(len(json.loads(fixture.read_text(encoding='utf-8'))))
+                       'select count(*) from questions where active') == str(len(json.loads(fixture.read_text(encoding='utf-8'))))
         env.update(SKILLBATTLES_E2E_BASE_URL=base, SKILLBATTLES_E2E_FIXTURE=str(fixture), SKILLBATTLES_E2E_REVISION=str(revision))
         runner = subprocess.Popen(['node', str(root / 'backend/scripts/smoke_e2e.mjs')], cwd=root, env=env,
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -121,7 +129,7 @@ def main():
                 print(line.rstrip(), flush=True)
         if runner.wait(timeout=15) != 0 or not restarted:
             raise RuntimeError('Compose REST/STOMP check failed')
-        print('Compose check passed: clean V1-V11, fixture dry/apply, REST/STOMP through proxy, whole-stack restart with retained data.', flush=True)
+        print('Compose check passed: clean V1-V13, 240 seeded questions, fixture dry/apply, REST/STOMP through proxy, whole-stack restart with retained data.', flush=True)
     finally:
         if runner and runner.poll() is None:
             runner.terminate()

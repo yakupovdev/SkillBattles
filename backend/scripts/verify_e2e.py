@@ -2,7 +2,8 @@
 
 Requires Java 21, Docker, Node.js 22+ and a previously built backend JAR.
 Creates one uniquely named PostgreSQL container with tmpfs storage, without volumes. Imports only
-the explicit test fixture, runs public REST/STOMP flows, restarts the JAR on that same
+the explicit test fixture, deactivates bundled bank rows only in this temporary DB,
+runs public REST/STOMP flows, restarts the JAR on that same
 temporary DB, then removes only processes/container created by this invocation.
 Credentials and JWTs are never printed or written to the report.
 """
@@ -128,9 +129,10 @@ def main():
         base = f'http://127.0.0.1:{port}'
         fixture = backend / 'src/test/resources/fixtures/stage2-questions-test-only.json'
         import_questions(fixture, False, 'dry')
-        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions') == '0'
+        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions') == '240'
+        command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'update questions set active=false')
         import_questions(fixture, True, 'apply')
-        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions') == str(len(json.loads(fixture.read_text(encoding='utf-8'))))
+        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions where active') == str(len(json.loads(fixture.read_text(encoding='utf-8'))))
         start_backend('first')
         env.update(SKILLBATTLES_E2E_BASE_URL=base, SKILLBATTLES_E2E_FIXTURE=str(fixture), SKILLBATTLES_E2E_REVISION=str(revision))
         runner = subprocess.Popen([node, str(backend / 'scripts/smoke_e2e.mjs')], cwd=backend, env=env, stdin=subprocess.PIPE,

@@ -534,7 +534,7 @@ class StageDEPostgresTest {
   jdbc.update("insert into retired_practice_upgrade.battles select * from public.battles where id=?",source.getId());
   jdbc.update("insert into retired_practice_upgrade.question_reports select * from public.question_reports where id=?",report.getId());
   jdbc.update("insert into retired_practice_upgrade.practice_sessions(id,created_at,updated_at,user_id,source_battle_id,source_round_id,discipline_code,expires_at,question) values (?,now(),now(),?,?,?,'SAT_MATH',now()+interval '30 minutes','{}'::jsonb)",UUID.randomUUID(),id(a),source.getId(),round.getId());
-  org.flywaydb.core.Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).load().migrate();
+  org.flywaydb.core.Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).target("11").load().migrate();
   Assertions.assertThat(jdbc.queryForObject("select to_regclass('retired_practice_upgrade.practice_sessions')::text",String.class)).isNull();
   Assertions.assertThat(jdbc.queryForObject("select count(*) from retired_practice_upgrade.users",Integer.class)).isEqualTo(2);
   Assertions.assertThat(jdbc.queryForObject("select count(*) from retired_practice_upgrade.battles",Integer.class)).isEqualTo(1);
