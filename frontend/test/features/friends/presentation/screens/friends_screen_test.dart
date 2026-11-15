@@ -8,15 +8,109 @@ import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
+import 'package:skill_battles/features/friends/domain/entity/friend_request_direction.dart';
+import 'package:skill_battles/features/friends/domain/entity/friend_requests_page_entity.dart';
 import 'package:skill_battles/features/friends/domain/entity/friends_page_entity.dart';
 import 'package:skill_battles/features/friends/presentation/screens/friends_screen.dart';
+import 'package:skill_battles/features/friends/presentation/widgets/friend_request_row.dart';
 import 'package:skill_battles/features/friends/presentation/widgets/friend_row.dart';
 import 'package:skill_battles/features/friends/presentation/widgets/friends_list_section.dart';
+import 'package:skill_battles/features/friends/presentation/widgets/friends_requests_section.dart';
 
 import '../../../../helpers/friends_fakes.dart';
 import '../../../../helpers/router_harness.dart';
 
 void main() {
+  final List<
+    ({
+      String name,
+      Either<Failure, FriendRequestsPageEntity> result,
+      String label,
+      int rows,
+    })
+  >
+  outgoingResults = [
+    (
+      name: 'empty success',
+      result: ok(requestsPage([], totalPages: 0)),
+      label: 'No outgoing requests',
+      rows: 0,
+    ),
+    (
+      name: 'success with a request',
+      result: ok(
+        requestsPage([
+          relationship('outgoing-1', incoming: false, other: friendBoris),
+        ]),
+      ),
+      label: friendBoris.nickname,
+      rows: 1,
+    ),
+    (
+      name: 'failure',
+      result: failed(const TimeoutFailure()),
+      label:
+          "Couldn't load your requests. Check your connection and try again.",
+      rows: 0,
+    ),
+  ];
+  for (final scenario in outgoingResults) {
+    testWidgets(
+      'Friends switching to Outgoing shows ${scenario.name} completed while hidden',
+      (WidgetTester tester) async {
+        final ScriptedFriendsRepository repository =
+            ScriptedFriendsRepository();
+        final Completer<Either<Failure, FriendRequestsPageEntity>> answer =
+            Completer<Either<Failure, FriendRequestsPageEntity>>();
+        repository.onGetFriendRequests = (params) =>
+            params.direction == FriendRequestDirection.outgoing
+            ? answer.future
+            : Future.value(ok(requestsPage([], totalPages: 0)));
+        final RouterHarness harness = await RouterHarness.create(
+          signedIn: true,
+          location: AppRoutes.friends.path,
+          friendsRepository: repository,
+        );
+        addTearDown(() => harness.dispose(tester));
+        await harness.pump(tester);
+
+        expect(find.text('No incoming requests'), findsOneWidget);
+        answer.complete(scenario.result);
+        await pumpFrames(tester);
+
+        // The hidden list has finished; switching must read its current state
+        // without requiring another response or realtime event.
+        final int callsBeforeSwitch = repository.requestsCalls.length;
+        await tester.tap(find.text('Outgoing'));
+        await pumpFrames(tester);
+
+        expect(find.text(scenario.label), findsOneWidget);
+        expect(find.byType(FriendRequestRow), findsNWidgets(scenario.rows));
+        expect(
+          tester
+              .widgetList<Skeletonizer>(
+                find.descendant(
+                  of: find.byType(FriendsRequestsSection),
+                  matching: find.byWidgetPredicate(
+                    (widget) => widget is Skeletonizer,
+                  ),
+                ),
+              )
+              .any((widget) => widget.enabled),
+          isFalse,
+        );
+        expect(repository.requestsCalls, hasLength(callsBeforeSwitch));
+
+        await tester.tap(find.text('Incoming'));
+        await pumpFrames(tester);
+
+        expect(find.text('No incoming requests'), findsOneWidget);
+        expect(find.byType(FriendRequestRow), findsNothing);
+        expect(repository.requestsCalls, hasLength(callsBeforeSwitch));
+      },
+    );
+  }
+
   testWidgets(
     'Friends route skeleton uses real rows then renders empty state',
     (WidgetTester tester) async {

@@ -78,6 +78,8 @@ final class _RequestsBody extends StatelessWidget {
         ? FriendsList.incoming
         : FriendsList.outgoing;
     return BlocBuilder<FriendsBloc, FriendsState>(
+      // A direction change must read updates filtered out by buildWhen.
+      key: ValueKey<FriendsList>(list),
       buildWhen: (FriendsState previous, FriendsState current) =>
           previous.slice(list) != current.slice(list) ||
           previous.requestActions != current.requestActions,
