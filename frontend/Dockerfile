@@ -16,7 +16,7 @@ FROM source AS build
 # Public compile-time configuration only. Never pass server ENV or secrets here.
 ARG API_BASE_URL=/api/v1
 ARG EVENTS_URL=/ws/v1/events
-RUN flutter build web --release --no-pub --no-web-resources-cdn  --dart-define=API_BASE_URL=${API_BASE_URL}     --dart-define=EVENTS_URL=${EVENTS_URL}
+RUN flutter build web --release --wasm --no-pub --no-web-resources-cdn  --dart-define=API_BASE_URL=${API_BASE_URL}     --dart-define=EVENTS_URL=${EVENTS_URL}
 
 FROM nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883 AS runtime
 COPY nginx/default.conf /etc/nginx/templates/default.conf.template
