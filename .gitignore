@@ -18,6 +18,7 @@ AGENTS.override.md
 
 # Local environment files, keep examples
 /.env
+/.env.heroku
 .env
 .env.*
 !.env.example
