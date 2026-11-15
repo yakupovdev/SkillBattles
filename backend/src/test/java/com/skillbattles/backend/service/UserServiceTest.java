@@ -20,6 +20,7 @@ class UserServiceTest {
     @Mock UserRepository repository;
     @Mock UserMapper mapper;
     @Mock PasswordEncoder passwordEncoder;
+    @Mock FriendCodeGenerator friendCodes;
     @InjectMocks UserServiceImpl service;
 
     @Test
@@ -31,10 +32,12 @@ class UserServiceTest {
         User entity = new User();
         when(mapper.toEntity(dto)).thenReturn(entity);
         when(passwordEncoder.encode(" password ")).thenReturn("encoded-password");
+        when(friendCodes.next()).thenReturn("ABCD2345EFGH");
         service.register(dto);
         assertThat(entity.getEmailNormalized()).isEqualTo("alex@example.com");
         assertThat(entity.getNicknameNormalized()).isEqualTo("alex_one");
         assertThat(entity.getPasswordHash()).isEqualTo("encoded-password");
+        assertThat(entity.getFriendCode()).isEqualTo("ABCD2345EFGH");
         verify(repository).saveAndFlush(entity);
     }
 

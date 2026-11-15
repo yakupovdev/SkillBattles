@@ -19,11 +19,13 @@ class AuthProcessorTest {
     @Mock TokenService tokens;
     @Mock RatingService ratings;
     @Mock SubscriptionService subscriptions;
+    @Mock org.springframework.transaction.PlatformTransactionManager transactions;
     @org.junit.jupiter.api.BeforeEach void subscriptionDefaults(){lenient().when(subscriptions.entitlements(any())).thenReturn(new EntitlementsDto());}
     @InjectMocks AuthProcessorImpl processor;
 
     @Test
     void registrationInitializesRatingsBeforeIssuingTokens() {
+        when(transactions.getTransaction(any())).thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
         RegisterDto registration = new RegisterDto(); registration.setBirthYear(2000); registration.setBirthMonth(1);
         UserDto user = new UserDto();
         UUID id = UUID.randomUUID();

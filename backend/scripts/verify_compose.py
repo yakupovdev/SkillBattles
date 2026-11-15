@@ -109,9 +109,9 @@ def main():
         base = 'https://127.0.0.1:' + port
         wait_ready()
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       "select max(version::int) from flyway_schema_history where success") == '14'
+                       "select max(version::int) from flyway_schema_history where success") == '15'
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       "select count(*) from flyway_schema_history where success and type='SQL'") == '14'
+                       "select count(*) from flyway_schema_history where success and type='SQL'") == '15'
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
                        'select count(*) from questions where active and not deleted') == '239'
         fixture = illustrated_fixture(root / 'backend', cache / (project + '-fixture.json'))
@@ -142,9 +142,10 @@ def main():
                 restarted = True
             else:
                 print(line.rstrip(), flush=True)
-        if runner.wait(timeout=15) != 0 or not restarted:
-            raise RuntimeError('Compose REST/STOMP check failed')
-        print('Compose check passed: clean V1-V14, 239 active/261 stored seed revisions, fixture dry/apply, images and REST/STOMP through HTTPS proxy, whole-stack recreate with retained data.', flush=True)
+        runner_code = runner.wait(timeout=15)
+        if runner_code != 0 or not restarted:
+            raise RuntimeError(f'Compose REST/STOMP check failed (runner exit {runner_code}, restarted={restarted})')
+        print('Compose check passed: clean V1-V15, 239 active/261 stored seed revisions, fixture dry/apply, friends/images and REST/STOMP through HTTPS proxy, whole-stack recreate with retained data.', flush=True)
     finally:
         if runner and runner.poll() is None:
             runner.terminate()

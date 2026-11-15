@@ -3,6 +3,7 @@ package com.skillbattles.backend.processor;
 import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.mapper.BattleSnapshotMapper;
 import com.skillbattles.backend.mapper.MatchmakingMapper;
+import com.skillbattles.backend.mapper.FriendMapper;
 import com.skillbattles.backend.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -31,10 +32,14 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
     private final ThreadPoolTaskExecutor executor;
     private final TransactionTemplate committedRead;
     private final MatchmakingMapper matchmakingMapper;
+    private final FriendMapper friendMapper;
+    private final DuelInvitationProcessor invitations;
 
     public RealtimeProcessorImpl(BattleService battles, BattleProcessor processor, BattleSnapshotMapper mapper,
             RealtimeSessionService sessions, SimpMessagingTemplate messaging, Clock clock, PlatformTransactionManager transactions,
-            ThreadPoolTaskExecutor realtimeEventExecutor, MatchmakingMapper matchmakingMapper,BattleAccessProcessor access,MatchmakingProcessor matchmaking) {
+            ThreadPoolTaskExecutor realtimeEventExecutor, MatchmakingMapper matchmakingMapper,BattleAccessProcessor access,MatchmakingProcessor matchmaking,
+            com.skillbattles.backend.mapper.FriendMapper friendMapper,DuelInvitationProcessor invitations) {
+        this.friendMapper=friendMapper;this.invitations=invitations;
         this.access=access;this.matchmaking=matchmaking;
         this.battles = battles; this.processor = processor; this.mapper = mapper;
         this.sessions = sessions; this.messaging = messaging; this.clock = clock;
@@ -142,6 +147,28 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
             // Notifications are recoverable; transport expiry must never wait for database work.
             log.warn("Realtime work queue is full; REST snapshots recover current state.");
         }
+    }
+
+    @Override @EventListener public void friendshipChanged(FriendshipChangedEvent event){
+        if(!sessions.hasSubscribers())return;
+        enqueue(()->{try{
+            var r=event.relationship();socialDelivery(List.of(r.requester().getId(),r.recipient().getId()),
+                    new RealtimeEvent<>(UUID.randomUUID(),"FRIENDSHIP_CHANGED",r.id(),r.version(),event.occurredAt(),friendMapper.toResponse(r)));
+        }catch(RuntimeException ex){log.error("Friendship notification failed: {}",ex.getClass().getSimpleName());}});
+    }
+    @Override @EventListener public void duelInvitationChanged(DuelInvitationChangedEvent event){
+        if(!sessions.hasSubscribers())return;
+        enqueue(()->{try{
+            var i=event.invitation();socialDelivery(List.of(i.getHostId(),i.getRecipientId()),
+                    new RealtimeEvent<>(UUID.randomUUID(),"DUEL_INVITATION_CHANGED",i.getId(),i.getVersion(),event.occurredAt(),friendMapper.toResponse(invitations.present(i))));
+        }catch(RuntimeException ex){log.error("Invitation notification failed: {}",ex.getClass().getSimpleName());}});
+    }
+    private void socialDelivery(List<UUID> users,RealtimeEvent<?> event){
+        for(var user:users)sessions.target(user).ifPresent(target->{
+            if(!sessions.isCurrent(target.sessionId()))return;
+            var headers=SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);headers.setSessionId(target.sessionId());headers.setLeaveMutable(true);
+            messaging.convertAndSendToUser(user.toString(),"/queue/events",event,headers.getMessageHeaders());
+        });
     }
 
     private record Delivery(RealtimeTargetDto target, RealtimeEvent<?> event) { }

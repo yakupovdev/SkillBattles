@@ -13,6 +13,7 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted = false")
 @SQLDelete(sql = "UPDATE users SET deleted = true, updated_at = timezone('UTC', now()) WHERE id = ?")
 public class User extends BaseEntity {
+    @Column(length=12) private String friendCode;
     private Integer birthYear;
     private Integer birthMonth;
     private Integer birthDay;

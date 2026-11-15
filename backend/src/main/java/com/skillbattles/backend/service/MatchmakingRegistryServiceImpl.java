@@ -26,7 +26,7 @@ public class MatchmakingRegistryServiceImpl implements MatchmakingRegistryServic
     @Override public boolean hasWaiting() {
         lock.lock();
         try {
-            return committed.getRematches().values().stream().anyMatch(r -> r.getStatus().equals("WAITING")) || committed.getEntries().values().stream().anyMatch(entry -> entry.getStatus() == QueueStatus.SEARCHING)
+            return committed.getDuelInvitations().values().stream().anyMatch(i->i.getStatus()==DuelInvitationStatus.PENDING) || committed.getRematches().values().stream().anyMatch(r -> r.getStatus().equals("WAITING")) || committed.getEntries().values().stream().anyMatch(entry -> entry.getStatus() == QueueStatus.SEARCHING)
                     || committed.getDuels().values().stream().anyMatch(duel -> duel.getStatus() == DuelStatus.WAITING);
         } finally { lock.unlock(); }
     }
@@ -46,6 +46,9 @@ public class MatchmakingRegistryServiceImpl implements MatchmakingRegistryServic
                         @Override public void afterCommit() {
                             committed = staged;
                             var at = clock.instant();
+                            staged.getDuelInvitations().forEach((id,invitation)->{
+                                if(!invitation.equals(before.getDuelInvitations().get(id)))events.publishEvent(new DuelInvitationChangedEvent(invitation,at));
+                            });
                             staged.getRematches().forEach((id,rematch)->{
                                 if(!rematch.equals(before.getRematches().get(id)))events.publishEvent(new RematchChangedEvent(rematch,at));
                             });

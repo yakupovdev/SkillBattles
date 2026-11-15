@@ -56,7 +56,7 @@ public class BattleProcessorImpl implements BattleProcessor {
         }
         Map<UUID, UserDto> users = new HashMap<>();
         // Serialize creation for shared accounts before checking cross-column participant ownership.
-        List.of(command.getFirstUserId(), command.getSecondUserId()).stream().sorted().forEach(id -> users.put(id, userService.lockActiveById(id)));
+        List.of(command.getFirstUserId(), command.getSecondUserId()).stream().sorted(Comparator.comparing(UUID::toString)).forEach(id -> users.put(id, userService.lockActiveById(id)));
         for (UUID id : users.keySet()) {
             if (battleService.hasActiveBattle(id)) throw new ConflictException("ACTIVITY_CONFLICT", "User already participates in an active battle.");
         }
@@ -64,7 +64,7 @@ public class BattleProcessorImpl implements BattleProcessor {
         if (command.getFormat() != settings.getFormat()) throw new BusinessValidationException("VALIDATION_ERROR", "Unsupported battle format.");
         // Lock both accounts' ratings before taking one season cut for the pair.
         // A quarter boundary between preparing the two players must not mix seasons.
-        users.keySet().stream().sorted().forEach(id -> {ratingService.initialize(id);ratingService.lockForUser(id);});
+        users.keySet().stream().sorted(Comparator.comparing(UUID::toString)).forEach(id -> {ratingService.initialize(id);ratingService.lockForUser(id);});
         var pairSeason=seasons.current();
         Map<UUID, RatingDto> playerRatings = new HashMap<>();
         for (UUID id : users.keySet()) {
@@ -242,7 +242,7 @@ public class BattleProcessorImpl implements BattleProcessor {
             battle.setSettledAt(now);
         }
         battleService.save(battle);
-        if(newlySettled) battle.getState().getPlayers().stream().map(BattlePlayerDto::getId).sorted().forEach(ratingProcessor::prepare);
+        if(newlySettled) battle.getState().getPlayers().stream().map(BattlePlayerDto::getId).sorted(Comparator.comparing(UUID::toString)).forEach(ratingProcessor::prepare);
         if (battle.getVersion() != previousVersion) publish(battle);
     }
 
