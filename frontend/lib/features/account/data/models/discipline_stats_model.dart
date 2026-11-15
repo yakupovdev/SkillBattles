@@ -1,8 +1,8 @@
 import 'package:json_annotation/json_annotation.dart';
 
-import 'package:skill_battles/features/account/data/models/calibration_model.dart';
-import 'package:skill_battles/features/account/data/models/match_stats_model.dart';
-import 'package:skill_battles/features/account/data/models/rank_progress_model.dart';
+import 'package:skill_battles/core/data/models/calibration_model.dart';
+import 'package:skill_battles/core/data/models/match_stats_model.dart';
+import 'package:skill_battles/core/data/models/rank_progress_model.dart';
 import 'package:skill_battles/features/account/data/models/rating_history_point_model.dart';
 import 'package:skill_battles/features/account/data/models/topic_stats_model.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';

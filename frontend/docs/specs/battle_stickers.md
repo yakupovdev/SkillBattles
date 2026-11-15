@@ -32,9 +32,9 @@ Hard rule: **the picker and the bubbles never cover the question text, the optio
 - **Incoming bubble (opponent)**: `right = 64`, `top = 122`, 120 px wide. The caret is 16 px from the right, pointing at the opponent's avatar centre (x 1352).
 - Both bubbles can play at the same time, one on each side. The incoming bubble can also show while your picker is open, because they are on opposite sides.
 - **Width limits**: the gutter is `(viewport − 880) / 2` (the `BattleColumn` max width). The picker needs a gutter of at least 280 px at `left = 64`. When the gutter is smaller, the picker and bubble slide left to `left = max(16, gutter − 16 − width)`.
-  - The picker fits down to a 1344 px viewport and a bubble down to 1184 px. Below that, see the open questions; nothing may overlap the column.
+  - The picker fits down to a 1344 px viewport and a bubble down to 1280 px. Below 1280 px the page scrolls sideways inside a 1280 px canvas (`AppDesktopViewport`) while the overlay follows the window, so the app shows no bubble and disables the trigger (`Window too narrow for stickers`); see the open questions. Nothing may overlap the column.
 - **Z-order**: the overlay is above the battle body and below dialogs (the report modal, the surrender confirm). Opening any dialog closes the picker.
-- **Empty state**: no picker open and nothing playing → nothing is rendered. There is no loading skeleton for this feature (the sticker set is bundled with the app; see "Lottie asset notes").
+- **Empty state**: no picker open and nothing playing → nothing is rendered. There is no loading skeleton and no per-message spinner. Until the nine compositions are parsed, only the trigger is disabled (tooltip `Loading stickers…`); see "Lottie asset notes".
 
 ## Components
 
@@ -56,7 +56,7 @@ StickerTriggerButton                   40 x 40 circle (AppTappable), hit area = 
 | Disabled | `surface` | none | sticker icon `faint` | no (only while the realtime connection is down) |
 
 - Tooltip and semantics label: `Send a sticker`.
-- Disabled is used only while the realtime connection is not `connected` (the send cannot go through). Tooltip: `Reconnecting…`. Stickers are allowed in every phase and have no count limit, so there is no other disabled reason.
+- Disabled while the realtime connection is not `connected` (tooltip `Reconnecting…`), while the compositions are still loading (`Loading stickers…`), and in the `finished` / `cancelled` phases or after a `STICKERS_NOT_ALLOWED` answer. There is no count limit.
 
 ### StickerPicker (new)
 
@@ -112,15 +112,15 @@ Surface decision: the bubbles are tinted, with no 1.5–2 px colored border, bec
 
 Lifecycle:
 - **Enter**: scale 0.6 → 1 from the caret point plus fade in, 180 ms, ease-out-back. Then the Lottie starts.
-- **Hold**: the bubble stays **3.0 s** from its appearance. A one-shot sticker holds its last frame; a looping sticker keeps looping.
+- **Hold**: the bubble stays **3.0 s** from its appearance. Every sticker plays **once** from its start and then holds its last frame; nothing loops (`battle_stickers_frontend_task.md`).
 - **Exit**: fade out and move 8 px up, 200 ms.
 - One bubble per side. A newer sticker from the same player replaces the current bubble and restarts it (no queue).
 - **Not sent**: shown instead of the outgoing animation when the send is rejected or fails. It hides after 2 s and does not start or keep the cooldown.
-- Incoming stickers are dropped silently while `MuteOpponentToggle` is on "hidden". They are shown in every phase while the battle screen is open.
+- Incoming stickers are dropped silently while `MuteOpponentToggle` is on "hidden". They are shown in `waitingReady`, `countdown`, `question` and `reveal`; the bubbles are cleared when the battle ends.
 
 ### MuteOpponentToggle (new, optional)
 
-40 x 40 icon button, radius 10, in the picker header. The state is local to the current battle: it lives in the battle screen's state, is not persisted and resets to "shown" in the next battle. Switching to "hidden" also hides the opponent's bubble that is playing right now.
+40 x 40 icon button, radius 10, in the picker header. The state is local to the current battle: it lives in `BattleStickersBloc` (`opponentHidden`), is not persisted, never reaches the server and resets to "shown" in the next battle. Switching to "hidden" also hides the opponent's bubble that is playing right now.
 
 | State | Fill | Icon | Tooltip / label |
 |---|---|---|---|
@@ -174,37 +174,25 @@ The "settle" frame in Paper is the static frame used in the picker cells, as the
   | Z's | `muted` #6B6F7A |
 
   The body is deliberately white, not blue or amber, so a sticker reads the same on either side. The bubble carries the ownership color.
-- **Size budget**: aim for 20 KB or less per JSON. Bundle the files with the app (no network fetch, no loading state).
-- **Files**: `tool/stickers/build_stickers.py` generates every file. It holds the Paper geometry, adds the motion, and writes both outputs; change the script, never the JSON. Run it with `python3 tool/stickers/build_stickers.py`.
-  - `assets/stickers/<id>.json`: 96 x 96, 60 fps, 7.7–17.4 KB each.
-  - `docs/stickers/tgs/<id>.tgs`: Telegram animated stickers (gzipped Lottie, `"tgs": 1`), 512 x 512 at 60 fps, at most 2.0 s, 1.2–1.9 KB each. These files are kept outside `assets/` so they are not bundled with the app.
-- **Playback markers** (in each JSON, `markers`):
-
-  | Playback | Markers | How to play |
-  |---|---|---|
-  | One-shot (`gg`, `facepalm`, `ez`, `wait_what`) | `settle` = last frame | play once and hold the last frame |
-  | Loop (`fire`, `lol`, `hmm`, `too_slow`, `crying`) | `intro` [0, loop start), `loop` [loop start, end], `settle` = loop start | play `intro` once, then repeat the `loop` segment. The first and last frames of `loop` match |
-
-  - Intro lengths: `fire` 0.6 s, `lol` 0.4 s, `hmm` 0.8 s, `too_slow` 0.5 s, `crying` 0.8 s. Each loop cycle lasts as long as the catalog says.
-  - The intro is the move from the Paper "start" key frame to the settle pose (ignite, start laughing, raise the hand, check the watch, the first tear). The loop starts and ends on the settle pose, so the static picker frame, the reduced-motion frame and the loop seam are all the same frame.
-  - If the whole file is looped instead, the intro replays and the sticker visibly snaps back at every repeat.
-- **Telegram (.tgs)**: Telegram always loops the whole file.
-  - The loop stickers contain only their loop cycle.
-  - The one-shots contain the whole animation plus a 0.6 s hold on the settle pose. They still snap back to the start pose when they repeat.
-  - The art fills 88 % of the 512 canvas, so the jumps stay inside it.
+- **Size budget**: aim for 20 KB or less per JSON. Bundle the files with the app (`assets/stickers/` in `pubspec.yaml`). On Flutter Web the files are still fetched from the frontend server on first load: the app parses the nine compositions once (signed-in shell / battle screen) and renders every bubble and cell from those objects.
+- **Files in the app** (`assets/stickers/<id>.json`, as of 2026-11-15): 512 x 512, 60 fps, 8.1–18.4 KB. They are the loop-cut Telegram builds without the `tgs` key, copied into the app on 2026-11-15. The art fills 88 % of the canvas. The loop stickers contain one loop cycle and the one-shots end with a 0.6 s hold on the settle pose; no file is longer than 2.0 s.
+  - The last frame (progress 1.0) is the settle frame of every file: it is the picker frame and the reduced-motion frame.
+  - `tool/stickers/build_stickers.py` generates a different variant for `assets/stickers/`: 96 x 96 with an intro and the full one-shot. Running it overwrites the files in the app, so decide which variant ships before running it again.
+- **Telegram (.tgs)**: `docs/stickers/tgs/<id>.tgs`, gzipped Lottie with `"tgs": 1`, 512 x 512, 60 fps, at most 2.0 s, 1.2–1.9 KB; outside `assets/`, not bundled.
+  - Telegram always loops the whole file: the loop stickers contain only their loop cycle; the one-shots snap back to the start pose when they repeat.
   - The files use only shape layers, parenting, transforms, path morphs and trim paths. They use no masks, mattes, effects, expressions, repeaters, star shapes, merge paths, images, text or solids.
 - **As built: differences from the catalog** (the decision is open):
-  - `wait_what`: the jump is 5 px, not 10 px, and the stretch is 1.04, not 1.06. With 10 px the tuft and the shock lines leave the 96 canvas for about 10 frames, and the Paper 0.25 s key frame shows the same overflow. One option is to keep 10 px in the app JSON and reduce it only in the .tgs, where Telegram forbids leaving the canvas.
-  - `fire`: in the loop the flame scale Y is 0.92–1.03, not up to 1.08, because the Paper flame already touches the top edge. The intro flare still reaches 1.17.
+  - `wait_what`: the jump is 5 px, not 10 px, and the stretch is 1.04, not 1.06, so the tuft and the shock lines stay inside the canvas.
+  - `fire`: in the loop the flame scale Y is 0.92–1.03, not up to 1.08, because the Paper flame already touches the top edge.
   - `facepalm`: the hand starts 7 px left and 22 px down, not 14 and 30, so it starts inside the canvas.
-  - `crying`: the open wailing mouth from the Paper 0.5 s key frame is left out. The mouth goes straight from the small frown to the settle frown.
-  - The one-shots end on the hero art from artboard 31, which is also what the picker cells on artboard 32 show. Where the strip's last key frame differs from it (`facepalm` tilted 6°, a bigger sparkle in `ez`), the hero art wins.
+  - `crying`: the open wailing mouth from the Paper 0.5 s key frame is left out.
+  - The one-shots end on the hero art from artboard 31 (also the picker art on artboard 32).
 - **Reduced motion** (`MediaQuery.disableAnimationsOf`): the bubble shows the static settle frame with a plain fade in/out, and the picker cells never animate.
 - **Picker cells**: show the settle frame and do not autoplay. Hover or focus may play the sticker once (optional, nice-to-have).
 
 ## States
 
-Stickers are allowed in **every** battle phase while the battle screen (and its header) is shown:
+New sends are allowed in `waitingReady`, `countdown`, `question` and `reveal` only (`battle_stickers_frontend_task.md`):
 
 | Phase | Trigger | Incoming stickers | Overlay top |
 |---|---|---|---|
@@ -212,7 +200,7 @@ Stickers are allowed in **every** battle phase while the battle screen (and its 
 | `countdown` | enabled | shown | 116 |
 | `question` (incl. overtime) | enabled | shown | 122 (104 header + 6 time bar + 12) |
 | `reveal` | enabled | shown | 122 |
-| `finished` (until the result screen opens), `cancelled` | enabled | shown | 116 |
+| `finished` (until the result screen opens), `cancelled` | disabled | cleared, new ones dropped | — |
 
 Leaving the battle screen (the result screen, leaving the app) removes the picker and the bubbles; the result screen has no stickers.
 
@@ -243,7 +231,7 @@ Text styles: `eyebrow`, `bodyXs` (w400 / w600), `monoBodySm`-sized JetBrains Mon
    - `sticker.svg` (20 x 20, the trigger icon, tinted per state)
    - `eye.svg` and `eye_off.svg` (18 x 18, the mute toggle; the eye-off also at 14 px as the hidden indicator)
    - Add them to `AppIcons`.
-2. **9 Lottie files**: done, in `assets/stickers/<id>.json` (see "Lottie asset notes"). Still to do: the Lottie dependency, the `assets/stickers/` entry in `pubspec.yaml`, and playback by markers.
+2. **9 Lottie files**: done, in `assets/stickers/<id>.json` (see "Lottie asset notes"), with `lottie: ^3.8.2` and `assets/stickers/` in `pubspec.yaml`.
 3. **`StickerTriggerButton`, `StickerPicker`, `StickerCell`, `StickerBubble`, `MuteOpponentToggle`, `StickerOverlay`**: new widgets in `features/battle/presentation/widgets/`.
 4. **Cooldown ring**: a 40 px circular progress ring (2.5 stroke, `divider` track, `primary` arc). There is no existing ring widget; a `CustomPaint` or `CircularProgressIndicator` styled to match.
 5. **`BattleHeader` change**: a trigger slot in the "you" block (`Expanded` → `Flexible` + `Spacer`), and the optional hidden indicator in the opponent block.
@@ -262,13 +250,13 @@ No new color or text style is introduced.
 
 1. **Cooldown**: 4 s.
 2. **Limits**: none; the cooldown is the only throttle.
-3. **Phases**: stickers are allowed in every phase (see "States").
+3. **Phases**: `waitingReady`, `countdown`, `question`, `reveal`; never after `finished` / `cancelled` (owner decision in `battle_stickers_frontend_task.md`, no post-battle grace window).
 4. **Mute**: per battle, not persisted.
-5. **Wire ids**: the client list in "Sticker catalog" for now; the backend will send its own decision later.
+5. **Wire ids**: confirmed by the owner: the nine lowercase ids in "Sticker catalog". API: `battle_stickers_api.yaml` (POST `/battles/{id}/stickers`, STOMP `BATTLE_STICKER`).
 
 ## Open questions
 
 1. **Rematch overlay collision**: `RematchOverlay` sits top-right at 88 px from the window top, 64 px from the right. If it ever shows on the battle route, it overlaps the incoming bubble. The rematch spec asks the same question; proposal: suppress the rematch overlay on the live battle route.
-2. **Narrow widths**: below a 1344 px viewport the picker no longer fits in the gutter, and below 1184 px neither does a bubble. Options: a smaller bubble (64 px sticker), hide the trigger, or receive-only. Not designed; mobile is not designed either.
+2. **Narrow widths**: below a 1344 px viewport the picker no longer fits in the gutter, and below 1280 px the bubbles are not shown (incoming stickers are missed there). Options: a smaller bubble (64 px sticker), hide the trigger, or receive-only. Not designed; mobile is not designed either.
 3. **Moderation / abuse**: taunts are fixed art, so there is no free text, but should the server rate-limit or log them, and should a report option exist? Not designed.
 4. **Copy**: `Send a sticker`, `Tap a sticker to send`, `Reconnecting…`, `Next sticker in 0:04`, `Sending GG…`, `Not sent`, `Hide / Show timur.b's stickers`, `timur.b sent LOL`. All are proposals.

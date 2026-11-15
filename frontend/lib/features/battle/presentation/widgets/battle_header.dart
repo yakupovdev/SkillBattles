@@ -19,9 +19,20 @@ import 'package:skill_battles/features/battle/domain/entity/battle_snapshot_enti
 /// 104-high header: you, round info, opponent. Scores include revealed
 /// rounds only; the opponent's correctness appears only after the reveal.
 final class BattleHeader extends StatelessWidget {
-  const BattleHeader({required this.snapshot, super.key});
+  const BattleHeader({
+    required this.snapshot,
+    this.youTrailing,
+    this.opponentNameLeading,
+    super.key,
+  });
 
   final BattleSnapshotEntity snapshot;
+
+  /// Placed right after your name column (the sticker trigger).
+  final Widget? youTrailing;
+
+  /// Placed before the opponent's nickname (the "stickers hidden" eye).
+  final Widget? opponentNameLeading;
 
   static const double _sideMaxWidth = 420;
 
@@ -52,6 +63,7 @@ final class BattleHeader extends StatelessWidget {
                         child: _PlayerBlock(
                           player: me,
                           isYou: true,
+                          trailing: youTrailing,
                           showCorrectCount: _showCorrectCount(snapshot),
                         ),
                       ),
@@ -68,6 +80,7 @@ final class BattleHeader extends StatelessWidget {
                         child: _PlayerBlock(
                           player: opponent,
                           isYou: false,
+                          nameLeading: opponentNameLeading,
                           status: _opponentStatus(snapshot, opponent),
                           statusPoints: _opponentPoints(snapshot, opponent),
                           showCorrectCount: _showCorrectCount(snapshot),
@@ -141,6 +154,8 @@ final class _PlayerBlock extends StatelessWidget {
     required this.player,
     required this.isYou,
     required this.showCorrectCount,
+    this.trailing,
+    this.nameLeading,
     this.status,
     this.statusPoints,
     this.clockOffset = Duration.zero,
@@ -149,6 +164,12 @@ final class _PlayerBlock extends StatelessWidget {
   final BattlePlayerEntity player;
   final bool isYou;
   final bool showCorrectCount;
+
+  /// Your block only: the sticker trigger after the name column.
+  final Widget? trailing;
+
+  /// Opponent block only: icon before the nickname.
+  final Widget? nameLeading;
   final _OpponentStatus? status;
 
   /// Points of a correct revealed answer ("Correct · +1,116").
@@ -185,38 +206,52 @@ final class _PlayerBlock extends StatelessWidget {
             ),
           )
         : null;
-    final Widget info = Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: isYou
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.end,
-        spacing: 2,
-        children: <Widget>[
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 6,
-            children: <Widget>[
-              Flexible(
-                child: Text(
-                  player.nickname,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.buttonLg,
-                ),
+    final Widget infoColumn = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: isYou
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
+      spacing: 2,
+      children: <Widget>[
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 6,
+          children: <Widget>[
+            Flexible(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  ?nameLeading,
+                  Flexible(
+                    child: Text(
+                      player.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.buttonLg,
+                    ),
+                  ),
+                ],
               ),
-              if (player.isPro) const ProBadge(compact: true),
-            ],
-          ),
-          ?subline,
-        ],
-      ),
+            ),
+            if (player.isPro) const ProBadge(compact: true),
+          ],
+        ),
+        ?subline,
+      ],
     );
     return Row(
       spacing: 14,
       children: isYou
-          ? <Widget>[avatar, info, score]
-          : <Widget>[score, info, avatar],
+          ? <Widget>[
+              avatar,
+              // Loose fit, so the trigger sits right after the name; the
+              // spacer keeps the score at the edge.
+              Flexible(child: infoColumn),
+              ?trailing,
+              const Spacer(),
+              score,
+            ]
+          : <Widget>[score, Expanded(child: infoColumn), avatar],
     );
   }
 }

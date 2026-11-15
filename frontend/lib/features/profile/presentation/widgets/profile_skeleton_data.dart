@@ -1,10 +1,10 @@
 import 'package:skeletonizer/skeletonizer.dart';
 
+import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/core/domain/entity/entitlements_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
+import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
+import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/match_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/statistics_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/streaks_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/difficulty_schedule_entity.dart';

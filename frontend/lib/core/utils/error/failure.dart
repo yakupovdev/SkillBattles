@@ -44,7 +44,8 @@ final class ApiFailure extends Failure {
   /// Request property path → message.
   final Map<String, String> fieldErrors;
 
-  /// Next ET midnight for `DAILY_LIMIT_REACHED`, `null` otherwise.
+  /// Next ET midnight for `DAILY_LIMIT_REACHED`; the exact server instant
+  /// the next sticker is allowed for `STICKER_COOLDOWN`; `null` otherwise.
   final DateTime? resetsAt;
 
   /// `Retry-After` of a 429, when present.

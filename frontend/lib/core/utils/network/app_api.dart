@@ -40,6 +40,7 @@ abstract final class AppApi {
   static const String disciplineCodeKey = 'disciplineCode';
   static const String modeKey = 'mode';
   static const String mistakesOnlyKey = 'mistakesOnly';
+  static const String directionKey = 'direction';
 
   // Authentication.
   static const String register = '/auth/register';
@@ -71,10 +72,29 @@ abstract final class AppApi {
   static const String duelsJoin = '/duels/join';
   static String duel(String id) => '$duels/$id';
 
+  // Friends and room invitations.
+  static const String meFriendCode = '/users/me/friend-code';
+  static const String meDuelInvitations = '/users/me/duel-invitations';
+  static const String friends = '/friends';
+  static String friend(String friendId) => '$friends/$friendId';
+  static const String friendRequests = '/friend-requests';
+  static String friendRequest(String id) => '$friendRequests/$id';
+  static String friendRequestAccept(String id) => '$friendRequests/$id/accept';
+  static String friendRequestDecline(String id) =>
+      '$friendRequests/$id/decline';
+  static String duelInvitations(String duelId) => '$duels/$duelId/invitations';
+  static const String duelInvitationsRoot = '/duel-invitations';
+  static String duelInvitation(String id) => '$duelInvitationsRoot/$id';
+  static String duelInvitationAccept(String id) =>
+      '$duelInvitationsRoot/$id/accept';
+  static String duelInvitationDecline(String id) =>
+      '$duelInvitationsRoot/$id/decline';
+
   // Battles.
   static String battle(String id) => '/battles/$id';
   static String battleReadiness(String id) => '/battles/$id/readiness';
   static String battleAnswers(String id) => '/battles/$id/answers';
+  static String battleStickers(String id) => '/battles/$id/stickers';
   static String battleSurrender(String id) => '/battles/$id/surrender';
   static String battleResult(String id) => '/battles/$id/result';
   static String battleReview(String id) => '/battles/$id/review';

@@ -45,10 +45,12 @@ import 'package:skill_battles/features/battle/data/repository/battle_repository_
 import 'package:skill_battles/features/battle/data/sources/remote/battle_remote.dart';
 import 'package:skill_battles/features/battle/domain/repository/battle_repository.dart';
 import 'package:skill_battles/features/battle/domain/usecases/get_battle_usecase.dart';
+import 'package:skill_battles/features/battle/domain/usecases/send_sticker_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/set_ready_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/submit_answer_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/surrender_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/watch_battle_usecase.dart';
+import 'package:skill_battles/features/battle/domain/usecases/watch_stickers_usecase.dart';
 import 'package:skill_battles/features/battle_result/data/repository/battle_result_repository_impl.dart';
 import 'package:skill_battles/features/battle_result/data/sources/remote/battle_result_remote.dart';
 import 'package:skill_battles/features/battle_result/domain/repository/battle_result_repository.dart';
@@ -59,12 +61,36 @@ import 'package:skill_battles/features/battle_result/domain/usecases/get_review_
 import 'package:skill_battles/features/battle_result/domain/usecases/report_round_usecase.dart';
 import 'package:skill_battles/features/battle_result/domain/usecases/request_rematch_usecase.dart';
 import 'package:skill_battles/features/battle_result/domain/usecases/watch_rematch_usecase.dart';
+import 'package:skill_battles/features/battle_result/domain/usecases/watch_rematches_usecase.dart';
 import 'package:skill_battles/features/catalog/data/repository/catalog_repository_impl.dart';
 import 'package:skill_battles/features/catalog/data/sources/remote/catalog_remote.dart';
 import 'package:skill_battles/features/catalog/domain/repository/catalog_repository.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_current_season_usecase.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_disciplines_usecase.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_ranks_usecase.dart';
+import 'package:skill_battles/features/friends/data/repository/friends_repository_impl.dart';
+import 'package:skill_battles/features/friends/data/sources/remote/friends_remote.dart';
+import 'package:skill_battles/features/friends/domain/repository/friends_repository.dart';
+import 'package:skill_battles/features/friends/domain/usecases/accept_duel_invitation_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/accept_friend_request_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/cancel_friend_request_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/decline_duel_invitation_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/decline_friend_request_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_duel_invitation_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_friend_code_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_friend_profile_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_friend_request_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_friend_requests_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_friends_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_incoming_duel_invitations_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/get_room_invitations_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/remove_friend_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/send_duel_invitation_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/send_friend_request_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/watch_duel_invitation_changes_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/watch_friendship_changes_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/watch_signed_in_user_usecase.dart';
+import 'package:skill_battles/features/friends/domain/usecases/withdraw_duel_invitation_usecase.dart';
 import 'package:skill_battles/features/history/data/repository/history_repository_impl.dart';
 import 'package:skill_battles/features/history/data/sources/remote/history_remote.dart';
 import 'package:skill_battles/features/history/domain/repository/history_repository.dart';
@@ -213,6 +239,7 @@ final class AppDependencies {
     c.registerLazySingleton<BattleResultRemote>(
       () => BattleResultRemoteImpl(api()),
     );
+    c.registerLazySingleton<FriendsRemote>(() => FriendsRemoteImpl(api()));
     c.registerLazySingleton<HistoryRemote>(() => HistoryRemoteImpl(api()));
     c.registerLazySingleton<LeaderboardRemote>(
       () => LeaderboardRemoteImpl(api()),
@@ -270,6 +297,17 @@ final class AppDependencies {
         realtime: c.get<RealtimeClient>(),
         session: c.get<AuthSession>(),
       ),
+    );
+    c.registerLazySingleton<FriendsRepository>(
+      () => FriendsRepositoryImpl(
+        remote: c.get<FriendsRemote>(),
+        realtime: c.get<RealtimeClient>(),
+        session: c.get<AuthSession>(),
+        clock: c.get<Clock>(),
+      ),
+      dispose: (FriendsRepository repository) async {
+        if (repository is FriendsRepositoryImpl) await repository.dispose();
+      },
     );
     c.registerLazySingleton<HistoryRepository>(
       () => HistoryRepositoryImpl(remote: c.get<HistoryRemote>()),
@@ -377,6 +415,12 @@ final class AppDependencies {
     c.registerLazySingleton(
       () => WatchBattleUsecase(c.get<BattleRepository>()),
     );
+    c.registerLazySingleton(
+      () => SendStickerUsecase(c.get<BattleRepository>()),
+    );
+    c.registerLazySingleton(
+      () => WatchStickersUsecase(c.get<BattleRepository>()),
+    );
     // Result, review, rematch, reports.
     c.registerLazySingleton(
       () => GetResultUsecase(c.get<BattleResultRepository>()),
@@ -397,7 +441,71 @@ final class AppDependencies {
       () => WatchRematchUsecase(c.get<BattleResultRepository>()),
     );
     c.registerLazySingleton(
+      () => WatchRematchesUsecase(c.get<BattleResultRepository>()),
+    );
+    c.registerLazySingleton(
       () => ReportRoundUsecase(c.get<BattleResultRepository>()),
+    );
+    // Friends and room invitations.
+    c.registerLazySingleton(
+      () => AcceptDuelInvitationUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => AcceptFriendRequestUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => CancelFriendRequestUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => DeclineDuelInvitationUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => DeclineFriendRequestUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetDuelInvitationUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetFriendCodeUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetFriendProfileUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetFriendRequestUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetFriendRequestsUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetFriendsUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetIncomingDuelInvitationsUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => GetRoomInvitationsUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => RemoveFriendUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => SendDuelInvitationUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => SendFriendRequestUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => WatchDuelInvitationChangesUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => WatchFriendshipChangesUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => WatchSignedInUserUsecase(c.get<FriendsRepository>()),
+    );
+    c.registerLazySingleton(
+      () => WithdrawDuelInvitationUsecase(c.get<FriendsRepository>()),
     );
     // History and leaderboard.
     c.registerLazySingleton(

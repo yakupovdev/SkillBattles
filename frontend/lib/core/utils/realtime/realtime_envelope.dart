@@ -7,7 +7,10 @@ enum RealtimeEventType {
   battleChanged('BATTLE_CHANGED'),
   rematchChanged('REMATCH_CHANGED'),
   accountChanged('ACCOUNT_CHANGED'),
-  seasonChanged('SEASON_CHANGED');
+  seasonChanged('SEASON_CHANGED'),
+  friendshipChanged('FRIENDSHIP_CHANGED'),
+  duelInvitationChanged('DUEL_INVITATION_CHANGED'),
+  battleSticker('BATTLE_STICKER');
 
   const RealtimeEventType(this.wireName);
 
@@ -38,7 +41,9 @@ final class RealtimeEnvelope {
   final RealtimeEventType type;
 
   /// Game resource UUID; user id for ACCOUNT_CHANGED; season code for
-  /// SEASON_CHANGED.
+  /// SEASON_CHANGED; relationship id for FRIENDSHIP_CHANGED; invitation id
+  /// for DUEL_INVITATION_CHANGED; battle id for BATTLE_STICKER (whose
+  /// [version] is the battle's sticker sequence, not the battle version).
   final String resourceId;
   final int version;
   final DateTime occurredAt;

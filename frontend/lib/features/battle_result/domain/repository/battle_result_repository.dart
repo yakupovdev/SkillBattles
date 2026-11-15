@@ -27,4 +27,7 @@ abstract interface class BattleResultRepository {
   Future<Either<Failure, ReportEntity>> reportRound(ReportParamsEntity params);
 
   Stream<RematchEntity> watchRematch(String battleId);
+
+  /// Every REMATCH_CHANGED of the signed-in user, for any source battle.
+  Stream<RematchEntity> watchRematches();
 }

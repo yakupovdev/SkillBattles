@@ -13,6 +13,8 @@ enum AppRoutes {
   editProfile('/profile/edit'),
   leaderboard('/leaderboard'),
   history('/history'),
+  friends('/friends'),
+  friendProfile('/friends/:$friendIdParam'),
   pro('/pro'),
   billingReturn('/billing/return');
 
@@ -22,6 +24,9 @@ enum AppRoutes {
 
   /// Path parameter of [battle] and [battleResult].
   static const String battleIdParam = 'battleId';
+
+  /// Path parameter of [friendProfile]: the friend's user id.
+  static const String friendIdParam = 'friendId';
 
   /// Query: discipline code (`SAT_MATH`) for [rankedSearch], [privateDuel]
   /// and [leaderboard].

@@ -5,6 +5,8 @@ import 'package:skill_battles/features/battle/data/models/answer_receipt_model.d
 import 'package:skill_battles/features/battle/data/models/answer_request_model.dart';
 import 'package:skill_battles/features/battle/data/models/battle_snapshot_model.dart';
 import 'package:skill_battles/features/battle/data/models/readiness_request_model.dart';
+import 'package:skill_battles/features/battle/data/models/sticker_receipt_model.dart';
+import 'package:skill_battles/features/battle/data/models/sticker_request_model.dart';
 
 /// Live battle endpoints. Result, review, rematch and reports are in the
 /// battle_result feature.
@@ -19,6 +21,12 @@ abstract interface class BattleRemote {
   );
 
   Future<BattleSnapshotModel> surrender(String id);
+
+  /// REST, never a STOMP SEND: the socket only delivers events.
+  Future<StickerReceiptModel> sendSticker(
+    String id,
+    StickerRequestModel request,
+  );
 }
 
 final class BattleRemoteImpl implements BattleRemote {
@@ -57,5 +65,17 @@ final class BattleRemoteImpl implements BattleRemote {
   Future<BattleSnapshotModel> surrender(String id) async {
     final Object? json = await _client.post(AppApi.battleSurrender(id));
     return BattleSnapshotModel.fromJson(asJsonObject(json));
+  }
+
+  @override
+  Future<StickerReceiptModel> sendSticker(
+    String id,
+    StickerRequestModel request,
+  ) async {
+    final Object? json = await _client.post(
+      AppApi.battleStickers(id),
+      data: request.toJson(),
+    );
+    return StickerReceiptModel.fromJson(asJsonObject(json));
   }
 }

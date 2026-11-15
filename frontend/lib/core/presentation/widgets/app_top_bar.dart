@@ -13,7 +13,8 @@ enum AppNavTab {
   play('Play'),
   leaderboard('Leaderboard'),
   stats('Stats'),
-  history('History');
+  history('History'),
+  friends('Friends');
 
   const AppNavTab(this.label);
 
