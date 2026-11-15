@@ -4257,42 +4257,6 @@ SELECT * FROM jsonb_to_recordset($sat_question_bank$
     "authored_distractors": false
   },
   {
-    "id": "0609352f-6266-55ff-869e-18903ac11125",
-    "external_key": "SAT_MATH:15ce8207",
-    "discipline_code": "SAT_MATH",
-    "topic_code": "DATA_TWO_VARIABLES",
-    "topic_name": "Problem-Solving and Data Analysis / Two-variable data: Models and scatterplots",
-    "difficulty": "EASY",
-    "prompt": "The scatterplot shows the relationship between two variables, $x$ and $y$. The data points start near $(0, 0)$ and follow an increasing, upward-curving trend through approximately $(2, 200)$, $(3, 200)$, $(3.5, 900)$, $(4.2, 850)$, $(5.2, 2200)$, $(5.8, 2700)$, and $(6.5, 4800)$. Which of the following graphs shows the most appropriate model for the data?",
-    "options": [
-      {
-        "id": "1b63fa80-d37c-3aba-8a87-539d167c6682",
-        "key": "A",
-        "text": "A linear model with a straight line passing through $(0, 0)$ and $(7, 5000)$ with most points well below it"
-      },
-      {
-        "id": "b5ef5fab-8b86-3335-841a-49a29361b2a7",
-        "key": "B",
-        "text": "A decreasing linear model with a straight line from $(0, 5000)$ to $(7, 0)$"
-      },
-      {
-        "id": "cf258b4f-16df-3be7-96d5-a103b2a8a2b9",
-        "key": "C",
-        "text": "An increasing curve starting at $(0, 1000)$ that stays entirely above all lower data points"
-      },
-      {
-        "id": "1275cb49-bde6-3b17-a6a9-bbf5552b5fd4",
-        "key": "D",
-        "text": "An increasing nonlinear curve starting near $(0, 0)$ that closely fits the data points with points distributed both above and below it"
-      }
-    ],
-    "correct_option_id": "1275cb49-bde6-3b17-a6a9-bbf5552b5fd4",
-    "explanation": "Choice D is correct. An appropriate mathematical model must match the underlying trend of the data points and balance them above and below the curve:\n- The data is nonlinear and increasing at an accelerating rate (concave up).\n- A straight line (Choices A and B) fails to capture the curvature.\n- The curve in Choice C starts too high ($y$-intercept 1,000) and leaves the early data points entirely beneath it.\n- Choice D provides an increasing curve that appropriately models the accelerating upward trend with data points balanced closely on both sides.",
-    "source_id": "15ce8207",
-    "source_number": 119,
-    "authored_distractors": false
-  },
-  {
     "id": "5d712b3d-bfec-53f6-be5f-e3b8b1e0ba2b",
     "external_key": "SAT_MATH:c88e0663",
     "discipline_code": "SAT_MATH",
