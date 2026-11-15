@@ -8,6 +8,7 @@ public interface UserService {
     UserDto register(RegisterDto dto);
     UserDto authenticate(LoginDto dto);
     UserDto getById(UUID id);
+    java.util.List<UserDto> findByIds(java.util.Collection<UUID> ids);
     UserDto lockActiveById(UUID id);
     void softDelete(UUID id);
     UserDto update(UUID id, ProfileUpdateDto dto);

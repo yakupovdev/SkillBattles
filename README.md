@@ -2,7 +2,7 @@
 
 Flutter Web frontend и Java 21 / Spring Boot backend v0.3 с PostgreSQL. Один
 backend-процесс: несколько replicas пока не поддерживаются. REST-контракт —
-39 операций, OpenAPI `0.3.0`; функция похожих вопросов удалена.
+40 операций, OpenAPI `0.3.0`; функция похожих вопросов удалена.
 
 ## Локальный запуск
 

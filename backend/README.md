@@ -1,6 +1,6 @@
 # SkillBattles — backend v0.3
 
-Реализованы этапы A–E и 39 REST-операций контракта v0.3. Generated Swagger
+Реализованы этапы A–E и 40 REST-операций контракта v0.3, включая входящие приглашения на реванш. Generated Swagger
 имеет версию `0.3.0` и строится из действующих controllers/DTO. Контрактная
 проверка сопоставляет маршруты, успешные статусы, request/response-поля,
 типы и единый ErrorResponse. Локальные спецификации остаются игнорируемыми Git.
@@ -586,9 +586,42 @@ POST `/api/v1/battles/{id}/rounds/{roundId}/report`: показанный reveal
 непустой comment. Первый report(user,battle,round) — 201, точный повтор — 200 с тем же
 объектом, другой payload — 409 REPORT_ALREADY_EXISTS. Контент/результат/Elo не меняются.
 
+## Входящие приглашения на реванш
+
+`GET /api/v1/users/me/rematch-invitations`, access Bearer JWT, без body/query и
+пагинации. Ответ: `{data: [{sourceBattleId, requester: {id,isPro,nickname},
+disciplineCode, expiresAt, version}], serverTime}`. Всегда присутствуют оба
+верхних поля, пустой `data` — нормальный 200, `Cache-Control: no-store`.
+Owner определяется только из JWT sub. Учитываются только входящие WAITING со
+строгим `expiresAt > serverTime`, порядок expiresAt/sourceBattleId. Исходящие,
+чужие, MATCHED/CANCELLED/EXPIRED и обычные комнаты не включаются.
+
+Снимок и expiration используют Clock под существующей registry-блокировкой;
+nickname и Pro-флаги затем загружаются двумя пакетными запросами вне блокировки.
+Минимальный список доступен Free/Pro и не расширяет history/answer access.
+Принять — прежний POST `/battles/{sourceBattleId}/rematch`, отклонить — прежний
+DELETE (204, CANCELLED). Входящее приглашение не резервирует получателя, не
+покидает его activity и не отменяет другие приглашения. Исходные 60 секунд не
+продлеваются. После MATCHED оба проходят Ready; DELETE возвращает 409
+MATCH_ALREADY_FOUND и не удаляет созданный матч.
+
+Используется прежний `REMATCH_CHANGED` на `/user/queue/events`, включая начальный
+WAITING обоим участникам после commit. Wire-поля RematchResponse и envelope не
+изменены. На клиентском startup/reconnect: слушатель → CONNECT/SUBSCRIBE → новый
+GET и GET `/users/me/activity`. События могут теряться, дублироваться и менять
+порядок; клиент объединяет их по sourceBattleId/version и поколению reconnect.
+Список incoming не восстанавливает потерянный MATCHED: для него нужны activity
+и snapshot нового battleId. При backend restart непринятые приглашения теряются;
+персистентный созданный батл использует существующее recovery, включая отмену
+незавершённого матча с SERVER_INTERRUPTION. Поддерживается один процесс backend.
+
+Полный generated контракт после `verify`: `backend/target/generated-openapi.json`.
+Точный контракт, примеры и сценарий двух аккаунтов —
+[REMATCH_NOTIFICATIONS_HANDOFF.md](REMATCH_NOTIFICATIONS_HANDOFF.md).
+
 ## Контракт и передача frontend
 
-Swagger `/v3/api-docs` содержит 39 реализованных REST-операций. OpenAPI 3.1 может
+Swagger `/v3/api-docs` содержит 40 реализованных REST-операций. OpenAPI 3.1 может
 представлять nullable как `type: [integer, null]`, эквивалент nullable=true целевого
 OpenAPI 3.0.3. Имена схем могут отличаться; публичные поля и типы сверяются.
 Webhook дополнительно документирует фактический 503 BILLING_UNAVAILABLE для retry

@@ -22,7 +22,8 @@ import uuid
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument('--backend-image', help='Optional freshly built image to check without restarting the main backend')
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     cache = root / 'backend/.cache'
     cache.mkdir(exist_ok=True)
@@ -58,7 +59,11 @@ def main():
         return subprocess.check_output(parts, cwd=root, env=env, text=True, stderr=subprocess.STDOUT, **hidden, **kwargs).strip()
 
     # Resolve the actual images built by the main project without reading/printing ENV.
-    images = {service: run(['docker', 'compose', 'images', '-q', service]) for service in ('backend', 'frontend')}
+    images = {
+        'backend': run(['docker', 'image', 'inspect', '--format', '{{.Id}}', args.backend_image])
+                   if args.backend_image else run(['docker', 'compose', 'images', '-q', 'backend']),
+        'frontend': run(['docker', 'compose', 'images', '-q', 'frontend']),
+    }
     if not all(images.values()):
         parser.error('Build/start the root Compose project first.')
     override = cache / (project + '.json')
