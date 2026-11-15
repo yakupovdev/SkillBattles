@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile, writeFile} from 'node:fs/promises';
 import {createInterface} from 'node:readline';
 import {randomUUID} from 'node:crypto';
+import {verifyQuestionImages} from './question_images_smoke.mjs';
+import {verifyBattleStickers} from './battle_stickers_smoke.mjs';
 
 const base = process.env.SKILLBATTLES_E2E_BASE_URL;
 if (!base || !process.env.SKILLBATTLES_E2E_FIXTURE || !process.env.SKILLBATTLES_E2E_REVISION) {
@@ -21,7 +23,7 @@ async function raw(method, path, auth, body) {
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const response = await fetch(base + path, {method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(8000)});
   const text = await response.text();
-  return {status: response.status, data: text ? JSON.parse(text) : null};
+  return {status: response.status, data: text ? JSON.parse(text) : null, cacheControl: response.headers.get('cache-control')};
 }
 async function request(method, path, auth, body, expected = 200) {
   const response = await raw(method, path, auth, body);
@@ -103,6 +105,12 @@ function answerBody(state, correct) {
   const option = state.round.question.options.find(option => (option.text === correctText) === correct);
   return {roundId: state.round.id, optionId: option.id, submissionId: randomUUID()};
 }
+function questionImage(question) {
+  const source = fixture.find(item => item.prompt === question.prompt);
+  assert(source);
+  assert.equal(question.imageUrl, source.imageKey ? '/media/questions/' + source.imageKey : null);
+  assert(!('imageKey' in question));
+}
 const submit = (id, auth, body, expected = 200) => request('POST', '/api/v1/battles/' + id + '/answers', auth, body, expected);
 const result = (id, auth) => get('/api/v1/battles/' + id + '/result', auth);
 const review = (id, auth) => get('/api/v1/battles/' + id + '/review', auth);
@@ -125,7 +133,8 @@ async function consistency(id, auth) {
 
 try {
   const api = await get('/v3/api-docs', null);
-  assert.equal(Object.values(api.paths).reduce((count, path) => count + Object.keys(path).filter(method => ['get', 'post', 'patch', 'delete'].includes(method)).length, 0), 39);
+  assert.equal(Object.entries(api.paths).filter(([url]) => url.startsWith('/api/v1/')).reduce((count, [, path]) => count + Object.keys(path).filter(method => ['get', 'post', 'patch', 'delete'].includes(method)).length, 0), 41);
+  await verifyQuestionImages(base);
   assert(!JSON.stringify(api).includes('canPracticeSimilar'));
   assert(!Object.keys(api.paths).some(path => path.includes('/practice')));
   for (const path of ['/api/v1/users/me/battles', '/api/v1/battles/{id}/review']) {
@@ -164,13 +173,15 @@ try {
   await ready(ranked, a); await ready(ranked, b);
   await battleEvent(sa, ranked, 'COUNTDOWN');
   for (let number = 1; number <= mainCount; number++) {
-    await battleEvent(sa, ranked, 'QUESTION', number);
+    const questionEvent = await battleEvent(sa, ranked, 'QUESTION', number);
     if (number === 1) {
       const account = await sa.event(event => event.type === 'ACCOUNT_CHANGED' && event.resourceId === a.user.id && event.data.limits.rankedStartedToday === 1);
       assert.equal(account.data.subscription.entitlements.isPro, false);
     }
     const state = await snapshot(ranked, a); const other = await snapshot(ranked, b);
     assert.deepEqual(state.round.question, other.round.question);
+    assert.deepEqual(questionEvent.data.round.question, state.round.question);
+    questionImage(state.round.question);
     assert.equal(state.round.deadline, other.round.deadline);
     const answer = answerBody(state, true);
     const receipt = await submit(ranked, a, answer);
@@ -223,6 +234,7 @@ try {
   await battleEvent(sa, privateId, 'QUESTION', 6);
   const overtime = await snapshot(privateId, a);
   assert.equal(overtime.questionCount, 5); assert.equal(overtime.overtimePlayed, true); assert.equal(overtime.round.isOvertimeRound, true);
+  questionImage(overtime.round.question);
   assert.equal(overtime.round.limitSeconds, catalogue.find(item => item.disciplineCode === 'SAT_MATH').overtimeSeconds);
   const overtimeAnswer = answerBody(overtime, true);
   const overtimeReceipt = await submit(privateId, a, overtimeAnswer);
@@ -253,6 +265,7 @@ try {
   assert.equal(savedHistory.historyLimit, 10);
   const freeReview = await review(ranked, a);
   assert(freeReview.rounds.every(round => round.question.correctOptionId === null && round.question.explanation === null));
+  freeReview.rounds.forEach(round => questionImage(round.question));
   assert(freeReview.rounds.every(round => round.answers.filter(answer => answer.userId !== a.user.id).every(answer => answer.selectedOptionId === null)));
   assert.equal((await get('/api/v1/users/me/limits', a)).rankedStartedToday, 1);
   const savedReviews = new Map(); const savedResults = new Map();
@@ -268,18 +281,40 @@ try {
   const board = await get('/api/v1/leaderboards/SAT_MATH', a);
   assert.equal(board.me.player.id, a.user.id); assert.equal(board.me.rating, 1032); privateShape(board);
   const rematchPath = `/api/v1/battles/${privateId}/rematch`;
+  const invitations = auth => get('/api/v1/users/me/rematch-invitations', auth);
+  await get('/api/v1/users/me/rematch-invitations', null, 401);
+  // A connected recipient can be elsewhere in the app; no result-screen subscription.
+  await get('/api/v1/users/me', b);
   const consent = await request('POST', rematchPath, a);
   assert.deepEqual(await request('POST', rematchPath, a), consent);
   assert.equal((await activity(a)).resourceKind, 'REMATCH');
   const rematchEvent = await sa.event(event => event.type === 'REMATCH_CHANGED' && event.resourceId === privateId && event.data.status === 'WAITING');
   assert.equal(rematchEvent.version, consent.version);
+  const recipientEvent = await sb.event(event => event.type === 'REMATCH_CHANGED' && event.resourceId === privateId && event.data.status === 'WAITING');
+  assert.deepEqual(recipientEvent.data, consent);
+  const incoming = await raw('GET', '/api/v1/users/me/rematch-invitations', b);
+  assert.equal(incoming.status, 200); assert.equal(incoming.cacheControl, 'no-store');
+  assert.deepEqual(Object.keys(incoming.data).sort(), ['data', 'serverTime']);
+  assert.deepEqual(incoming.data.data, [{sourceBattleId: privateId, requester: {id: a.user.id, isPro: false, nickname: a.user.nickname}, disciplineCode: 'SAT_MATH', expiresAt: consent.expiresAt, version: consent.version}]);
+  assert(new Date(incoming.data.serverTime) < new Date(consent.expiresAt));
+  assert.deepEqual((await invitations(a)).data, []); assert.deepEqual((await invitations(third)).data, []);
+  assert(!sc.events.some(event => event.type === 'REMATCH_CHANGED'));
+  await sb.close();
+  const recoveredRecipient = await new Stomp(b).connect();
+  assert.deepEqual((await invitations(b)).data, incoming.data.data);
   const rematch = await request('POST', rematchPath, b);
   assert.equal(rematch.status, 'MATCHED');
+  assert.equal((await request('POST', rematchPath, b)).battleId, rematch.battleId);
+  assert.deepEqual((await invitations(b)).data, []);
+  assert.equal((await activity(b)).battleId, rematch.battleId);
+  await recoveredRecipient.event(event => event.type === 'REMATCH_CHANGED' && event.resourceId === privateId && event.data.status === 'MATCHED');
+  assert.equal((await request('DELETE', rematchPath, b, undefined, 409)).code, 'MATCH_ALREADY_FOUND');
   assert.equal((await snapshot(rematch.battleId, a)).phase, 'WAITING_READY');
   await request('POST', '/api/v1/battles/' + rematch.battleId + '/surrender', a);
   const cancelPath = `/api/v1/battles/${surrenderId}/rematch`;
   await request('POST', cancelPath, a); await request('DELETE', cancelPath, b, undefined, 204);
   assert.equal((await get(cancelPath, a)).status, 'CANCELLED'); assert.equal((await activity(a)).type, 'NONE');
+  assert.deepEqual((await invitations(b)).data, []);
   const profile = await register();
   const changed = await request('PATCH', '/api/v1/users/me', profile, {nickname: 'Updated_' + randomUUID().replaceAll('-', '').slice(0, 10), currentPassword: 'IsolatedDemo123!', newPassword: 'UpdatedDemo123!'});
   assert.equal(changed.passwordChanged, true); assert.equal(changed.reauthenticationRequired, true);
@@ -306,11 +341,32 @@ try {
   const pendingId = (await request('POST', '/api/v1/matchmaking/entries', pendingB, {disciplineCode: 'SAT_MATH', format: 'STANDARD'}, 201)).battleId;
   await ready(pendingId, pendingA); await ready(pendingId, pendingB); await battleEvent(pendingSocket, pendingId, 'QUESTION', 1);
   assert.equal((await get('/api/v1/users/me/limits', pendingA)).rankedStartedToday, 1);
+  const forgottenPath = `/api/v1/battles/${rematch.battleId}/rematch`;
+  await request('POST', forgottenPath, a);
+  assert.equal((await invitations(b)).data[0].sourceBattleId, rematch.battleId);
+  // Separate accounts keep immutable-history assertions above independent of recovery.
+  const recoveryA = await register(), recoveryB = await register();
+  const recoveryRoom = await request('POST', '/api/v1/duels', recoveryA, {disciplineCode:'SAT_MATH',format:'STANDARD'}, 201);
+  const recoverySource = (await request('POST', '/api/v1/duels/join', recoveryB, {code:recoveryRoom.code})).battleId;
+  await request('POST', `/api/v1/battles/${recoverySource}/surrender`, recoveryA);
+  await request('POST', `/api/v1/battles/${recoverySource}/rematch`, recoveryA);
+  const acceptedRecovery = await request('POST', `/api/v1/battles/${recoverySource}/rematch`, recoveryB);
+  assert.equal((await activity(recoveryB)).battleId, acceptedRecovery.battleId);
   const source = fixture.find(item => item.prompt === savedReviews.get(ranked).rounds[0].question.prompt);
-  await writeFile(process.env.SKILLBATTLES_E2E_REVISION, JSON.stringify([{...source, contentVersion: 2, prompt: 'TEST ONLY revised prompt after completed battle', explanation: 'TEST ONLY revised explanation'}]));
+  await writeFile(process.env.SKILLBATTLES_E2E_REVISION, JSON.stringify([{...source, contentVersion: source.contentVersion + 1, imageKey: null, prompt: 'TEST ONLY revised prompt after completed battle', explanation: 'TEST ONLY revised explanation'}]));
+  const recoverStickers = await verifyBattleStickers({base, register, Stomp, request, snapshot});
   const restarted = new Promise(resolve => input.once('line', resolve));
   console.log('REVISE_AND_RESTART');
   assert.equal(await restarted, 'RESTARTED');
+  await recoverStickers();
+  await verifyQuestionImages(base);
+  assert.deepEqual((await invitations(b)).data, []);
+  assert.equal((await get(forgottenPath, a, 404)).code, 'REMATCH_NOT_FOUND');
+  const recoveredBattle = await snapshot(acceptedRecovery.battleId, recoveryB);
+  assert.equal(recoveredBattle.phase, 'CANCELLED');
+  assert.equal(recoveredBattle.result.reason, 'SERVER_INTERRUPTION');
+  assert.equal((await activity(recoveryB)).type, 'NONE');
+  console.log('Rematch invitations: personal no-store snapshot, WAITING to both sessions, reconnect, accept/decline, pending loss and accepted-battle recovery after restart passed.');
   assert.deepEqual(await history(a), savedHistory);
   assert.deepEqual(await get('/api/v1/users/me/statistics', a), statsBefore);
   assert.deepEqual(await get('/api/v1/seasons/current', a), currentSeason);
