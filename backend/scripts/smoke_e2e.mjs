@@ -4,6 +4,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {createInterface} from 'node:readline';
 import {randomUUID} from 'node:crypto';
 import {verifyQuestionImages} from './question_images_smoke.mjs';
+import {verifyBattleStickers} from './battle_stickers_smoke.mjs';
 
 const base = process.env.SKILLBATTLES_E2E_BASE_URL;
 if (!base || !process.env.SKILLBATTLES_E2E_FIXTURE || !process.env.SKILLBATTLES_E2E_REVISION) {
@@ -132,7 +133,7 @@ async function consistency(id, auth) {
 
 try {
   const api = await get('/v3/api-docs', null);
-  assert.equal(Object.entries(api.paths).filter(([url]) => url.startsWith('/api/v1/')).reduce((count, [, path]) => count + Object.keys(path).filter(method => ['get', 'post', 'patch', 'delete'].includes(method)).length, 0), 40);
+  assert.equal(Object.entries(api.paths).filter(([url]) => url.startsWith('/api/v1/')).reduce((count, [, path]) => count + Object.keys(path).filter(method => ['get', 'post', 'patch', 'delete'].includes(method)).length, 0), 41);
   await verifyQuestionImages(base);
   assert(!JSON.stringify(api).includes('canPracticeSimilar'));
   assert(!Object.keys(api.paths).some(path => path.includes('/practice')));
@@ -353,9 +354,11 @@ try {
   assert.equal((await activity(recoveryB)).battleId, acceptedRecovery.battleId);
   const source = fixture.find(item => item.prompt === savedReviews.get(ranked).rounds[0].question.prompt);
   await writeFile(process.env.SKILLBATTLES_E2E_REVISION, JSON.stringify([{...source, contentVersion: source.contentVersion + 1, imageKey: null, prompt: 'TEST ONLY revised prompt after completed battle', explanation: 'TEST ONLY revised explanation'}]));
+  const recoverStickers = await verifyBattleStickers({base, register, Stomp, request, snapshot});
   const restarted = new Promise(resolve => input.once('line', resolve));
   console.log('REVISE_AND_RESTART');
   assert.equal(await restarted, 'RESTARTED');
+  await recoverStickers();
   await verifyQuestionImages(base);
   assert.deepEqual((await invitations(b)).data, []);
   assert.equal((await get(forgottenPath, a, 404)).code, 'REMATCH_NOT_FOUND');

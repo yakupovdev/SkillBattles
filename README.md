@@ -2,9 +2,10 @@
 
 Flutter Web frontend и Java 21 / Spring Boot backend v0.3 с PostgreSQL. Один
 backend-процесс: несколько replicas пока не поддерживаются. REST-контракт —
-40 продуктовых операций и 2 публичные media GET/HEAD, OpenAPI `0.3.0`;
+41 продуктовая операция и 2 публичные media GET/HEAD, OpenAPI `0.3.0`;
 функция похожих вопросов удалена. Иллюстрации вопросов упакованы в backend image:
 подробности в [handoff](backend/QUESTION_IMAGES_HANDOFF.md).
+Добавлена REST-команда временных стикеров и событие сопернику: [контракт](backend/BATTLE_STICKERS_HANDOFF.md).
 
 ## Локальный запуск
 
