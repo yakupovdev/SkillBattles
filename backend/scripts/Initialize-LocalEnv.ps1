@@ -13,3 +13,4 @@ if ([string]::IsNullOrWhiteSpace($settings.JWT_SECRET)) {
     Set-RootEnvValue 'JWT_SECRET' ([Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)))
 }
 Write-Host 'Root .env initialized. Existing secrets/settings preserved; external credentials were not invented.'
+& (Join-Path $PSScriptRoot 'Initialize-LocalHttps.ps1')

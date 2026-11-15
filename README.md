@@ -17,8 +17,10 @@ Maven и PostgreSQL на хосте для основного запуска н�
 ```
 
 Скрипт копирует `.env.example` только при отсутствии `.env`, генерирует только
-незаполненные PostgreSQL/JWT secrets и сохраняет остальные значения. Можно
-скопировать пример вручную и заполнить эти два секрета. Не меняйте пароль уже
+незаполненные PostgreSQL/JWT secrets и сохраняет остальные значения. Он также
+подготавливает локальные HTTPS-сертификаты, сохраняя существующий локальный CA.
+Для существующего `.env` сертификаты можно подготовить отдельно командой
+`.\backend\scripts\Initialize-LocalHttps.ps1`. Не меняйте пароль уже
 созданного PostgreSQL volume редактированием ENV. Не публикуйте `.env` и вывод
 раскрытого `docker compose config`; безопасная проверка — `config --quiet`.
 
@@ -33,17 +35,37 @@ Compose ждёт готовности PostgreSQL, затем backend, затем
 
 | Адрес | Назначение |
 | --- | --- |
-| http://localhost:8081 | Приложение Flutter Web |
-| http://localhost:8081/swagger-ui/index.html | Swagger через frontend proxy |
-| http://localhost:8081/v3/api-docs | Фактический generated OpenAPI |
+| https://localhost:8443 | Приложение Flutter Web |
+| https://localhost:8443/swagger-ui/index.html | Swagger через frontend proxy |
+| https://localhost:8443/v3/api-docs | Фактический generated OpenAPI |
+| http://localhost:8081 | Перенаправление на HTTPS |
 | http://localhost:8080 | Backend при прямом доступе для разработки |
 | 127.0.0.1:55432 | PostgreSQL для локальных инструментов |
 
-Порты задают `FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`; опубликованы только
-на loopback. При смене frontend-порта согласуйте `BILLING_SUCCESS_URL`,
+Порты задают `FRONTEND_PORT` (HTTP), `FRONTEND_HTTPS_PORT` (HTTPS), `BACKEND_PORT`,
+`POSTGRES_PORT`. Frontend опубликован на `0.0.0.0`: устройства в общей сети
+открывают `https://<LAN-IP компьютера>:8443`. Старый HTTP-адрес перенаправляет на HTTPS.
+HTTPS нужен Flutter Secure Storage для сохранения токенов в secure context.
+Backend и PostgreSQL опубликованы на loopback. При смене frontend-порта согласуйте `BILLING_SUCCESS_URL`,
 `BILLING_CANCEL_URL`, `BILLING_PORTAL_RETURN_URL`, `PASSWORD_RESET_BASE_URL`.
 В примере они ссылаются на `${FRONTEND_PORT}`. Существующие значения локального
 `.env` скрипт инициализации не переписывает.
+
+Один раз установите **публичный** `backend/.cache/local-tls/ca.crt` в доверенные
+корневые сертификаты каждого устройства, с которого открывается приложение.
+Для Windows / текущего пользователя, из корня PowerShell:
+
+```powershell
+Import-Certificate -FilePath .\backend\.cache\local-tls\ca.crt -CertStoreLocation Cert:\CurrentUser\Root
+```
+
+Сертификат также доступен по `http://<LAN-IP компьютера>:8081/local-ca.crt`;
+сверьте его SHA-256 с выводом `Initialize-LocalHttps.ps1`. Скрипт сам доверие не
+устанавливает. Не переносите файлы `.key` на другие устройства. Ключ локального
+CA не передаётся контейнерам; nginx получает через read-only Compose secrets
+только серверные certificate/key и публичный CA. Эти файлы игнорируются Git и
+не входят в Docker images. Сертификат сервера действителен 90 дней; после смены
+IP/обновления повторите инициализацию и `docker compose restart frontend`.
 
 Браузер обращается к своему origin: REST `/api/v1`, native WebSocket
 `/ws/v1/events`. Nginx сохраняет пути, проксирует Swagger и Upgrade, передаёт

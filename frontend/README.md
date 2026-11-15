@@ -7,7 +7,9 @@ leaderboards and SkillBattles Pro (Stripe **test mode** only).
 
 From the repository root, `docker compose up -d --build` builds the real release
 web app with Flutter 3.50.0 / Dart 3.14.0 and starts PostgreSQL, backend and nginx.
-Open http://localhost:8081 (see the root README for ENV, imports and ports).
+Open https://localhost:8443 after trusting the local development CA (see the root
+README for certificate initialization, ENV, imports and ports). HTTP on 8081
+redirects to HTTPS; secure storage needs this secure context on LAN addresses.
 The Compose build disables mocks and proxies `/api/v1`, `/ws/v1/events`, Swagger
 and OpenAPI to the backend service. Browser requests stay on the current origin.
 Server secrets are never frontend build arguments.

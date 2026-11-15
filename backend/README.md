@@ -84,8 +84,10 @@ ENV: это не изменяет пароль роли в БД. Данные/vo
 
 По умолчанию COMPOSE_PROJECT_NAME=`skillbattles-local`, отдельная БД
 `skillbattles_v03`, PostgreSQL публикуется на 127.0.0.1:55432, backend —
-127.0.0.1:8080, frontend — 127.0.0.1:8081 (`FRONTEND_PORT`). Браузер открывает
-http://localhost:8081; Swagger доступен на этом же origin по
+127.0.0.1:8080, frontend — `0.0.0.0:8443` (HTTPS, `FRONTEND_HTTPS_PORT`),
+HTTP `0.0.0.0:8081` (`FRONTEND_PORT`) перенаправляет на HTTPS. Подготовку
+локального CA и установку доверия на устройствах см. в корневом README.
+Браузер открывает https://localhost:8443; Swagger доступен на этом же origin по
 `/swagger-ui/index.html`, OpenAPI — `/v3/api-docs`. Backend доверяет forwarded
 headers от локального nginx; proxy перезаписывает переданные клиентом заголовки.
 Compose автоматически читает корневой `.env` из корня проекта.

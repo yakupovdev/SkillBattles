@@ -16,11 +16,11 @@ FROM source AS build
 # Public compile-time configuration only. Never pass server ENV or secrets here.
 ARG API_BASE_URL=/api/v1
 ARG EVENTS_URL=/ws/v1/events
-RUN flutter build web --release --no-pub --no-web-resources-cdn     --dart-define=DEV_MOCKS=false     --dart-define=API_BASE_URL=${API_BASE_URL}     --dart-define=EVENTS_URL=${EVENTS_URL}
+RUN flutter build web --release --wasm --no-pub --no-web-resources-cdn     --dart-define=DEV_MOCKS=false     --dart-define=API_BASE_URL=${API_BASE_URL}     --dart-define=EVENTS_URL=${EVENTS_URL}
 
 FROM nginx:1.30.0-alpine@sha256:0272e4604ed93c1792f03695a033a6e8546840f86e0de20a884bb17d2c924883 AS runtime
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY nginx/default.conf /etc/nginx/templates/default.conf.template
 COPY nginx/proxy-headers.conf /etc/nginx/proxy-headers.conf
 COPY --from=build /app/build/web /usr/share/nginx/html
-EXPOSE 8080
+EXPOSE 8080 8443
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=5     CMD wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1
