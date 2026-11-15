@@ -152,8 +152,9 @@ def main():
                 restarted = True
             else:
                 print(line.rstrip(), flush=True)
-        if runner.wait(timeout=15) != 0 or not restarted:
-            raise RuntimeError('REST/STOMP end-to-end check failed')
+        runner_code = runner.wait(timeout=15)
+        if runner_code != 0 or not restarted:
+            raise RuntimeError(f'REST/STOMP end-to-end check failed (runner exit {runner_code}, restarted={restarted})')
         print('Isolated Java 21 JAR end-to-end check passed; only test fixtures were imported.', flush=True)
     finally:
         if runner is not None and runner.poll() is None:

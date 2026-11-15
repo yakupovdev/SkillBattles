@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
-import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
+import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 
 part 'rank_progress_model.g.dart';
 

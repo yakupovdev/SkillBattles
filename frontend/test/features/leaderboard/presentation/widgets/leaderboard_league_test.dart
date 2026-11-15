@@ -4,10 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
+import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/core/domain/entity/season_entity.dart';
 import 'package:skill_battles/core/presentation/widgets/app_progress_bar.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entry_entity.dart';
 import 'package:skill_battles/features/leaderboard/presentation/widgets/leaderboard_side_panel.dart';

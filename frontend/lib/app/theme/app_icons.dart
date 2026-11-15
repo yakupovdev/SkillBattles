@@ -74,6 +74,15 @@ abstract final class AppIcons {
   /// Red door-and-arrow of the "Log out" menu item (16 x 16).
   static const String logOut = '$_dir/log_out.svg';
 
+  /// Peeled-sticker smiley of the sticker trigger (20 x 20).
+  static const String sticker = '$_dir/sticker.svg';
+
+  /// Muted open eye of the "hide opponent stickers" toggle (18 x 18).
+  static const String eye = '$_dir/eye.svg';
+
+  /// Muted crossed-out eye: stickers hidden (18 x 18, also shown at 14).
+  static const String eyeOff = '$_dir/eye_off.svg';
+
   static const List<String> all = <String>[
     logoMark,
     logoMarkInverse,
@@ -98,6 +107,9 @@ abstract final class AppIcons {
     info,
     clock,
     logOut,
+    sticker,
+    eye,
+    eyeOff,
   ];
 }
 

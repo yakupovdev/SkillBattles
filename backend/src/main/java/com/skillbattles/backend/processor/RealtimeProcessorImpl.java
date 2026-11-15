@@ -141,6 +141,19 @@ public class RealtimeProcessorImpl implements RealtimeProcessor {
             });
         }catch(RuntimeException ex){log.error("Rematch notification failed: {}",ex.getClass().getSimpleName());}});
     }
+    @Override @EventListener
+    public void battleStickerAccepted(BattleStickerAcceptedEvent event) {
+        // Bind the subscribed generation at acceptance; never replay queued work to a replacement session.
+        sessions.target(event.opponentUserId()).ifPresent(target -> enqueue(() -> {
+            try {
+                if (!sessions.isCurrent(target.sessionId())) return;
+                var headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
+                headers.setSessionId(target.sessionId()); headers.setLeaveMutable(true);
+                messaging.convertAndSendToUser(target.userId().toString(), "/queue/events", event.envelope(), headers.getMessageHeaders());
+            } catch (RuntimeException ex) { log.warn("Sticker notification dropped: {}", ex.getClass().getSimpleName()); }
+        }));
+    }
+
     private void enqueue(Runnable action) {
         try { executor.execute(action); }
         catch (TaskRejectedException ex) {

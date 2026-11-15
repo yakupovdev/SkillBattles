@@ -19,6 +19,9 @@ import 'package:skill_battles/features/battle/domain/entity/battle_phase.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_player_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_round_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_snapshot_entity.dart';
+import 'package:skill_battles/features/battle/domain/entity/incoming_sticker_entity.dart';
+import 'package:skill_battles/features/battle/domain/entity/send_sticker_params_entity.dart';
+import 'package:skill_battles/features/battle/domain/entity/sticker_receipt_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/submit_answer_params_entity.dart';
 import 'package:skill_battles/features/battle/domain/repository/battle_repository.dart';
 import 'package:skill_battles/features/battle/domain/usecases/get_battle_usecase.dart';
@@ -142,6 +145,15 @@ final class _FakeBattleRepository implements BattleRepository {
 
   @override
   Stream<BattleSnapshotEntity> watchBattle(String battleId) => events.stream;
+
+  @override
+  Future<Either<Failure, StickerReceiptEntity>> sendSticker(
+    SendStickerParamsEntity params,
+  ) async => const Left(ConnectionFailure());
+
+  @override
+  Stream<IncomingStickerEntity> watchStickers(String battleId) =>
+      const Stream<IncomingStickerEntity>.empty();
 }
 
 final class _FakeConnection implements ConnectionRepository {

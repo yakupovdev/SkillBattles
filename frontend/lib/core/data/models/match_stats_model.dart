@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
-import 'package:skill_battles/features/account/domain/entity/match_stats_entity.dart';
+import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
 
 part 'match_stats_model.g.dart';
 

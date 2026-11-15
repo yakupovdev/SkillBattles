@@ -2,8 +2,9 @@
 
 The actual complete OpenAPI is `backend/target/generated-openapi.json`, generated
 by Maven `verify`. Application API version stays **0.3.0**. This increment adds
-**17** product operations: 57 product REST operations plus 2 illustration media
-GET/HEAD operations, 59 total. The supplied feature-only YAML includes 5 existing
+**17** product operations. Combined with the existing sticker command, the current
+contract has 58 product REST operations plus 2 illustration media GET/HEAD operations,
+60 total. The supplied feature-only YAML includes 5 existing
 context operations and does not replace the complete application contract.
 Frontend implementation and browser UI testing belong to the frontend task.
 

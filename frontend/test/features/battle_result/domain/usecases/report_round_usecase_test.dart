@@ -53,6 +53,9 @@ final class _Repository implements BattleResultRepository {
   @override
   Stream<RematchEntity> watchRematch(String battleId) =>
       const Stream<RematchEntity>.empty();
+
+  @override
+  Stream<RematchEntity> watchRematches() => const Stream<RematchEntity>.empty();
 }
 
 void main() {

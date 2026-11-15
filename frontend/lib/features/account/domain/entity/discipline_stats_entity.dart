@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
 
-import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/match_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
+import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
+import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
+import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/rating_history_point_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/topic_stats_entity.dart';
 

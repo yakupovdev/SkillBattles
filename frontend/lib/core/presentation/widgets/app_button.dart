@@ -16,6 +16,9 @@ enum AppButtonVariant {
 
   /// Filled with amber, ink label ("Choose annual", "See plans").
   accent,
+
+  /// Filled with red, white label ("Remove friend").
+  danger,
 }
 
 /// Height, corner radius, padding and label style of an [AppButton].
@@ -54,7 +57,9 @@ enum AppButtonSize {
 /// The filled and outlined buttons of the Paper design.
 ///
 /// A `null` [onPressed] renders the disabled look (faint label; outlined
-/// buttons get the light border).
+/// buttons get the light border). While [isLoading] the button keeps its
+/// enabled look at full opacity, shows a spinner before the label and ignores
+/// taps.
 final class AppButton extends StatelessWidget {
   const AppButton({
     required this.label,
@@ -64,6 +69,7 @@ final class AppButton extends StatelessWidget {
     this.icon,
     this.trailingIcon,
     this.expand = false,
+    this.isLoading = false,
     super.key,
   });
 
@@ -81,14 +87,19 @@ final class AppButton extends StatelessWidget {
   /// Whether the button takes the full available width.
   final bool expand;
 
+  /// Whether a request of this button is in flight.
+  final bool isLoading;
+
   @override
   Widget build(BuildContext context) {
-    final bool enabled = onPressed != null;
+    final bool canTap = onPressed != null && !isLoading;
+    final bool enabled = onPressed != null || isLoading;
     final Color background = switch (variant) {
       AppButtonVariant.primary => AppColors.primary,
       AppButtonVariant.dark => AppColors.ink,
       AppButtonVariant.outline => Colors.transparent,
       AppButtonVariant.accent => AppColors.accent,
+      AppButtonVariant.danger => AppColors.danger,
     };
     final Color foreground = switch (variant) {
       AppButtonVariant.outline => enabled ? AppColors.ink : AppColors.faint,
@@ -117,14 +128,14 @@ final class AppButton extends StatelessWidget {
 
     return Semantics(
       button: true,
-      enabled: enabled,
+      enabled: canTap,
       child: Opacity(
         opacity: enabled || variant == AppButtonVariant.outline ? 1 : 0.4,
         child: Material(
           color: background,
           shape: RoundedRectangleBorder(borderRadius: radius, side: side),
           child: InkWell(
-            onTap: onPressed,
+            onTap: canTap ? onPressed : null,
             borderRadius: radius,
             hoverColor: foreground.withValues(alpha: 0.06),
             highlightColor: foreground.withValues(alpha: 0.1),
@@ -143,7 +154,15 @@ final class AppButton extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   spacing: 10,
                   children: <Widget>[
-                    if (leading != null)
+                    if (isLoading)
+                      SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: foreground,
+                        ),
+                      )
+                    else if (leading != null)
                       IconTheme.merge(
                         data: IconThemeData(color: foreground, size: 16),
                         child: leading,

@@ -19,6 +19,7 @@ final class AppTappable extends StatefulWidget {
     this.isSelected,
     this.semanticLabel,
     this.semanticValue,
+    this.focusNode,
     super.key,
   });
 
@@ -40,6 +41,10 @@ final class AppTappable extends StatefulWidget {
   /// Extra state read after the label ("Correct", "Your answer").
   final String? semanticValue;
 
+  /// Lets the owner move focus here (e.g. back to a trigger after a popover
+  /// closes). The owner creates and disposes it.
+  final FocusNode? focusNode;
+
   @override
   State<AppTappable> createState() => _AppTappableState();
 }
@@ -52,9 +57,17 @@ final class _AppTappableState extends State<AppTappable> {
   void initState() {
     super.initState();
     _showFocus = false;
+    // The web shortcuts map Enter to ButtonActivateIntent and Space to
+    // ActivateIntent; handle both so Enter works in the browser too.
     _actions = <Type, Action<Intent>>{
       ActivateIntent: CallbackAction<ActivateIntent>(
         onInvoke: (ActivateIntent intent) {
+          widget.onTap?.call();
+          return null;
+        },
+      ),
+      ButtonActivateIntent: CallbackAction<ButtonActivateIntent>(
+        onInvoke: (ButtonActivateIntent intent) {
           widget.onTap?.call();
           return null;
         },
@@ -88,6 +101,7 @@ final class _AppTappableState extends State<AppTappable> {
       onTap: widget.onTap,
       child: FocusableActionDetector(
         enabled: enabled,
+        focusNode: widget.focusNode,
         actions: _actions,
         mouseCursor: enabled
             ? SystemMouseCursors.click

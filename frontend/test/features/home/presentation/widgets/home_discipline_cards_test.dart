@@ -3,18 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 
+import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/core/domain/entity/entitlements_entity.dart';
+import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
+import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/core/presentation/widgets/division_pips.dart';
-import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
+import 'package:skill_battles/core/presentation/widgets/league_emblem.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/match_stats_entity.dart';
-import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/statistics_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/streaks_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/rank_ladder_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/rank_tier_entity.dart';
-import 'package:skill_battles/core/presentation/widgets/league_emblem.dart';
 import 'package:skill_battles/features/home/presentation/widgets/home_discipline_cards.dart';
 
 const DisciplineEntity _discipline = DisciplineEntity(

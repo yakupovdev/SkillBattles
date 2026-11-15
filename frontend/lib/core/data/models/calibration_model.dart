@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
-import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
+import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
 
 part 'calibration_model.g.dart';
 
