@@ -50,21 +50,29 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
   StreamSubscription<DuelEntity>? _duelSubscription;
   StreamSubscription<RealtimeStatus>? _connectionSubscription;
   Timer? _poll;
+  Future<Either<Failure, DuelEntity>>? _initialDuelRequest;
+  Future<Either<Failure, Unit>>? _cancelRequest;
+  String? _cancelRequestDuelId;
+  Future<void>? _closeFuture;
+  bool _isClosing = false;
 
   Future<void> _onStarted(
     PrivateDuelStarted event,
     Emitter<PrivateDuelState> emit,
   ) async {
+    if (_isClosing) return;
     // A retry follows a new resource.
     await _duelSubscription?.cancel();
+    if (emit.isDone || _isClosing) return;
     _duelSubscription = null;
     _poll?.cancel();
     _poll = null;
+    _initialDuelRequest = null;
     emit(const PrivateDuelState(loadStatus: LoadStatus.loading));
     final String? duelId = event.duelId;
     if (duelId != null) {
       _follow(duelId);
-      await _refresh(duelId, emit);
+      await _refresh(duelId, emit, initial: true);
       return;
     }
     final String? code = event.disciplineCode;
@@ -72,10 +80,12 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
       emit(state.copyWith(loadStatus: LoadStatus.failure));
       return;
     }
-    final Either<Failure, DuelEntity> result = await _createDuel(
+    final Future<Either<Failure, DuelEntity>> request = _createDuel(
       CreateDuelParamsEntity(disciplineCode: code),
     );
-    if (emit.isDone) return;
+    _initialDuelRequest = request;
+    final Either<Failure, DuelEntity> result = await request;
+    if (emit.isDone || _isClosing) return;
     await result.match(
       (Failure failure) async => emit(
         state.copyWith(loadStatus: LoadStatus.failure, failure: failure),
@@ -89,22 +99,34 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
   }
 
   void _follow(String duelId) {
+    if (_isClosing) return;
     _duelSubscription ??= _watchDuel(DuelParamsEntity(duelId: duelId))
-        .listen((DuelEntity duel) => add(_DuelReceived(duel)));
+        .listen((DuelEntity duel) {
+          if (!_isClosing) add(_DuelReceived(duel));
+        });
     _connectionSubscription ??= _watchConnection(const NoParams())
         .where((RealtimeStatus status) => status == RealtimeStatus.connected)
-        .listen((_) => add(const _DuelRefreshTick()));
+        .listen((_) {
+          if (!_isClosing) add(const _DuelRefreshTick());
+        });
     _poll ??= Timer.periodic(
       pollInterval,
       (_) => add(const _DuelRefreshTick()),
     );
   }
 
-  Future<void> _refresh(String duelId, Emitter<PrivateDuelState> emit) async {
-    final Either<Failure, DuelEntity> result = await _getDuel(
+  Future<void> _refresh(
+    String duelId,
+    Emitter<PrivateDuelState> emit, {
+    bool initial = false,
+  }) async {
+    if (_isClosing) return;
+    final Future<Either<Failure, DuelEntity>> request = _getDuel(
       DuelParamsEntity(duelId: duelId),
     );
-    if (emit.isDone) return;
+    if (initial) _initialDuelRequest = request;
+    final Either<Failure, DuelEntity> result = await request;
+    if (emit.isDone || _isClosing) return;
     result.match((Failure failure) {
       if (state.duel == null) {
         emit(state.copyWith(loadStatus: LoadStatus.failure, failure: failure));
@@ -126,6 +148,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
   }
 
   void _apply(DuelEntity duel, Emitter<PrivateDuelState> emit) {
+    if (emit.isDone || _isClosing) return;
     final DuelEntity? current = state.duel;
     if (current != null &&
         current.id == duel.id &&
@@ -146,16 +169,17 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     PrivateDuelCancelRequested event,
     Emitter<PrivateDuelState> emit,
   ) async {
+    if (_isClosing) return;
     final DuelEntity? duel = state.duel;
-    if (duel == null || duel.status != DuelStatus.waiting) {
+    if (duel == null ||
+        duel.status != DuelStatus.waiting ||
+        duel.guest != null) {
       emit(state.copyWith(cancelStatus: LoadStatus.success));
       return;
     }
     emit(state.copyWith(cancelStatus: LoadStatus.loading));
-    final Either<Failure, Unit> result = await _cancelDuel(
-      DuelParamsEntity(duelId: duel.id),
-    );
-    if (emit.isDone) return;
+    final Either<Failure, Unit> result = await _cancel(duel.id);
+    if (emit.isDone || _isClosing) return;
     await result.match(
       (Failure failure) async {
         if (failure.hasCode(ApiErrorCodes.matchAlreadyFound)) {
@@ -163,6 +187,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
           await _refresh(duel.id, emit);
           return;
         }
+        _cancelRequest = null;
         emit(
           state.copyWith(
             cancelStatus: LoadStatus.failure,
@@ -182,11 +207,42 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     _poll = null;
   }
 
+  Future<Either<Failure, Unit>> _cancel(String duelId) {
+    if (_cancelRequestDuelId == duelId && _cancelRequest != null) {
+      return _cancelRequest!;
+    }
+    _cancelRequestDuelId = duelId;
+    return _cancelRequest = _cancelDuel(DuelParamsEntity(duelId: duelId));
+  }
+
   @override
-  Future<void> close() async {
+  Future<void> close() {
+    final Future<void>? closing = _closeFuture;
+    if (closing != null) return closing;
+    _isClosing = true;
     _stopPolling();
-    await _duelSubscription?.cancel();
-    await _connectionSubscription?.cancel();
-    return super.close();
+    return _closeFuture = _finishClosing(<Future<void>>[
+      _duelSubscription?.cancel() ?? Future<void>.value(),
+      _connectionSubscription?.cancel() ?? Future<void>.value(),
+      super.close(),
+    ]);
+  }
+
+  Future<void> _finishClosing(List<Future<void>> cleanup) async {
+    await Future.wait(cleanup);
+    // Leaving while creation/resume is in flight must also release that room.
+    final DuelEntity? acquired = (await _initialDuelRequest)?.toNullable();
+    DuelEntity? duel = state.duel;
+    if (acquired != null &&
+        (duel == null ||
+            (duel.id == acquired.id && acquired.version > duel.version))) {
+      duel = acquired;
+    }
+    if (duel != null &&
+        duel.status == DuelStatus.waiting &&
+        duel.guest == null) {
+      // The server rejects cancellation if a guest joined before this request.
+      await _cancel(duel.id);
+    }
   }
 }
