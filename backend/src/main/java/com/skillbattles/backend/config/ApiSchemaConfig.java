@@ -12,6 +12,7 @@ public class ApiSchemaConfig {
  @Bean OpenApiCustomizer responseSchemaConventions(){return api->{
   Set<String> visited=new HashSet<>();
   api.getPaths().forEach((path,item)->item.readOperations().forEach(operation->{
+   if(path.startsWith("/media/questions/")) return; // Resource-handler contracts include binary GET and bodyless HEAD.
    // The input-free invitation snapshot has only the feature contract's 200/401/500 responses.
    if(!"getUsersMeRematchInvitations".equals(operation.getOperationId()))
     operation.getResponses().putIfAbsent("400",new ApiResponse().description("VALIDATION_ERROR"));

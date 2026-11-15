@@ -1331,6 +1331,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -1633,6 +1636,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -1977,6 +1983,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -2316,6 +2325,9 @@
                 "$type": "string"
               },
               "explanation": {
+                "$type": "string"
+              },
+              "imageUrl": {
                 "$type": "string"
               }
             },

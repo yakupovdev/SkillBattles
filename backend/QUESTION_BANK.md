@@ -1,13 +1,19 @@
 # SAT question bank and local accounts
 
-The agreed migration chain remains **V1–V13**, with no separate baseline.
+The migration chain is **V1–V14**, with no separate baseline.
 Existing V1–V11 remain unchanged so deployed databases retain valid history and
 checksums. V12/V13 append content/accounts without changing the existing schema,
 gameplay rules, constraints, indexes, foreign keys or catalogue settings.
 
-`V12` loads all **240** supplied questions: 120 SAT Math and 120 SAT Reading &
-Writing. Each discipline has 40 EASY, 40 MEDIUM and 40 HARD questions. All 240
-source IDs are unique. External keys are `SAT_MATH:<source ID>` / `SAT_RW:<source ID>`.
+The source documents contain 240 questions; the current `V12` retains **239**:
+119 SAT Math and 120 SAT Reading & Writing. `SAT_MATH:15ce8207` was removed and
+is not restored. Math has 39 EASY, 40 MEDIUM and 40 HARD; Reading & Writing has
+40 of each difficulty. External keys are `SAT_MATH:<source ID>` / `SAT_RW:<source ID>`.
+The owner confirmed 239 and authorized correcting V12's stale 240-row guard;
+this changes its checksum. Existing database history is never repaired automatically.
+`V14` retains those 239 source revisions and appends 22 image-bearing revision-2
+rows: 261 total seed revisions, 239 active questions. The 23 packaged PNGs include
+the explicitly deferred, unbound illustration for the removed source.
 
 The exact source Markdown files are retained under `src/test/resources/question-bank/`:
 
@@ -16,7 +22,7 @@ The exact source Markdown files are retained under `src/test/resources/question-
 | SAT_Questions_Math.md | `cb779fb46ce96a132821f573fb044397fc61e5f91641b2b37d2203fd1372407d` |
 | SAT_Questions_RW.md | `9102ba7e7c8a663974fac00ebb5b795da620966321b4a2e02ac75cb71d0967f8` |
 
-Prompts, full rationales, difficulty and all 217 original A–D choice sets are
+Prompts, full rationales, difficulty and all 216 retained original A–D choice sets are
 preserved. Domain and skill are retained together in `topicName`; stable topic
 codes support existing analytics. Only line endings and surrounding section
 whitespace are normalized. Tables, graph descriptions and LaTeX stay in the text.

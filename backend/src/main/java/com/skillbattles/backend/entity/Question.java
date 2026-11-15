@@ -38,6 +38,8 @@ public class Question extends BaseEntity {
     private UUID correctOptionId;
     @Column(nullable = false, columnDefinition = "text")
     private String explanation;
+    @Column(length = 255)
+    private String imageKey;
     @Column(nullable = false)
     private boolean active;
 }

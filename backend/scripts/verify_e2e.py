@@ -23,6 +23,7 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 import uuid
+from question_image_fixtures import illustrated_fixture
 
 
 def main():
@@ -127,9 +128,9 @@ def main():
             available.bind(('127.0.0.1', 0))
             port = available.getsockname()[1]
         base = f'http://127.0.0.1:{port}'
-        fixture = backend / 'src/test/resources/fixtures/stage2-questions-test-only.json'
+        fixture = illustrated_fixture(backend, revision.with_name(revision.stem + '-fixture.json'))
         import_questions(fixture, False, 'dry')
-        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions') == '240'
+        assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions') == '261'
         command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'update questions set active=false')
         import_questions(fixture, True, 'apply')
         assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions where active') == str(len(json.loads(fixture.read_text(encoding='utf-8'))))
@@ -141,7 +142,9 @@ def main():
         for line in runner.stdout:
             if line.strip() == 'REVISE_AND_RESTART':
                 import_questions(revision, True, 'revision')
-                assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc', 'select count(*) from questions where content_version=2 and active') == '1'
+                updated = json.loads(revision.read_text(encoding='utf-8'))[0]
+                assert command('exec', name, 'psql', '-U', 'e2e', '-d', 'e2e', '-Atc',
+                               "select count(*) from questions where active and external_key='" + updated['externalKey'].replace("'", "''") + "' and content_version=" + str(updated['contentVersion'])) == '1'
                 stop_backend()
                 start_backend('restart')
                 runner.stdin.write('RESTARTED\n')
@@ -164,6 +167,7 @@ def main():
         for output in logs:
             output.close()
         revision.unlink(missing_ok=True)  # Exact file created above; no directory/volume removal.
+        revision.with_name(revision.stem + '-fixture.json').unlink(missing_ok=True)
         if created:
             subprocess.run([docker, 'rm', '-f', name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 

@@ -18,11 +18,13 @@ import time
 from urllib.error import URLError
 from urllib.request import urlopen
 import uuid
+from question_image_fixtures import illustrated_fixture
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend-image', help='Optional freshly built image to check without restarting the main backend')
+    parser.add_argument('--frontend-image', help='Optional freshly built proxy image to check without restarting the main frontend')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     cache = root / 'backend/.cache'
@@ -62,7 +64,8 @@ def main():
     images = {
         'backend': run(['docker', 'image', 'inspect', '--format', '{{.Id}}', args.backend_image])
                    if args.backend_image else run(['docker', 'compose', 'images', '-q', 'backend']),
-        'frontend': run(['docker', 'compose', 'images', '-q', 'frontend']),
+        'frontend': run(['docker', 'image', 'inspect', '--format', '{{.Id}}', args.frontend_image])
+                    if args.frontend_image else run(['docker', 'compose', 'images', '-q', 'frontend']),
     }
     if not all(images.values()):
         parser.error('Build/start the root Compose project first.')
@@ -106,15 +109,15 @@ def main():
         base = 'https://127.0.0.1:' + port
         wait_ready()
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       "select max(version::int) from flyway_schema_history where success") == '13'
+                       "select max(version::int) from flyway_schema_history where success") == '14'
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       "select count(*) from flyway_schema_history where success and type='SQL'") == '13'
+                       "select count(*) from flyway_schema_history where success and type='SQL'") == '14'
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       'select count(*) from questions where active and not deleted') == '240'
-        fixture = root / 'backend/src/test/resources/fixtures/stage2-questions-test-only.json'
+                       'select count(*) from questions where active and not deleted') == '239'
+        fixture = illustrated_fixture(root / 'backend', cache / (project + '-fixture.json'))
         import_questions(fixture, False)
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
-                       'select count(*) from questions') == '240'
+                       'select count(*) from questions') == '261'
         # Only this new test project's DB is changed. Keep all seeded rows but
         # activate only the deterministic fixture for the gameplay assertions.
         command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
@@ -130,8 +133,9 @@ def main():
         for line in runner.stdout:
             if line.strip() == 'REVISE_AND_RESTART':
                 import_questions(revision, True)
-                # Restart the whole stack on the same named volume and check persistence.
-                log.write(command('restart'))
+                # Recreate the whole isolated stack on the same volume: no runtime
+                # copies or writable container files may be needed for media recovery.
+                log.write(command('up', '-d', '--no-build', '--force-recreate', '--wait', '--wait-timeout', '120'))
                 wait_ready()
                 runner.stdin.write('RESTARTED\n')
                 runner.stdin.flush()
@@ -140,7 +144,7 @@ def main():
                 print(line.rstrip(), flush=True)
         if runner.wait(timeout=15) != 0 or not restarted:
             raise RuntimeError('Compose REST/STOMP check failed')
-        print('Compose check passed: clean V1-V13, 240 seeded questions, fixture dry/apply, REST/STOMP through proxy, whole-stack restart with retained data.', flush=True)
+        print('Compose check passed: clean V1-V14, 239 active/261 stored seed revisions, fixture dry/apply, images and REST/STOMP through HTTPS proxy, whole-stack recreate with retained data.', flush=True)
     finally:
         if runner and runner.poll() is None:
             runner.terminate()
@@ -150,6 +154,7 @@ def main():
             log.write(command('down'))  # Keep named volume; never touch normal project resources.
         log.close()
         revision.unlink(missing_ok=True)
+        (cache / (project + '-fixture.json')).unlink(missing_ok=True)
         override.unlink(missing_ok=True)
         print('Test PostgreSQL volume retained: ' + project + '_postgres_data', flush=True)
 

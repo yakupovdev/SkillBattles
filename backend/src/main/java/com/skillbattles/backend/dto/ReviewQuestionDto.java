@@ -15,4 +15,5 @@ public class ReviewQuestionDto {
     private List<FrozenOptionDto> options;
     private UUID correctOptionId;
     private String explanation;
+    private String imageKey;
 }

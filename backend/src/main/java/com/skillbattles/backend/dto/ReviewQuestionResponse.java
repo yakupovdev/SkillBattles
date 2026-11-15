@@ -24,4 +24,8 @@ public class ReviewQuestionResponse {
     private UUID correctOptionId;
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true)
     private String explanation;
+    @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true,
+            pattern = "^/media/questions/[A-Z][A-Z0-9_]{1,63}/[a-f0-9]{8}/[a-f0-9]{64}\\.png$",
+            description = "Immutable origin-relative illustration URL from the frozen question; null when absent.")
+    private String imageUrl;
 }

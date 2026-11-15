@@ -30,4 +30,6 @@ public class QuestionImportDto {
     private String correctOptionKey;
     @NotBlank
     private String explanation;
+    @Size(max = 255)
+    private String imageKey;
 }
