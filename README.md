@@ -373,3 +373,32 @@ docker run --rm skillbattles-heroku-frontend-check flutter test --dart-define=OU
 `backend/.cache/heroku-check-report.json`; локальная скорость CPU/диска не гарантирует
 тот же старт и RAM на Heroku. Cedar требует bind к PORT в пределах
 [60 секунд](https://devcenter.heroku.com/articles/dyno-startup-behavior).
+
+Проверено локально 2026-11-15:
+
+Эти измерения относятся к версии до rebase на `develop` с друзьями и новым frontend;
+для объединённой версии время старта, память и Flutter-проверки нужно измерить заново.
+
+- Единый linux/amd64 образ собран; чистая TLS PostgreSQL: 13 миграций V1–V12 + V14,
+  239 активных вопросов / 261 seed-ревизия, демоаккаунтов нет.
+- Готовность вместе с первым OpenAPI: **6,78 с** на чистой БД, **6,81 / 6,91 с**
+  на сохранённой БД. Лимит контейнера **512 МиБ**, swap отключён.
+- Реальные auth/REST/native STOMP, два игрока, Free/Pro gates, все 23 PNG,
+  стикеры, SPA/MIME/COOP/COEP, JSON 401/404 и recovery после restart прошли.
+- Короткая нагрузка: **240 HTTP-запросов**, параллельность **8**, **0,14 с**, без ошибок.
+  Пиковый выборочный JVM RSS **340,3 МиБ**, cgroup memory.peak **327,3 МиБ**.
+  Метрики имеют разный учёт shared pages; это локальный smoke test, не оценка
+  максимальной ёмкости Heroku. OOM не было, увеличивать dyno для этого сценария не потребовалось.
+- SIGTERM: **0,58 с**, выполнены shutdown hooks / graceful shutdown, штатный HotSpot
+  exit code **143**. Никакого SIGKILL или shell-посредника.
+- Java 21 Maven verify: **430 тестов**, 0 ошибок/пропусков; после последней правки
+  web/CLI-конфигурации повторно прошли 6 Heroku-тестов с Maven verify.
+  Существующие Dockerfile и изолированный HTTPS Compose REST/STOMP/restart прошли.
+- Flutter release и analyze прошли; **287 тестов прошли, 8 упали** на устаревших
+  экранных/mock ожиданиях. Текущая DI не подключает старый mock backend; отдельный
+  запуск с `DEV_MOCKS=true` дал те же ошибки. Клиентский код не изменён.
+- Docker context исключает env/локальные ключи/служебные файлы, необходимые assets
+  включены; проверка значений локальных секретов в изменениях и `git diff --check` прошли.
+
+Провайдерские Stripe/SMTP сценарии и работа именно в инфраструктуре Heroku ещё не
+проверены: нужны перечисленные выше внешние настройки и первый ручной деплой.
