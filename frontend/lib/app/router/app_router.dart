@@ -10,6 +10,8 @@ import 'package:skill_battles/features/auth/presentation/screens/forgot_password
 import 'package:skill_battles/features/auth/presentation/screens/reset_password_screen.dart';
 import 'package:skill_battles/features/battle/presentation/screens/battle_screen.dart';
 import 'package:skill_battles/features/battle_result/presentation/screens/battle_result_screen.dart';
+import 'package:skill_battles/features/friends/presentation/screens/friend_profile_screen.dart';
+import 'package:skill_battles/features/friends/presentation/screens/friends_screen.dart';
 import 'package:skill_battles/features/history/presentation/screens/history_screen.dart';
 import 'package:skill_battles/features/home/presentation/screens/home_screen.dart';
 import 'package:skill_battles/features/leaderboard/presentation/screens/leaderboard_screen.dart';
@@ -61,6 +63,8 @@ GoRouter createAppRouter({
         builder: (BuildContext context, GoRouterState state, Widget child) =>
             AppShell(
               activeTab: AppShell.tabFor(state.topRoute?.name),
+              routeName: state.topRoute?.name,
+              pathParameters: state.pathParameters,
               child: child,
             ),
         routes: <RouteBase>[
@@ -113,6 +117,21 @@ GoRouter createAppRouter({
             name: AppRoutes.history.name,
             path: AppRoutes.history.path,
             wrappedBuilder: (_, _) => const HistoryScreen(),
+          ),
+          GoRouteExtension.wrappedRoute(
+            name: AppRoutes.friends.name,
+            path: AppRoutes.friends.path,
+            wrappedBuilder: (_, _) => const FriendsScreen(),
+          ),
+          GoRouteExtension.wrappedRoute(
+            name: AppRoutes.friendProfile.name,
+            path: AppRoutes.friendProfile.path,
+            wrappedBuilder: (_, GoRouterState state) => FriendProfileScreen(
+              friendId: state.pathParameters[AppRoutes.friendIdParam]!,
+              relationshipId: state.extra is String
+                  ? state.extra! as String
+                  : null,
+            ),
           ),
           GoRouteExtension.wrappedRoute(
             name: AppRoutes.pro.name,

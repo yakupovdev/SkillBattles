@@ -22,18 +22,24 @@ import 'package:skill_battles/features/battle/domain/entity/battle_phase.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_round_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_snapshot_entity.dart';
 import 'package:skill_battles/features/battle/domain/usecases/get_battle_usecase.dart';
+import 'package:skill_battles/features/battle/domain/usecases/send_sticker_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/set_ready_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/submit_answer_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/surrender_usecase.dart';
 import 'package:skill_battles/features/battle/domain/usecases/watch_battle_usecase.dart';
+import 'package:skill_battles/features/battle/domain/usecases/watch_stickers_usecase.dart';
 import 'package:skill_battles/features/battle/presentation/bloc/battle_bloc/battle_bloc.dart';
+import 'package:skill_battles/features/battle/presentation/bloc/battle_stickers_bloc/battle_stickers_bloc.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_countdown_view.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_ended_view.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_focus_guard.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_header.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_ready_check.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_round_view.dart';
+import 'package:skill_battles/features/battle/presentation/widgets/battle_sticker_slots.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_time_bar.dart';
+import 'package:skill_battles/features/battle/presentation/widgets/sticker_overlay.dart';
+import 'package:skill_battles/features/battle/presentation/widgets/sticker_picker_scope.dart';
 
 /// The live battle (Paper: "05 Live Battle"): ready check, countdown, five
 /// rounds plus a possible overtime, reveal after each round. The server
@@ -46,17 +52,30 @@ final class BattleScreen extends StatelessWidget implements GoRouterWrapper {
   @override
   Widget wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<BattleBloc>(
-      create: (_) => BattleBloc(
-        battleId: battleId,
-        getBattle: dependencies.getDep<GetBattleUsecase>(),
-        setReady: dependencies.getDep<SetReadyUsecase>(),
-        submitAnswer: dependencies.getDep<SubmitAnswerUsecase>(),
-        surrender: dependencies.getDep<SurrenderUsecase>(),
-        watchBattle: dependencies.getDep<WatchBattleUsecase>(),
-        watchConnection: dependencies.getDep<WatchConnectionUsecase>(),
-        generateId: dependencies.getDep<GenerateIdUsecase>(),
-      )..add(const BattleStarted()),
+    return MultiBlocProvider(
+      providers: <BlocProvider<dynamic>>[
+        BlocProvider<BattleBloc>(
+          create: (_) => BattleBloc(
+            battleId: battleId,
+            getBattle: dependencies.getDep<GetBattleUsecase>(),
+            setReady: dependencies.getDep<SetReadyUsecase>(),
+            submitAnswer: dependencies.getDep<SubmitAnswerUsecase>(),
+            surrender: dependencies.getDep<SurrenderUsecase>(),
+            watchBattle: dependencies.getDep<WatchBattleUsecase>(),
+            watchConnection: dependencies.getDep<WatchConnectionUsecase>(),
+            generateId: dependencies.getDep<GenerateIdUsecase>(),
+          )..add(const BattleStarted()),
+        ),
+        BlocProvider<BattleStickersBloc>(
+          create: (_) => BattleStickersBloc(
+            battleId: battleId,
+            sendSticker: dependencies.getDep<SendStickerUsecase>(),
+            watchStickers: dependencies.getDep<WatchStickersUsecase>(),
+            watchConnection: dependencies.getDep<WatchConnectionUsecase>(),
+            generateId: dependencies.getDep<GenerateIdUsecase>(),
+          )..add(const BattleStickersStarted()),
+        ),
+      ],
       child: this,
     );
   }
@@ -66,6 +85,8 @@ final class BattleScreen extends StatelessWidget implements GoRouterWrapper {
     BattleSnapshotEntity snapshot,
   ) async {
     final BattleBloc bloc = context.read<BattleBloc>();
+    // The picker must not stay open behind a dialog.
+    StickerPickerScope.maybeOf(context)?.close();
     final bool started =
         snapshot.phase != BattlePhase.waitingReady &&
         snapshot.phase != BattlePhase.countdown;
@@ -98,6 +119,14 @@ final class BattleScreen extends StatelessWidget implements GoRouterWrapper {
             context.goBattleResult(battleId);
           },
         ),
+        BlocListener<BattleStickersBloc, BattleStickersState>(
+          listenWhen: (
+            BattleStickersState previous,
+            BattleStickersState current,
+          ) => previous.battleRefreshTicket != current.battleRefreshTicket,
+          listener: (BuildContext context, BattleStickersState state) =>
+              context.read<BattleBloc>().add(const BattleRefreshRequested()),
+        ),
         BlocListener<AccountBloc, AccountState>(
           listenWhen: (AccountState previous, AccountState current) =>
               previous.entitlementsVersion != null &&
@@ -107,31 +136,44 @@ final class BattleScreen extends StatelessWidget implements GoRouterWrapper {
               .add(const BattleRefreshRequested(entitlementsChanged: true)),
         ),
       ],
-      child: Scaffold(
-        backgroundColor: AppColors.white,
-        body: AppDesktopViewport(
-          fullBleed: true,
-          child: AppContextMenuBlocker(
-            child: BlocBuilder<BattleBloc, BattleState>(
-              builder: (BuildContext context, BattleState state) {
-                final BattleSnapshotEntity? snapshot = state.snapshot;
-                if (snapshot == null) {
-                  if (state.loadStatus.isFailure) {
-                    return AppErrorView(
-                      title: "Couldn't open this match",
-                      message: state.failure?.playMessage(DateTime.now()) ?? '',
-                      onRetry: () => context.read<BattleBloc>().add(
-                        const BattleRefreshRequested(),
-                      ),
-                    );
-                  }
-                  return const Padding(
-                    padding: EdgeInsets.only(top: 160),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                return _BattleBody(snapshot: snapshot, state: state);
-              },
+      child: _StickersBattleSync(
+        child: Scaffold(
+          backgroundColor: AppColors.white,
+          body: StickerPickerScope(
+            child: Stack(
+              children: <Widget>[
+                AppDesktopViewport(
+                  fullBleed: true,
+                  child: AppContextMenuBlocker(
+                    child: BlocBuilder<BattleBloc, BattleState>(
+                      builder: (BuildContext context, BattleState state) {
+                        final BattleSnapshotEntity? snapshot = state.snapshot;
+                        if (snapshot == null) {
+                          if (state.loadStatus.isFailure) {
+                            return AppErrorView(
+                              title: "Couldn't open this match",
+                              message:
+                                  state.failure?.playMessage(DateTime.now()) ??
+                                  '',
+                              onRetry: () => context.read<BattleBloc>().add(
+                                const BattleRefreshRequested(),
+                              ),
+                            );
+                          }
+                          return const Padding(
+                            padding: EdgeInsets.only(top: 160),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return _BattleBody(snapshot: snapshot, state: state);
+                      },
+                    ),
+                  ),
+                ),
+                // Outside the builder above: a sticker never rebuilds the
+                // question or the options.
+                const Positioned.fill(child: StickerOverlay()),
+              ],
             ),
           ),
         ),
@@ -160,7 +202,11 @@ final class _BattleBody extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            BattleHeader(snapshot: snapshot),
+            BattleHeader(
+              snapshot: snapshot,
+              youTrailing: const BattleStickerTrigger(),
+              opponentNameLeading: const BattleHiddenIndicator(),
+            ),
             if (inRound)
               BattleTimeBar(
                 key: ValueKey<String>('${round.id}-${snapshot.phase.name}'),
@@ -248,6 +294,60 @@ final class _BattleBody extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Tells the sticker bloc the phase, the players and the server clock: the
+/// snapshot already there when the screen mounts (a listener alone would
+/// miss it), then every change of those values.
+final class _StickersBattleSync extends StatefulWidget {
+  const _StickersBattleSync({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_StickersBattleSync> createState() => _StickersBattleSyncState();
+}
+
+final class _StickersBattleSyncState extends State<_StickersBattleSync> {
+  @override
+  void initState() {
+    super.initState();
+    final BattleSnapshotEntity? snapshot = context
+        .read<BattleBloc>()
+        .state
+        .snapshot;
+    if (snapshot != null) _forward(snapshot);
+  }
+
+  void _forward(BattleSnapshotEntity snapshot) {
+    context.read<BattleStickersBloc>().add(
+      BattleStickersBattleUpdated(
+        phase: snapshot.phase,
+        myUserId: snapshot.myUserId,
+        opponentUserId: snapshot.opponent.id,
+        clockOffset: snapshot.clockOffset,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<BattleBloc, BattleState>(
+      listenWhen: (BattleState previous, BattleState current) {
+        final BattleSnapshotEntity? next = current.snapshot;
+        final BattleSnapshotEntity? before = previous.snapshot;
+        return next != null &&
+            (before == null ||
+                before.phase != next.phase ||
+                before.myUserId != next.myUserId ||
+                before.opponent.id != next.opponent.id ||
+                before.clockOffset != next.clockOffset);
+      },
+      listener: (BuildContext context, BattleState state) =>
+          _forward(state.snapshot!),
+      child: widget.child,
     );
   }
 }

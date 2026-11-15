@@ -42,6 +42,11 @@ abstract final class ApiErrorCodes {
   static const String roundClosed = 'ROUND_CLOSED';
   static const String invalidOption = 'INVALID_OPTION';
 
+  // Battle stickers.
+  static const String stickerCooldown = 'STICKER_COOLDOWN';
+  static const String invalidStickerId = 'INVALID_STICKER_ID';
+  static const String stickersNotAllowed = 'STICKERS_NOT_ALLOWED';
+
   // Rematch and reports.
   static const String rematchNotAllowed = 'REMATCH_NOT_ALLOWED';
   static const String rematchExpired = 'REMATCH_EXPIRED';
@@ -49,6 +54,22 @@ abstract final class ApiErrorCodes {
   static const String roundNotFound = 'ROUND_NOT_FOUND';
   static const String roundNotRevealed = 'ROUND_NOT_REVEALED';
   static const String reportAlreadyExists = 'REPORT_ALREADY_EXISTS';
+
+  // Friends and room invitations.
+  static const String friendNotFound = 'FRIEND_NOT_FOUND';
+  static const String friendCodeNotFound = 'FRIEND_CODE_NOT_FOUND';
+  static const String selfFriendRequestNotAllowed =
+      'SELF_FRIEND_REQUEST_NOT_ALLOWED';
+  static const String friendAlreadyExists = 'FRIEND_ALREADY_EXISTS';
+  static const String friendRequestAlreadyReceived =
+      'FRIEND_REQUEST_ALREADY_RECEIVED';
+  static const String friendRequestNotFound = 'FRIEND_REQUEST_NOT_FOUND';
+  static const String friendRequestNotPending = 'FRIEND_REQUEST_NOT_PENDING';
+  static const String duelInvitationAlreadyPending =
+      'DUEL_INVITATION_ALREADY_PENDING';
+  static const String duelInvitationNotFound = 'DUEL_INVITATION_NOT_FOUND';
+  static const String duelInvitationNotPending = 'DUEL_INVITATION_NOT_PENDING';
+  static const String duelInvitationExpired = 'DUEL_INVITATION_EXPIRED';
 
   // Billing.
   static const String subscriptionAlreadyActive = 'SUBSCRIPTION_ALREADY_ACTIVE';

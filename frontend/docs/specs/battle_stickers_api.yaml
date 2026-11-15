@@ -1,0 +1,135 @@
+# Received from the user on 2026-11-15 as BATTLE_STICKERS_OPENAPI.yaml (proposed feature-only
+# contract, backend develop 894079fa). Condensed copy: repeated Cache-Control headers and
+# duplicate examples were dropped; every path, schema, status, code and rule is kept.
+openapi: 3.0.3
+info:
+  title: SkillBattles — ephemeral battle stickers
+  version: 1.0.0-proposed
+  description: Exactly ONE new REST operation and ONE new incoming opponent-only STOMP event.
+    Commands use REST, not STOMP SEND. No server asset catalog/history/upload endpoint,
+    persistent store, paywall, second socket or change to existing battle DTOs.
+paths:
+  /api/v1/battles/{id}/stickers:
+    post:
+      operationId: sendBattleSticker
+      description: 'Authenticated participant only, RANKED/PRIVATE and Free/Pro equally. New sends
+        allowed only in WAITING_READY, COUNTDOWN, QUESTION, REVEAL; never after FINISHED/CANCELLED.
+        Sender from JWT sub, opponent from battle. Per-user cooldown 4000ms shared across
+        stickers/tabs/sessions/battles. Accepted receipts deduplicated for 120s in the same
+        process: identical sender/submissionId/payload returns original receipt without
+        re-emission or cooldown reset, including a retry after the battle ends; changed
+        battleId/stickerId under retained submissionId is IDEMPOTENCY_CONFLICT. 200 confirms
+        acceptance, not delivery/read; no opponent subscription still consumes cooldown and no
+        missed sticker replay occurs. No sticker state in battle snapshots/history;
+        battle.version never changes.'
+      parameters:
+      - {name: id, in: path, required: true, description: BATTLE UUID, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendBattleStickerRequest'}
+            example: {stickerId: gg, submissionId: 22222222-2222-4222-8222-222222222222}
+      responses:
+        '200':
+          description: New acceptance or identical retained retry; always the original receipt, never a second event.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StickerSendResponse'}
+              example:
+                battleId: 11111111-1111-4111-8111-111111111111
+                submissionId: 22222222-2222-4222-8222-222222222222
+                senderUserId: aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa
+                stickerId: gg
+                sentAt: '2026-11-15T03:00:00Z'
+                nextAllowedAt: '2026-11-15T03:00:04Z'
+        '400': {description: 'VALIDATION_ERROR; INVALID_STICKER_ID (ErrorResponse, resetsAt null)'}
+        '401': {description: 'UNAUTHORIZED (ErrorResponse)'}
+        '404': {description: 'BATTLE_NOT_FOUND (ErrorResponse)'}
+        '409': {description: 'STICKERS_NOT_ALLOWED ("Stickers are not allowed after the battle ends."); IDEMPOTENCY_CONFLICT'}
+        '429':
+          description: STICKER_COOLDOWN. Quiet frontend cooldown synchronization, no Not sent bubble.
+            Example attempted at 03:00:01.250, remaining 2750ms -> Retry-After 3.
+          headers:
+            Retry-After: {schema: {type: integer, minimum: 1}, description: 'Ceiling of remaining cooldown ms / 1000, minimum 1.'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StickerCooldownErrorResponse'}
+              example: {code: STICKER_COOLDOWN, message: Wait before sending another sticker., fieldErrors: [], resetsAt: '2026-11-15T03:00:04Z'}
+        '500': {description: 'INTERNAL_ERROR (ErrorResponse)'}
+components:
+  schemas:
+    StickerId:
+      type: string
+      enum: [gg, fire, facepalm, lol, hmm, too_slow, ez, wait_what, crying]
+      description: Exact lowercase outgoing whitelist. No aliases/case normalization.
+    SendBattleStickerRequest:
+      type: object
+      required: [stickerId, submissionId]
+      additionalProperties: false
+      properties:
+        stickerId: {$ref: '#/components/schemas/StickerId'}
+        submissionId: {type: string, format: uuid, description: One user send intent UUID. Retain on immediate identical retries; do not regenerate on auth refresh.}
+    StickerSendResponse:
+      type: object
+      required: [battleId, submissionId, senderUserId, stickerId, sentAt, nextAllowedAt]
+      additionalProperties: false
+      properties:
+        battleId: {type: string, format: uuid}
+        submissionId: {type: string, format: uuid}
+        senderUserId: {type: string, format: uuid}
+        stickerId: {$ref: '#/components/schemas/StickerId'}
+        sentAt: {type: string, format: date-time, description: Server acceptance instant.}
+        nextAllowedAt: {type: string, format: date-time, description: Original acceptance +4000ms. Replayed receipt does not extend/reset actual cooldown.}
+    BattleStickerData:
+      type: object
+      required: [battleId, submissionId, senderUserId, stickerId, sentAt]
+      additionalProperties: false
+      properties:
+        battleId: {type: string, format: uuid}
+        submissionId: {type: string, format: uuid}
+        senderUserId: {type: string, format: uuid}
+        stickerId: {type: string, maxLength: 64, description: Incoming wire string deliberately NOT a closed enum. Older clients silently ignore unknown future ids.}
+        sentAt: {type: string, format: date-time}
+    BattleStickerEnvelope:
+      type: object
+      required: [eventId, type, resourceId, version, occurredAt, data]
+      properties:
+        eventId: {type: string, format: uuid}
+        type: {type: string, enum: [BATTLE_STICKER]}
+        resourceId: {type: string, format: uuid, description: Equals data.battleId.}
+        version: {type: integer, minimum: 1, description: 'Separate per-battle STICKER SEQUENCE, never battle.version. Gaps are normal; reset local baseline per connection generation.'}
+        occurredAt: {type: string, format: date-time, description: Equals data.sentAt.}
+        data: {$ref: '#/components/schemas/BattleStickerData'}
+    ErrorResponse:
+      type: object
+      required: [code, message, fieldErrors, resetsAt]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        fieldErrors: {type: array, items: {type: object, required: [field, message]}}
+        resetsAt: {type: string, format: date-time, nullable: true}
+    StickerCooldownErrorResponse:
+      description: ErrorResponse with code STICKER_COOLDOWN and resetsAt REQUIRED NON-NULL (exact server nextAllowedAt).
+x-stomp:
+  endpoint: /ws/v1/events
+  subscription: /user/queue/events
+  clientSendAllowed: false
+  eventType: BATTLE_STICKER
+  recipients: Only the other participant's CURRENT authorized session; no sender echo, no public topic.
+  errors: No sticker-specific STOMP error. Send acknowledgement/error is the HTTP response.
+  delivery: Best-effort after acceptance. Offline/drop may lose an event. Accepted HTTP retry returns receipt without re-emitting. No history/replay on reconnect.
+  version: Per-battle sticker sequence independent of BATTLE_CHANGED version. Each user sees only opponent sends, so gaps are expected. Rebuild baseline per connection generation/restart.
+  relationships: ['resourceId == data.battleId', 'occurredAt == data.sentAt']
+  forwardCompatibilityExample: 'stickerId: future_sticker_id — valid incoming envelope; current frontend silently ignores it.'
+x-runtime:
+  allowedPhases: [WAITING_READY, COUNTDOWN, QUESTION, REVEAL]
+  blockedPhases: [FINISHED, CANCELLED]
+  cooldownMs: 4000
+  receiptRetentionSeconds: 120
+  idempotencyKey: [senderUserId, submissionId]
+  canonicalPayload: [battleId, stickerId]
+  restart: Clears ephemeral receipts/cooldowns/sequences; no durable exactly-once guarantee. Never auto-resurrect intents on reconnect.
+  frontendFailurePolicy:
+    STICKER_COOLDOWN: quietly remove rejected optimistic preview and synchronize timer
+    otherFinalFailure: Not sent; timeout means unconfirmed, not proven undelivered

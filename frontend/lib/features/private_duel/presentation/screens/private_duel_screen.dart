@@ -25,6 +25,8 @@ import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/features/friends/presentation/widgets/room_invitation_section.dart';
+import 'package:skill_battles/features/notifications/presentation/bloc/notification_bloc/notification_bloc.dart';
 import 'package:skill_battles/features/private_duel/domain/entity/duel_entity.dart';
 import 'package:skill_battles/features/private_duel/domain/entity/duel_status.dart';
 import 'package:skill_battles/features/private_duel/domain/usecases/cancel_duel_usecase.dart';
@@ -67,8 +69,14 @@ final class PrivateDuelScreen extends StatelessWidget
         BlocListener<PrivateDuelBloc, PrivateDuelState>(
           listenWhen: (PrivateDuelState previous, PrivateDuelState current) =>
               previous.battleId != current.battleId && current.battleId != null,
-          listener: (BuildContext context, PrivateDuelState state) =>
-              context.goBattle(state.battleId!),
+          listener: (BuildContext context, PrivateDuelState state) {
+            // Marks the battle as opened, so the global listener of an
+            // accepted invitation does not navigate a second time.
+            context.read<NotificationBloc>().add(
+              NotificationBattleOpened(state.battleId!),
+            );
+            context.goBattle(state.battleId!);
+          },
         ),
         BlocListener<PrivateDuelBloc, PrivateDuelState>(
           listenWhen: (PrivateDuelState previous, PrivateDuelState current) =>
@@ -112,7 +120,12 @@ final class PrivateDuelScreen extends StatelessWidget
                     flex: 480,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 480),
-                      child: _RoomCard(duel: duel, state: state),
+                      child: duel.status == DuelStatus.waiting
+                          ? RoomInvitationScope(
+                              duelId: duel.id,
+                              child: _RoomCard(duel: duel, state: state),
+                            )
+                          : _RoomCard(duel: duel, state: state),
                     ),
                   ),
                 ],
@@ -307,7 +320,9 @@ final class _RoomCard extends StatelessWidget {
                   subtitle: 'Host · $discipline',
                   status: 'In room',
                 ),
-                if (guest == null)
+                if (guest == null && duel.status == DuelStatus.waiting)
+                  const RoomGuestSlot(fallback: _WaitingRow())
+                else if (guest == null)
                   const _WaitingRow()
                 else
                   _PlayerRow(
@@ -318,6 +333,8 @@ final class _RoomCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (duel.status == DuelStatus.waiting && guest == null)
+              RoomInvitationActions(disciplineCode: duel.disciplineCode),
             Text(
               duel.status == DuelStatus.matched
                   ? 'Opening the ready check…'
@@ -405,7 +422,7 @@ final class _WaitingRow extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Share the code to invite them',
+                    'Share the code or invite a friend',
                     style: AppTextStyles.bodySm.copyWith(
                       color: AppColors.muted,
                     ),

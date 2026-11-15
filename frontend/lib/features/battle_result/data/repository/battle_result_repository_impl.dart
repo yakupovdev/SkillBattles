@@ -122,4 +122,12 @@ final class BattleResultRepositoryImpl implements BattleResultRepository {
         parse: (Map<String, dynamic> data) =>
             RematchModel.fromJson(data).toEntity(),
       );
+
+  @override
+  Stream<RematchEntity> watchRematches() => decodeRealtime<RematchEntity>(
+    _realtime.events,
+    type: RealtimeEventType.rematchChanged,
+    parse: (Map<String, dynamic> data) =>
+        RematchModel.fromJson(data).toEntity(),
+  );
 }
