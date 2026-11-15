@@ -235,21 +235,6 @@ final class _Harness {
   late final BattleStickersBloc stickers;
   late final AccountBloc account;
 
-  Widget app() => MaterialApp(
-    theme: AppTheme.light,
-    home: StickerCompositionsScope(
-      loader: (String path) async => _parsed[path]!,
-      child: MultiBlocProvider(
-        providers: <BlocProvider<dynamic>>[
-          BlocProvider<AccountBloc>.value(value: account),
-          BlocProvider<BattleBloc>.value(value: battle),
-          BlocProvider<BattleStickersBloc>.value(value: stickers),
-        ],
-        child: const BattleScreen(battleId: 'b1'),
-      ),
-    ),
-  );
-
   Future<void> close() async {
     await stickers.close();
     await battle.close();
@@ -257,6 +242,28 @@ final class _Harness {
     await battles.events.close();
     await battles.stickers.close();
   }
+}
+
+final class _ScreenTestApp extends StatelessWidget {
+  const _ScreenTestApp({required this.harness});
+
+  final _Harness harness;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    theme: AppTheme.light,
+    home: StickerCompositionsScope(
+      loader: (String path) async => _parsed[path]!,
+      child: MultiBlocProvider(
+        providers: <BlocProvider<dynamic>>[
+          BlocProvider<AccountBloc>.value(value: harness.account),
+          BlocProvider<BattleBloc>.value(value: harness.battle),
+          BlocProvider<BattleStickersBloc>.value(value: harness.stickers),
+        ],
+        child: const BattleScreen(battleId: 'b1'),
+      ),
+    ),
+  );
 }
 
 Future<void> _pumpScreen(
@@ -267,7 +274,7 @@ Future<void> _pumpScreen(
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(harness.app());
+  await tester.pumpWidget(_ScreenTestApp(harness: harness));
   for (int i = 0; i < 4; i++) {
     await tester.pump(const Duration(milliseconds: 50));
   }
@@ -276,7 +283,18 @@ Future<void> _pumpScreen(
 /// Unmounts the screen (stopping the time bar) and closes the blocs.
 Future<void> _finish(WidgetTester tester, _Harness harness) async {
   await tester.pumpWidget(const SizedBox.shrink());
-  await harness.close();
+  bool isClosed = false;
+  final Future<void> closing = harness.close().whenComplete(() {
+    isClosed = true;
+  });
+  // Dart 3.14 async* cancellation can await a shared root-zone Future while
+  // its continuation belongs to fake async. Drain both queues before awaiting.
+  for (int i = 0; !isClosed && i < 10; i++) {
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pump();
+  }
+  expect(isClosed, isTrue, reason: 'all test-owned resources close');
+  await closing;
 }
 
 Rect _column(double width) =>
@@ -297,188 +315,204 @@ void main() {
       'own bubble in the left gutter, and nothing touches the column or '
       'rebuilds the question', (WidgetTester tester) async {
     final _Harness harness = _Harness();
-    await _pumpScreen(tester, harness, const Size(1440, 900));
-    final Rect column = _column(1440);
+    try {
+      await _pumpScreen(tester, harness, const Size(1440, 900));
+      final Rect column = _column(1440);
 
-    final Finder trigger = find.byType(StickerTriggerButton);
-    expect(trigger, findsOneWidget);
-    final Rect triggerRect = tester.getRect(trigger);
-    expect(triggerRect.bottom, lessThanOrEqualTo(104), reason: 'in the header');
-    expect(triggerRect.right, lessThan(1440 / 2), reason: 'in your block');
-    expect(
-      tester.widget<StickerTriggerButton>(trigger).disabledMessage,
-      isNull,
-    );
+      final Finder trigger = find.byType(StickerTriggerButton);
+      expect(trigger, findsOneWidget);
+      final Rect triggerRect = tester.getRect(trigger);
+      expect(
+        triggerRect.bottom,
+        lessThanOrEqualTo(104),
+        reason: 'in the header',
+      );
+      expect(triggerRect.right, lessThan(1440 / 2), reason: 'in your block');
+      expect(
+        tester.widget<StickerTriggerButton>(trigger).disabledMessage,
+        isNull,
+      );
 
-    final BattleRoundView roundBefore = tester.widget<BattleRoundView>(
-      find.byType(BattleRoundView),
-    );
+      final BattleRoundView roundBefore = tester.widget<BattleRoundView>(
+        find.byType(BattleRoundView),
+      );
 
-    await tester.tap(trigger);
-    await tester.pump();
-    final Finder picker = find.byType(StickerPicker);
-    expect(picker, findsOneWidget);
-    expect(tester.getRect(picker).overlaps(column), isFalse);
-    expect(tester.getRect(picker).top, greaterThanOrEqualTo(122));
+      await tester.tap(trigger);
+      await tester.pump();
+      final Finder picker = find.byType(StickerPicker);
+      expect(picker, findsOneWidget);
+      expect(tester.getRect(picker).overlaps(column), isFalse);
+      expect(tester.getRect(picker).top, greaterThanOrEqualTo(122));
 
-    await tester.tap(find.byKey(const ValueKey<StickerId>(StickerId.fire)));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      await tester.tap(find.byKey(const ValueKey<StickerId>(StickerId.fire)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(harness.battles.sends.single.stickerId, StickerId.fire);
-    expect(find.byType(StickerPicker), findsNothing, reason: 'closed on send');
-    final Finder bubble = find.byType(StickerBubble);
-    expect(bubble, findsOneWidget);
-    final Rect bubbleRect = tester.getRect(bubble);
-    expect(bubbleRect.overlaps(column), isFalse);
-    expect(bubbleRect.left, 64, reason: 'aligned with your avatar block');
-    expect(
-      tester.widget<StickerBubble>(bubble).variant,
-      StickerBubbleVariant.outgoing,
-    );
-    expect(
-      identical(
-        roundBefore,
-        tester.widget<BattleRoundView>(find.byType(BattleRoundView)),
-      ),
-      isTrue,
-      reason: 'a sticker never rebuilds the question and the options',
-    );
+      expect(harness.battles.sends.single.stickerId, StickerId.fire);
+      expect(
+        find.byType(StickerPicker),
+        findsNothing,
+        reason: 'closed on send',
+      );
+      final Finder bubble = find.byType(StickerBubble);
+      expect(bubble, findsOneWidget);
+      final Rect bubbleRect = tester.getRect(bubble);
+      expect(bubbleRect.overlaps(column), isFalse);
+      expect(bubbleRect.left, 64, reason: 'aligned with your avatar block');
+      expect(
+        tester.widget<StickerBubble>(bubble).variant,
+        StickerBubbleVariant.outgoing,
+      );
+      expect(
+        identical(
+          roundBefore,
+          tester.widget<BattleRoundView>(find.byType(BattleRoundView)),
+        ),
+        isTrue,
+        reason: 'a sticker never rebuilds the question and the options',
+      );
 
-    // In flight: focus stays on the trigger after the picker closed, and
-    // a tap opens nothing (a second send would be refused).
-    expect(
-      tester.widget<StickerTriggerButton>(trigger).disabledMessage,
-      isNull,
-    );
-    expect(FocusManager.instance.primaryFocus?.debugLabel, 'StickerTrigger');
-    await tester.tap(trigger);
-    await tester.pump();
-    expect(find.byType(StickerPicker), findsNothing);
+      // In flight: focus stays on the trigger after the picker closed, and
+      // a tap opens nothing (a second send would be refused).
+      expect(
+        tester.widget<StickerTriggerButton>(trigger).disabledMessage,
+        isNull,
+      );
+      expect(FocusManager.instance.primaryFocus?.debugLabel, 'StickerTrigger');
+      await tester.tap(trigger);
+      await tester.pump();
+      expect(find.byType(StickerPicker), findsNothing);
 
-    final SendStickerParamsEntity params = harness.battles.sends.single;
-    final DateTime now = DateTime.now().toUtc();
-    harness.battles.pending
-        .removeAt(0)
-        .complete(
-          Right(
-            StickerReceiptEntity(
-              battleId: params.battleId,
-              submissionId: params.submissionId,
-              senderUserId: 'me',
-              stickerId: params.stickerId,
-              sentAt: now,
-              nextAllowedAt: now.add(const Duration(seconds: 4)),
+      final SendStickerParamsEntity params = harness.battles.sends.single;
+      final DateTime now = DateTime.now().toUtc();
+      harness.battles.pending
+          .removeAt(0)
+          .complete(
+            Right(
+              StickerReceiptEntity(
+                battleId: params.battleId,
+                submissionId: params.submissionId,
+                senderUserId: 'me',
+                stickerId: params.stickerId,
+                sentAt: now,
+                nextAllowedAt: now.add(const Duration(seconds: 4)),
+              ),
             ),
-          ),
-        );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+          );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
-    final StickerTriggerButton cooling = tester.widget<StickerTriggerButton>(
-      trigger,
-    );
-    expect(cooling.cooldownUntil, isNotNull);
-    expect(cooling.disabledMessage, isNull, reason: 'the ring, not Disabled');
-    expect(
-      find.descendant(of: trigger, matching: find.text('4')),
-      findsOneWidget,
-    );
-
-    await _finish(tester, harness);
+      final StickerTriggerButton cooling = tester.widget<StickerTriggerButton>(
+        trigger,
+      );
+      expect(cooling.cooldownUntil, isNotNull);
+      expect(cooling.disabledMessage, isNull, reason: 'the ring, not Disabled');
+      expect(
+        find.descendant(of: trigger, matching: find.text('4')),
+        findsOneWidget,
+      );
+    } finally {
+      await _finish(tester, harness);
+    }
   });
 
   testWidgets('an incoming sticker plays in the right gutter with the '
       "opponent's name", (WidgetTester tester) async {
     final _Harness harness = _Harness();
-    await _pumpScreen(tester, harness, const Size(1440, 900));
+    try {
+      await _pumpScreen(tester, harness, const Size(1440, 900));
 
-    harness.battles.stickers.add(
-      IncomingStickerEntity(
-        eventId: 'e1',
-        sequence: 1,
-        battleId: 'b1',
-        submissionId: 's1',
-        senderUserId: 'timur.b',
-        stickerId: StickerId.lol,
-        sentAt: DateTime.now().toUtc(),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump(const Duration(milliseconds: 200));
+      harness.battles.stickers.add(
+        IncomingStickerEntity(
+          eventId: 'e1',
+          sequence: 1,
+          battleId: 'b1',
+          submissionId: 's1',
+          senderUserId: 'timur.b',
+          stickerId: StickerId.lol,
+          sentAt: DateTime.now().toUtc(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 200));
 
-    final Finder bubble = find.byType(StickerBubble);
-    expect(bubble, findsOneWidget);
-    final Rect rect = tester.getRect(bubble);
-    expect(rect.overlaps(_column(1440)), isFalse);
-    expect(rect.right, 1440 - 64);
-    expect(tester.widget<StickerBubble>(bubble).caption, 'timur.b');
-    expect(find.bySemanticsLabel('timur.b sent LOL'), findsOneWidget);
-
-    await _finish(tester, harness);
+      final Finder bubble = find.byType(StickerBubble);
+      expect(bubble, findsOneWidget);
+      final Rect rect = tester.getRect(bubble);
+      expect(rect.overlaps(_column(1440)), isFalse);
+      expect(rect.right, 1440 - 64);
+      expect(tester.widget<StickerBubble>(bubble).caption, 'timur.b');
+      expect(find.bySemanticsLabel('timur.b sent LOL'), findsOneWidget);
+    } finally {
+      await _finish(tester, harness);
+    }
   });
 
   testWidgets('below the 1280 px canvas no bubble shows and the trigger is '
       'off, so nothing can cover the column', (WidgetTester tester) async {
     final _Harness harness = _Harness();
-    await _pumpScreen(tester, harness, const Size(1100, 900));
+    try {
+      await _pumpScreen(tester, harness, const Size(1100, 900));
 
-    expect(
-      tester
-          .widget<StickerTriggerButton>(find.byType(StickerTriggerButton))
-          .disabledMessage,
-      'Window too narrow for stickers',
-    );
-    harness.battles.stickers.add(
-      IncomingStickerEntity(
-        eventId: 'e1',
-        sequence: 1,
-        battleId: 'b1',
-        submissionId: 's1',
-        senderUserId: 'timur.b',
-        stickerId: StickerId.lol,
-        sentAt: DateTime.now().toUtc(),
-      ),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      expect(
+        tester
+            .widget<StickerTriggerButton>(find.byType(StickerTriggerButton))
+            .disabledMessage,
+        'Window too narrow for stickers',
+      );
+      harness.battles.stickers.add(
+        IncomingStickerEntity(
+          eventId: 'e1',
+          sequence: 1,
+          battleId: 'b1',
+          submissionId: 's1',
+          senderUserId: 'timur.b',
+          stickerId: StickerId.lol,
+          sentAt: DateTime.now().toUtc(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.byType(StickerBubble), findsNothing);
-
-    await _finish(tester, harness);
+      expect(find.byType(StickerBubble), findsNothing);
+    } finally {
+      await _finish(tester, harness);
+    }
   });
 
   testWidgets('STICKERS_NOT_ALLOWED makes the battle screen read the battle '
       'again', (WidgetTester tester) async {
     final _Harness harness = _Harness();
-    await _pumpScreen(tester, harness, const Size(1440, 900));
-    final int readsBefore = harness.battles.reads;
+    try {
+      await _pumpScreen(tester, harness, const Size(1440, 900));
+      final int readsBefore = harness.battles.reads;
 
-    await tester.tap(find.byType(StickerTriggerButton));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey<StickerId>(StickerId.gg)));
-    await tester.pump();
-    harness.battles.pending
-        .removeAt(0)
-        .complete(
-          const Left(
-            ApiFailure(
-              statusCode: 409,
-              errorCode: ApiErrorCodes.stickersNotAllowed,
-              message: 'Stickers are not allowed after the battle ends.',
+      await tester.tap(find.byType(StickerTriggerButton));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey<StickerId>(StickerId.gg)));
+      await tester.pump();
+      harness.battles.pending
+          .removeAt(0)
+          .complete(
+            const Left(
+              ApiFailure(
+                statusCode: 409,
+                errorCode: ApiErrorCodes.stickersNotAllowed,
+                message: 'Stickers are not allowed after the battle ends.',
+              ),
             ),
-          ),
-        );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+          );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(harness.battles.reads, readsBefore + 1);
-    expect(
-      tester.widget<StickerBubble>(find.byType(StickerBubble)).variant,
-      StickerBubbleVariant.notSent,
-    );
-
-    await _finish(tester, harness);
+      expect(harness.battles.reads, readsBefore + 1);
+      expect(
+        tester.widget<StickerBubble>(find.byType(StickerBubble)).variant,
+        StickerBubbleVariant.notSent,
+      );
+    } finally {
+      await _finish(tester, harness);
+    }
   });
 }

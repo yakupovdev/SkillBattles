@@ -183,9 +183,3 @@ final class _DuelInvitationReceived extends NotificationEvent {
   @override
   List<Object?> get props => <Object?>[invitation];
 }
-
-/// Re-reads the host's own invitation by id when its room is no longer the
-/// own activity (a lost push).
-final class _OutgoingInvitationCheckRequested extends NotificationEvent {
-  const _OutgoingInvitationCheckRequested();
-}

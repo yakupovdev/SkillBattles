@@ -209,11 +209,14 @@ final class _Body extends StatelessWidget {
         }
         final FriendProfileEntity? profile = state.profile;
         if (profile == null && state.loadStatus.isFailure) {
-          return AppErrorView(
-            title: "Couldn't load this profile",
-            message: 'Check your connection and try again.',
-            onRetry: () => context.read<FriendProfileBloc>().add(
-              const FriendProfileRefreshRequested(),
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 72),
+            child: AppErrorView(
+              title: "Couldn't load this profile",
+              message: 'Check your connection and try again.',
+              onRetry: () => context.read<FriendProfileBloc>().add(
+                const FriendProfileRefreshRequested(),
+              ),
             ),
           );
         }

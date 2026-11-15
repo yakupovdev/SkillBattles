@@ -8,7 +8,9 @@ import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
+import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
 import 'package:skill_battles/core/presentation/widgets/app_status_view.dart';
+import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_list_item_entity.dart';
 import 'package:skill_battles/features/friends/presentation/bloc/friends_bloc/friends_bloc.dart';
 import 'package:skill_battles/features/friends/presentation/widgets/friend_row.dart';
@@ -77,13 +79,19 @@ final class FriendsListSection extends StatelessWidget {
                       : slice.items,
                 ),
               ),
+              if (slice.pageStatus.isFailure && slice.pageFailure != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: AppInlineError(slice.pageFailure!.userMessage),
+                ),
               if (!isLoading && (slice.page?.totalPages ?? 0) > 1)
                 Padding(
                   padding: const EdgeInsets.only(top: 16),
                   child: FriendsPagination(
                     page: slice.page!,
                     itemCount: slice.items.length,
-                    onPageSelected: slice.pageStatus.isLoading
+                    onPageSelected:
+                        slice.loadStatus.isLoading || slice.pageStatus.isLoading
                         ? null
                         : (int page) => context.read<FriendsBloc>().add(
                             FriendsPageRequested(FriendsList.friends, page),

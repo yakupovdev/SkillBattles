@@ -31,11 +31,16 @@ abstract interface class RealtimeClient {
 /// in the CONNECT `Authorization` header — never in the URL or a cookie. One
 /// subscription, no SEND frames.
 final class StompRealtimeClient implements RealtimeClient {
-  StompRealtimeClient({required this._session, String? url})
-    : _url = url ?? AppApi.eventsUrl;
+  StompRealtimeClient({
+    required this._session,
+    String? url,
+    StompClient Function(StompConfig config)? createClient,
+  }) : _url = url ?? AppApi.eventsUrl,
+       _createClient = createClient ?? _newClient;
 
   final AuthSession _session;
   final String _url;
+  final StompClient Function(StompConfig config) _createClient;
 
   final StreamController<RealtimeEnvelope> _events =
       StreamController<RealtimeEnvelope>.broadcast();
@@ -46,9 +51,15 @@ final class StompRealtimeClient implements RealtimeClient {
   StompClient? _client;
   String? _connectedToken;
   RealtimeStatus _status = RealtimeStatus.disconnected;
+  int _clientGeneration = 0;
+  int _connectionGeneration = 0;
+  bool _isDisposed = false;
 
   static const Duration _heartbeat = Duration(seconds: 5);
   static const Duration _reconnectDelay = Duration(seconds: 3);
+
+  static StompClient _newClient(StompConfig config) =>
+      StompClient(config: config);
 
   @override
   Stream<RealtimeEnvelope> get events => _events.stream;
@@ -61,12 +72,14 @@ final class StompRealtimeClient implements RealtimeClient {
 
   @override
   void start() {
+    if (_isDisposed) return;
     _sessionSubscription ??= _session.changes.listen(_onSession);
     final String? token = _session.accessToken;
     if (token != null) _connect(token);
   }
 
   void _onSession(SessionTokens? tokens) {
+    if (_isDisposed) return;
     if (tokens == null) {
       _disconnect();
       return;
@@ -75,11 +88,22 @@ final class StompRealtimeClient implements RealtimeClient {
   }
 
   void _connect(String token) {
+    // Invalidate first: deactivation may synchronously call old callbacks.
+    final int generation = ++_clientGeneration;
+    _connectionGeneration++;
     _client?.deactivate();
     _connectedToken = token;
     _setStatus(RealtimeStatus.connecting);
-    final StompClient client = StompClient(
-      config: StompConfig(
+    late final StompClient client;
+    bool isCurrent() => _isCurrentClient(client, generation);
+    void disconnected() {
+      if (!isCurrent()) return;
+      _connectionGeneration++;
+      _setStatus(RealtimeStatus.disconnected);
+    }
+
+    client = _createClient(
+      StompConfig(
         url: _url,
         reconnectDelay: _reconnectDelay,
         heartbeatIncoming: _heartbeat,
@@ -87,30 +111,55 @@ final class StompRealtimeClient implements RealtimeClient {
         stompConnectHeaders: <String, String>{
           AppApi.authorizationHeader: '${AppApi.bearerPrefix} $token',
         },
-        beforeConnect: () async => _setStatus(RealtimeStatus.connecting),
-        onConnect: _onConnect,
-        onStompError: _onStompError,
-        onWebSocketDone: () => _setStatus(RealtimeStatus.disconnected),
+        beforeConnect: () async {
+          if (!isCurrent()) return;
+          _connectionGeneration++;
+          _setStatus(RealtimeStatus.connecting);
+        },
+        onConnect: (StompFrame _) {
+          if (isCurrent()) _onConnect(client, generation);
+        },
+        onStompError: (StompFrame frame) {
+          if (!isCurrent()) return;
+          _connectionGeneration++;
+          _onStompError(frame);
+        },
+        onWebSocketDone: disconnected,
         onWebSocketError: (Object? error) {
+          if (!isCurrent()) return;
           developer.log(
             'WebSocket error',
             name: 'realtime',
             error: error.runtimeType,
           );
-          _setStatus(RealtimeStatus.disconnected);
+          disconnected();
         },
-        onDisconnect: (StompFrame _) => _setStatus(RealtimeStatus.disconnected),
+        onDisconnect: (StompFrame _) => disconnected(),
       ),
     );
     _client = client;
     client.activate();
   }
 
-  void _onConnect(StompFrame frame) {
-    _client?.subscribe(
+  bool _isCurrentClient(StompClient client, int generation) =>
+      !_isDisposed &&
+      generation == _clientGeneration &&
+      identical(client, _client) &&
+      _connectedToken == _session.accessToken;
+
+  void _onConnect(StompClient client, int clientGeneration) {
+    // A StompClient also reconnects by itself, reusing its config. Each new
+    // subscription therefore needs its own generation as well.
+    final int connectionGeneration = ++_connectionGeneration;
+    client.subscribe(
       destination: AppApi.eventsDestination,
       headers: <String, String>{'id': AppApi.eventsSubscriptionId},
       callback: (StompFrame message) {
+        if (!_isCurrentClient(client, clientGeneration) ||
+            connectionGeneration != _connectionGeneration ||
+            _status != RealtimeStatus.connected) {
+          return;
+        }
         final RealtimeEnvelope? envelope = RealtimeEnvelope.tryParse(
           message.body,
         );
@@ -145,6 +194,8 @@ final class StompRealtimeClient implements RealtimeClient {
   }
 
   void _disconnect() {
+    _clientGeneration++;
+    _connectionGeneration++;
     _client?.deactivate();
     _client = null;
     _connectedToken = null;
@@ -159,8 +210,10 @@ final class StompRealtimeClient implements RealtimeClient {
 
   @override
   Future<void> dispose() async {
-    await _sessionSubscription?.cancel();
+    if (_isDisposed) return;
+    _isDisposed = true;
     _disconnect();
+    await _sessionSubscription?.cancel();
     await _events.close();
     await _statuses.close();
   }

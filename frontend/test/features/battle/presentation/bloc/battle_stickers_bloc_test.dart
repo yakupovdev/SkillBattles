@@ -857,6 +857,22 @@ void main() {
       expect(bloc.state.opponentBubble?.eventId, 'e4', reason: 'gaps are fine');
     });
 
+    test('a sticker received while disconnected neither displays nor consumes '
+        'its ids before the next connection', () async {
+      await ready();
+      connection.set(RealtimeStatus.disconnected);
+      await _flush();
+
+      await receive(incoming(eventId: 'during-disconnect', sequence: 40));
+      expect(bloc.state.opponentBubble, isNull);
+
+      connection.set(RealtimeStatus.connected);
+      await _flush();
+      await receive(incoming(eventId: 'during-disconnect', sequence: 1));
+
+      expect(bloc.state.opponentBubble?.eventId, 'during-disconnect');
+    });
+
     test(
       'a reconnect starts a new sequence baseline (backend restart)',
       () async {

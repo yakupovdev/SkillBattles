@@ -8,6 +8,7 @@ import 'package:skill_battles/core/presentation/bloc/load_status.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
 import 'package:skill_battles/core/presentation/widgets/app_segmented_control.dart';
+import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_request_direction.dart';
 import 'package:skill_battles/features/friends/domain/entity/relationship_entity.dart';
 import 'package:skill_battles/features/friends/presentation/bloc/friends_bloc/friends_bloc.dart';
@@ -123,11 +124,14 @@ final class _RequestsBody extends StatelessWidget {
                 ],
               ),
             ),
+            if (slice.pageStatus.isFailure && slice.pageFailure != null)
+              AppInlineError(slice.pageFailure!.userMessage),
             if (!isLoading && (slice.page?.totalPages ?? 0) > 1)
               FriendsPagination(
                 page: slice.page!,
                 itemCount: items.length,
-                onPageSelected: slice.pageStatus.isLoading
+                onPageSelected:
+                    slice.loadStatus.isLoading || slice.pageStatus.isLoading
                     ? null
                     : (int page) => context.read<FriendsBloc>().add(
                         FriendsPageRequested(list, page),

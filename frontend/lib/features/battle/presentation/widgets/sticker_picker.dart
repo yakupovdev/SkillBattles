@@ -57,7 +57,7 @@ final class StickerPicker extends StatefulWidget {
 }
 
 final class _StickerPickerState extends State<StickerPicker> {
-  late FocusNode _panelNode;
+  late FocusScopeNode _panelNode;
   late FocusNode _firstCellNode;
   late ValueNotifier<StickerId?> _highlighted;
   late ValueNotifier<StickerId?> _pressed;
@@ -67,7 +67,12 @@ final class _StickerPickerState extends State<StickerPicker> {
   @override
   void initState() {
     super.initState();
-    _panelNode = FocusNode(debugLabel: 'StickerPicker', skipTraversal: true);
+    _panelNode = FocusScopeNode(
+      debugLabel: 'StickerPicker',
+      skipTraversal: true,
+      traversalEdgeBehavior: TraversalEdgeBehavior.closedLoop,
+      directionalTraversalEdgeBehavior: TraversalEdgeBehavior.stop,
+    );
     _firstCellNode = FocusNode(debugLabel: 'StickerPickerFirstCell');
     _highlighted = ValueNotifier<StickerId?>(null);
     _pressed = ValueNotifier<StickerId?>(null);
@@ -111,8 +116,8 @@ final class _StickerPickerState extends State<StickerPicker> {
   Widget build(BuildContext context) {
     final double caretLeft = widget.caretCenter.clamp(16, 168) - 8;
     final bool isCoolingDown = _isCoolingDown;
-    return Focus(
-      focusNode: _panelNode,
+    return FocusScope(
+      node: _panelNode,
       onKeyEvent: _onKeyEvent,
       child: SizedBox(
         width: StickerPicker.width,
@@ -141,6 +146,7 @@ final class _StickerPickerState extends State<StickerPicker> {
                     Opacity(
                       opacity: isCoolingDown ? 0.4 : 1,
                       child: _GridKeyboard(
+                        enabled: !isCoolingDown,
                         child: Column(
                           spacing: 8,
                           children: <Widget>[
@@ -333,12 +339,36 @@ final class _FooterText extends StatelessWidget {
 }
 
 /// Arrow keys move focus inside the 3 x 3 grid. On the web the default
-/// shortcuts map the arrows to scrolling, so they are remapped here, and
-/// the group keeps directional moves among the cells.
-final class _GridKeyboard extends StatelessWidget {
-  const _GridKeyboard({required this.child});
+/// shortcuts map the arrows to scrolling, so they are remapped here. The
+/// grid scope stops arrow traversal at its edges; Tab reaches the mute toggle.
+final class _GridKeyboard extends StatefulWidget {
+  const _GridKeyboard({required this.enabled, required this.child});
 
+  final bool enabled;
   final Widget child;
+
+  @override
+  State<_GridKeyboard> createState() => _GridKeyboardState();
+}
+
+final class _GridKeyboardState extends State<_GridKeyboard> {
+  late FocusScopeNode _scopeNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _scopeNode = FocusScopeNode(
+      debugLabel: 'StickerGrid',
+      traversalEdgeBehavior: TraversalEdgeBehavior.parentScope,
+      directionalTraversalEdgeBehavior: TraversalEdgeBehavior.stop,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scopeNode.dispose();
+    super.dispose();
+  }
 
   static const Map<ShortcutActivator, Intent> _arrows =
       <ShortcutActivator, Intent>{
@@ -360,7 +390,12 @@ final class _GridKeyboard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Shortcuts(
       shortcuts: _arrows,
-      child: FocusTraversalGroup(child: child),
+      child: FocusScope(
+        node: _scopeNode,
+        canRequestFocus: widget.enabled,
+        descendantsAreFocusable: widget.enabled,
+        child: FocusTraversalGroup(child: widget.child),
+      ),
     );
   }
 }

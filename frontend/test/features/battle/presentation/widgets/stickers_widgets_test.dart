@@ -8,6 +8,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:skill_battles/features/battle/domain/entity/sticker_id.dart';
 import 'package:skill_battles/features/battle/presentation/controllers/sticker_compositions.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_sticker_slots.dart';
+import 'package:skill_battles/features/battle/presentation/widgets/mute_opponent_toggle.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/sticker_cell.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/sticker_compositions_scope.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/sticker_picker.dart';
@@ -28,7 +29,20 @@ Future<void> _pumpLoaded(
   Widget child, {
   StickerCompositionLoader loader = _fromCache,
 }) async {
-  Widget app(Widget? content) => MaterialApp(
+  await tester.pumpWidget(_LoadedTestApp(loader: loader));
+  await tester.pump();
+  await tester.pumpWidget(_LoadedTestApp(loader: loader, content: child));
+  await tester.pump();
+}
+
+final class _LoadedTestApp extends StatelessWidget {
+  const _LoadedTestApp({required this.loader, this.content});
+
+  final StickerCompositionLoader loader;
+  final Widget? content;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
     home: StickerCompositionsScope(
       loader: loader,
       child: Scaffold(
@@ -41,10 +55,6 @@ Future<void> _pumpLoaded(
       ),
     ),
   );
-  await tester.pumpWidget(app(null));
-  await tester.pump();
-  await tester.pumpWidget(app(child));
-  await tester.pump();
 }
 
 double _progress(WidgetTester tester) =>
@@ -234,23 +244,9 @@ void main() {
   });
 
   group('StickerPicker', () {
-    Widget picker({
-      DateTime? cooldownUntil,
-      ValueChanged<StickerId>? onSelected,
-      VoidCallback? onClose,
-    }) => StickerPicker(
-      opponentNickname: 'timur.b',
-      isOpponentHidden: false,
-      cooldownUntil: cooldownUntil,
-      caretCenter: 32,
-      onSelected: onSelected ?? (_) {},
-      onToggleOpponentHidden: () {},
-      onClose: onClose ?? () {},
-    );
-
     testWidgets('shows the nine stickers in the designed order with their '
         'labels', (WidgetTester tester) async {
-      await _pumpLoaded(tester, picker());
+      await _pumpLoaded(tester, _TestPicker());
 
       final List<StickerId> order = tester
           .widgetList<StickerCell>(find.byType(StickerCell))
@@ -274,7 +270,7 @@ void main() {
 
     testWidgets('a tap selects the sticker', (WidgetTester tester) async {
       final List<StickerId> selected = <StickerId>[];
-      await _pumpLoaded(tester, picker(onSelected: selected.add));
+      await _pumpLoaded(tester, _TestPicker(onSelected: selected.add));
 
       await tester.tap(find.byKey(const ValueKey<StickerId>(StickerId.ez)));
       await tester.pump();
@@ -284,7 +280,7 @@ void main() {
 
     testWidgets('Esc closes it', (WidgetTester tester) async {
       int closed = 0;
-      await _pumpLoaded(tester, picker(onClose: () => closed++));
+      await _pumpLoaded(tester, _TestPicker(onClose: () => closed++));
       await tester.pump();
 
       await tester.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -310,7 +306,7 @@ void main() {
               direction: AxisDirection.right,
             ),
           },
-          child: picker(onSelected: selected.add),
+          child: _TestPicker(onSelected: selected.add),
         ),
       );
       await tester.pump();
@@ -324,13 +320,152 @@ void main() {
       expect(selected, <StickerId>[StickerId.tooSlow]);
     });
 
+    testWidgets('Tab and Shift Tab cycle between the grid and mute without '
+        'reaching the background, and Escape still closes', (
+      WidgetTester tester,
+    ) async {
+      int closed = 0;
+      await _pumpLoaded(
+        tester,
+        _BackgroundAction(child: _TestPicker(onClose: () => closed++)),
+      );
+      final Finder first = find.byKey(const ValueKey<StickerId>(StickerId.gg));
+      final Finder last = find.byKey(
+        const ValueKey<StickerId>(StickerId.crying),
+      );
+      final Finder mute = find.byType(MuteOpponentToggle);
+      expect(_focusOf(tester, first).hasPrimaryFocus, isTrue);
+
+      await _tab(tester, reverse: true);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      await _tab(tester);
+      expect(_focusOf(tester, first).hasPrimaryFocus, isTrue);
+
+      _focusOf(tester, last).requestFocus();
+      await tester.pump();
+      await _tab(tester);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      await _tab(tester, reverse: true);
+      expect(_focusOf(tester, last).hasPrimaryFocus, isTrue);
+      expect(
+        _focusOf(tester, find.byKey(_backgroundKey)).hasPrimaryFocus,
+        isFalse,
+      );
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(closed, 1);
+    });
+
+    testWidgets('arrow keys stop at grid boundaries instead of reaching mute '
+        'or the background', (WidgetTester tester) async {
+      await _pumpLoaded(tester, const _BackgroundAction(child: _TestPicker()));
+      final Finder first = find.byKey(const ValueKey<StickerId>(StickerId.gg));
+      final Finder last = find.byKey(
+        const ValueKey<StickerId>(StickerId.crying),
+      );
+      for (final LogicalKeyboardKey key in <LogicalKeyboardKey>[
+        LogicalKeyboardKey.arrowUp,
+        LogicalKeyboardKey.arrowLeft,
+      ]) {
+        await tester.sendKeyEvent(key);
+        await tester.pump();
+        expect(_focusOf(tester, first).hasPrimaryFocus, isTrue);
+      }
+      _focusOf(tester, last).requestFocus();
+      await tester.pump();
+      for (final LogicalKeyboardKey key in <LogicalKeyboardKey>[
+        LogicalKeyboardKey.arrowDown,
+        LogicalKeyboardKey.arrowRight,
+      ]) {
+        await tester.sendKeyEvent(key);
+        await tester.pump();
+        expect(_focusOf(tester, last).hasPrimaryFocus, isTrue);
+      }
+    });
+
+    testWidgets('during cooldown both Tab directions stay on mute and Escape '
+        'closes after traversal', (WidgetTester tester) async {
+      int closed = 0;
+      await _pumpLoaded(
+        tester,
+        _BackgroundAction(
+          child: _TestPicker(
+            cooldownUntil: DateTime.now().add(const Duration(seconds: 4)),
+            onClose: () => closed++,
+          ),
+        ),
+      );
+      final Finder mute = find.byType(MuteOpponentToggle);
+      await _tab(tester);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      await _tab(tester);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      await _tab(tester, reverse: true);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      expect(
+        _focusOf(tester, find.byKey(_backgroundKey)).hasPrimaryFocus,
+        isFalse,
+      );
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(closed, 1);
+    });
+
+    testWidgets('an active picker keeps mute accessible when cooldown starts '
+        'and restores cell traversal when it ends', (
+      WidgetTester tester,
+    ) async {
+      final ValueNotifier<DateTime?> cooldown = ValueNotifier<DateTime?>(null);
+      addTearDown(cooldown.dispose);
+      final List<StickerId> selected = <StickerId>[];
+      int closed = 0;
+      await _pumpLoaded(
+        tester,
+        _BackgroundAction(
+          child: ValueListenableBuilder<DateTime?>(
+            valueListenable: cooldown,
+            builder:
+                (BuildContext context, DateTime? deadline, Widget? child) =>
+                    _TestPicker(
+                      cooldownUntil: deadline,
+                      onSelected: selected.add,
+                      onClose: () => closed++,
+                    ),
+          ),
+        ),
+      );
+      final Finder first = find.byKey(const ValueKey<StickerId>(StickerId.gg));
+      final Finder mute = find.byType(MuteOpponentToggle);
+      expect(_focusOf(tester, first).hasPrimaryFocus, isTrue);
+
+      cooldown.value = DateTime.now().add(const Duration(seconds: 4));
+      await tester.pump();
+      expect(_focusOf(tester, first).hasPrimaryFocus, isFalse);
+      await _tab(tester);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+      await _tab(tester, reverse: true);
+      expect(_focusOf(tester, mute).hasPrimaryFocus, isTrue);
+
+      cooldown.value = null;
+      await tester.pump();
+      await _tab(tester);
+      expect(_focusOf(tester, first).hasPrimaryFocus, isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(selected, <StickerId>[StickerId.gg]);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pump();
+      expect(closed, 1);
+    });
+
     testWidgets('during the cooldown the cells do nothing', (
       WidgetTester tester,
     ) async {
       final List<StickerId> selected = <StickerId>[];
       await _pumpLoaded(
         tester,
-        picker(
+        _TestPicker(
           cooldownUntil: DateTime.now().add(const Duration(seconds: 4)),
           onSelected: selected.add,
         ),
@@ -346,4 +481,56 @@ void main() {
       expect(find.textContaining('Next sticker in'), findsOneWidget);
     });
   });
+}
+
+const Key _backgroundKey = ValueKey<String>('background-answer');
+
+FocusNode _focusOf(WidgetTester tester, Finder target) => Focus.of(
+  tester.element(
+    find.descendant(of: target, matching: find.byType(GestureDetector)).first,
+  ),
+);
+
+Future<void> _tab(WidgetTester tester, {bool reverse = false}) async {
+  if (reverse) await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+  await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+  if (reverse) await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+  await tester.pump();
+}
+
+final class _BackgroundAction extends StatelessWidget {
+  const _BackgroundAction({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      TextButton(
+        key: _backgroundKey,
+        onPressed: () {},
+        child: const Text('Background answer'),
+      ),
+      child,
+    ],
+  );
+}
+
+final class _TestPicker extends StatelessWidget {
+  const _TestPicker({this.cooldownUntil, this.onSelected, this.onClose});
+
+  final DateTime? cooldownUntil;
+  final ValueChanged<StickerId>? onSelected;
+  final VoidCallback? onClose;
+
+  @override
+  Widget build(BuildContext context) => StickerPicker(
+    opponentNickname: 'timur.b',
+    isOpponentHidden: false,
+    cooldownUntil: cooldownUntil,
+    caretCenter: 32,
+    onSelected: onSelected ?? (_) {},
+    onToggleOpponentHidden: () {},
+    onClose: onClose ?? () {},
+  );
 }
