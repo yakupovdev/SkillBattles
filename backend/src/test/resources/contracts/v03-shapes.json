@@ -1331,6 +1331,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -1633,6 +1636,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -1977,6 +1983,9 @@
                   "$type": "string"
                 }
               }
+            },
+            "imageUrl": {
+              "$type": "string"
             }
           },
           "mySelectedOptionId": {
@@ -2316,6 +2325,9 @@
                 "$type": "string"
               },
               "explanation": {
+                "$type": "string"
+              },
+              "imageUrl": {
                 "$type": "string"
               }
             },
@@ -2873,6 +2885,86 @@
     },
     "errors": {
       "400": "VALIDATION_ERROR, INVALID_WEBHOOK_SIGNATURE, INVALID_WEBHOOK_EVENT",
+      "500": "INTERNAL_ERROR"
+    }
+  },
+  "GET /api/v1/users/me/rematch-invitations": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "sourceBattleId": {
+              "$type": "string"
+            },
+            "requester": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "disciplineCode": {
+              "$type": "string"
+            },
+            "expiresAt": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "serverTime": {
+          "$type": "string"
+        }
+      }
+    },
+    "errors": {
+      "401": "UNAUTHORIZED",
+      "500": "INTERNAL_ERROR"
+    }
+  },
+  "POST /api/v1/battles/{id}/stickers": {
+    "success": {
+      "200": {
+        "battleId": {
+          "$type": "string"
+        },
+        "submissionId": {
+          "$type": "string"
+        },
+        "senderUserId": {
+          "$type": "string"
+        },
+        "stickerId": {
+          "$type": "string"
+        },
+        "sentAt": {
+          "$type": "string"
+        },
+        "nextAllowedAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {
+      "stickerId": {
+        "$type": "string"
+      },
+      "submissionId": {
+        "$type": "string"
+      }
+    },
+    "errors": {
+      "400": "VALIDATION_ERROR; INVALID_STICKER_ID",
+      "401": "UNAUTHORIZED",
+      "404": "BATTLE_NOT_FOUND",
+      "409": "STICKERS_NOT_ALLOWED; IDEMPOTENCY_CONFLICT",
+      "429": "STICKER_COOLDOWN",
       "500": "INTERNAL_ERROR"
     }
   }

@@ -24,6 +24,9 @@ public class GlobalExceptionHandler {
     public GlobalExceptionHandler(java.time.Clock clock){this.clock=clock;}
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> business(BusinessException ex) {
+        if (ex instanceof com.skillbattles.backend.exception.StickerCooldownException cooldown)
+            return ResponseEntity.status(429).header("Retry-After", Long.toString(cooldown.getRetryAfter()))
+                    .body(new ErrorResponse(ex.getCode(), ex.getMessage(), List.of(), cooldown.getResetsAt()));
         if(ex instanceof com.skillbattles.backend.exception.RateLimitedException rate) return ResponseEntity.status(429).header("Retry-After",Long.toString(rate.getRetryAfter())).body(ErrorResponse.of(rate.getCode(),rate.getMessage()));
         if(ex instanceof com.skillbattles.backend.exception.FieldValidationException field)
             return ResponseEntity.badRequest().body(new ErrorResponse(ex.getCode(),ex.getMessage(),List.of(new FieldErrorDto(field.getField(),ex.getMessage()))));
@@ -73,7 +76,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> missing(NoResourceFoundException ex) {
+    public ResponseEntity<ErrorResponse> missing(NoResourceFoundException ex, jakarta.servlet.http.HttpServletRequest request) {
+        if (HttpMethod.HEAD.matches(request.getMethod())) return ResponseEntity.notFound().build();
         return ResponseEntity.status(404).body(ErrorResponse.of("NOT_FOUND", "Resource not found."));
     }
 

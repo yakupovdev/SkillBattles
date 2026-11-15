@@ -4,18 +4,21 @@ import com.skillbattles.backend.config.CommonMapperConfig;
 import com.skillbattles.backend.dto.*;
 import com.skillbattles.backend.entity.*;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import com.skillbattles.backend.service.RankCalculator;
 import java.time.Instant;
 import java.util.UUID;
 
 /** Explicit allowlist projection: never serialize BattleDto or its JSONB state to HTTP. */
-@Mapper(config = CommonMapperConfig.class)
+@Mapper(config = CommonMapperConfig.class, uses = QuestionImageMapper.class)
 public interface BattleSnapshotMapper {
     AnswerDto toDto(AnswerRequest request);
     AnswerReceipt toResponse(AnswerReceiptDto dto);
     BattleSnapshot toResponse(BattleSnapshotDto dto);
     BattleResultResponse toResponse(BattleResultDto dto);
     QuestionViewDto question(FrozenQuestionDto dto);
+    @Mapping(target = "imageUrl", source = "imageKey", qualifiedByName = "questionImageUrl")
+    QuestionResponse toResponse(QuestionViewDto dto);
     AnswerViewDto answer(BattleAnswerDto dto);
     BattleResultPlayerDto copyPlayer(BattleResultPlayerDto dto);
 

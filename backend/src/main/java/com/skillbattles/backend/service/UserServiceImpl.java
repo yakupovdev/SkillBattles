@@ -24,6 +24,11 @@ public class UserServiceImpl implements UserService {
     private static final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
     @Override
+    public List<UserDto> findByIds(Collection<UUID> ids) {
+        return ids.isEmpty() ? List.of() : repository.findAllById(ids).stream().map(mapper::toDto).toList();
+    }
+
+    @Override
     @Transactional
     public UserDto register(RegisterDto dto) {
         agePolicy.validate(dto.getBirthYear(), dto.getBirthMonth(), dto.getBirthDay());
