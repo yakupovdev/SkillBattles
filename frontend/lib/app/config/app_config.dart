@@ -8,11 +8,7 @@ import 'package:skill_battles/core/utils/network/app_api.dart';
 ///   (clearly labelled; it never replaces an end-to-end check with the real
 ///   backend).
 final class AppConfig {
-  const AppConfig({
-    required this.apiBaseUrl,
-    required this.eventsUrl,
-    required this.useDevMocks,
-  });
+  const AppConfig({required this.apiBaseUrl, required this.eventsUrl});
 
   factory AppConfig.fromEnvironment() {
     final Uri events = Uri.parse(AppApi.eventsUrl);
@@ -26,13 +22,11 @@ final class AppConfig {
                 .resolveUri(events)
                 .replace(scheme: base.scheme == 'https' ? 'wss' : 'ws')
                 .toString(),
-      useDevMocks: const bool.fromEnvironment('DEV_MOCKS'),
     );
   }
 
   final String apiBaseUrl;
   final String eventsUrl;
-  final bool useDevMocks;
 
   static const Duration connectTimeout = Duration(seconds: 10);
   static const Duration receiveTimeout = Duration(seconds: 20);

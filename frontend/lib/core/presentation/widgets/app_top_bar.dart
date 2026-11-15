@@ -241,7 +241,18 @@ final class _AccountMenu extends StatelessWidget {
             PopupMenuDivider(),
             PopupMenuItem<AppAccountAction>(
               value: AppAccountAction.logOut,
-              child: Text('Log out'),
+              child: Row(
+                spacing: 10,
+                children: <Widget>[
+                  AppSvgIcon(
+                    AppIcons.logOut,
+                    width: 16,
+                    height: 16,
+                    color: AppColors.danger,
+                  ),
+                  Text('Log out', style: TextStyle(color: AppColors.danger)),
+                ],
+              ),
             ),
           ],
       child: Row(

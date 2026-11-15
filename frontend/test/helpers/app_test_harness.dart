@@ -6,7 +6,6 @@ import 'package:skill_battles/app/config/app_config.dart';
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
 import 'package:skill_battles/app/skill_battles_app.dart';
-import 'package:skill_battles/dev/mock_backend.dart';
 import 'package:skill_battles/features/auth/domain/entity/login_params_entity.dart';
 import 'package:skill_battles/features/auth/domain/usecases/login_usecase.dart';
 
@@ -16,11 +15,7 @@ const Size desktopArtboard = Size(1440, 900);
 /// Window used to check the horizontal-scroll fallback of the viewport.
 const Size narrowDesktop = Size(1280, 760);
 
-const AppConfig mockConfig = AppConfig(
-  apiBaseUrl: '',
-  eventsUrl: '',
-  useDevMocks: true,
-);
+const AppConfig mockConfig = AppConfig(apiBaseUrl: '', eventsUrl: '');
 
 /// Pumps the real app over the real router and DI, backed by the in-app
 /// development mock backend (no network). Call [finishApp] at the end.
@@ -46,7 +41,6 @@ Future<AppDependencies> pumpApp(
         ),
       );
     }
-    if (isPro) dependencies.getDep<MockBackend>().setPro(true);
   });
   final GoRouter router = dependencies.getDep<GoRouter>();
   if (location != null) router.go(location);

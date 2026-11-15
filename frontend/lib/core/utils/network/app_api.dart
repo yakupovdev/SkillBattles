@@ -15,6 +15,15 @@ abstract final class AppApi {
     defaultValue: kIsWeb ? '/ws/v1/events' : 'ws://localhost:8080/ws/v1/events',
   );
 
+  /// Public origin that serves `/media/...` (question illustrations), set
+  /// with `--dart-define=MEDIA_ORIGIN=https://host:port`. Empty on web means
+  /// the page's own origin (the same-origin proxy); it is never derived from
+  /// [baseUrl], which ends in `/api/v1`.
+  static const String mediaOrigin = String.fromEnvironment(
+    'MEDIA_ORIGIN',
+    defaultValue: kIsWeb ? '' : 'http://localhost:8080',
+  );
+
   /// The only subscription the server allows.
   static const String eventsDestination = '/user/queue/events';
   static const String eventsSubscriptionId = 'skillbattles-events';

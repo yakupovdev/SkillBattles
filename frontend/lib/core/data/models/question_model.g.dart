@@ -36,6 +36,7 @@ QuestionModel _$QuestionModelFromJson(Map<String, dynamic> json) =>
               )
               .toList(),
         ),
+        imageUrl: $checkedConvert('imageUrl', (v) => v as String?),
       );
       return val;
     });

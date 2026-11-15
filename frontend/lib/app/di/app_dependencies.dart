@@ -18,9 +18,6 @@ import 'package:skill_battles/core/utils/session/auth_session.dart';
 import 'package:skill_battles/core/utils/session/session_tokens.dart';
 import 'package:skill_battles/core/utils/storage/token_storage.dart';
 import 'package:skill_battles/core/utils/time/clock.dart';
-import 'package:skill_battles/dev/mock_api_client.dart';
-import 'package:skill_battles/dev/mock_backend.dart';
-import 'package:skill_battles/dev/mock_realtime_client.dart';
 import 'package:skill_battles/features/account/data/repository/account_repository_impl.dart';
 import 'package:skill_battles/features/account/data/sources/remote/account_remote.dart';
 import 'package:skill_battles/features/account/domain/repository/account_repository.dart';
@@ -107,11 +104,7 @@ final class AppDependencies {
   /// Wraps a container prepared elsewhere (tests).
   factory AppDependencies.fromContainer(
     GetIt container, {
-    AppConfig config = const AppConfig(
-      apiBaseUrl: '',
-      eventsUrl: '',
-      useDevMocks: true,
-    ),
+    AppConfig config = const AppConfig(apiBaseUrl: '', eventsUrl: ''),
   }) => AppDependencies._(container, config);
 
   final GetIt _container;
@@ -141,17 +134,9 @@ final class AppDependencies {
     final GetIt c = _container;
     c.registerLazySingleton<Clock>(() => const SystemClock());
     c.registerLazySingleton<Uuid>(() => const Uuid());
-    if (config.useDevMocks) {
-      c.registerLazySingleton<MockBackend>(
-        () => MockBackend(clock: c.get<Clock>()),
-        dispose: (MockBackend backend) => backend.dispose(),
-      );
-      c.registerLazySingleton<TokenStorage>(MemoryTokenStorage.new);
-    } else {
-      c.registerLazySingleton<TokenStorage>(
-        () => const SecureTokenStorage(FlutterSecureStorage()),
-      );
-    }
+    c.registerLazySingleton<TokenStorage>(
+      () => const SecureTokenStorage(FlutterSecureStorage()),
+    );
     c.registerLazySingleton<AuthSession>(
       () => AuthSession(
         storage: c.get<TokenStorage>(),
@@ -174,23 +159,6 @@ final class AppDependencies {
 
   void _registerClients() {
     final GetIt c = _container;
-    if (config.useDevMocks) {
-      c.registerLazySingleton<ApiClient>(
-        () => MockApiClient(backend: c.get<MockBackend>()),
-      );
-      c.registerLazySingleton<ApiClient>(
-        () => MockApiClient(backend: c.get<MockBackend>()),
-        instanceName: _refreshClient,
-      );
-      c.registerLazySingleton<RealtimeClient>(
-        () => MockRealtimeClient(
-          backend: c.get<MockBackend>(),
-          session: c.get<AuthSession>(),
-        ),
-        dispose: (RealtimeClient client) => client.dispose(),
-      );
-      return;
-    }
     BaseOptions options() => BaseOptions(
       baseUrl: config.apiBaseUrl,
       connectTimeout: AppConfig.connectTimeout,

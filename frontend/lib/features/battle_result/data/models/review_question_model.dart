@@ -19,6 +19,7 @@ final class ReviewQuestionModel {
     required this.options,
     required this.correctOptionId,
     required this.explanation,
+    this.imageUrl,
   });
 
   factory ReviewQuestionModel.fromJson(Map<String, dynamic> json) =>
@@ -48,6 +49,10 @@ final class ReviewQuestionModel {
   @JsonKey(required: true)
   final String? explanation;
 
+  /// Origin-relative illustration URL, `null` when absent. Not `required`:
+  /// older payloads omit the key, which means no illustration.
+  final String? imageUrl;
+
   ReviewQuestionEntity toEntity() => ReviewQuestionEntity(
     question: QuestionEntity(
       id: id,
@@ -58,6 +63,7 @@ final class ReviewQuestionModel {
       options: options
           .map((QuestionOptionModel option) => option.toEntity())
           .toList(growable: false),
+      imageUrl: imageUrl,
     ),
     correctOptionId: correctOptionId,
     explanation: explanation,

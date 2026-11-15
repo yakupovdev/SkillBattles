@@ -12,6 +12,7 @@ final class QuestionEntity extends Equatable {
     required this.difficulty,
     required this.prompt,
     required this.options,
+    this.imageUrl,
   });
 
   final String id;
@@ -21,6 +22,11 @@ final class QuestionEntity extends Equatable {
   final String prompt;
   final List<QuestionOptionEntity> options;
 
+  /// Origin-relative illustration URL as the server sent it; `null` when the
+  /// question has no illustration. Resolve it with `resolveMediaUrl` before
+  /// loading; never build it from other question fields.
+  final String? imageUrl;
+
   @override
   List<Object?> get props => <Object?>[
     id,
@@ -29,5 +35,6 @@ final class QuestionEntity extends Equatable {
     difficulty,
     prompt,
     options,
+    imageUrl,
   ];
 }
