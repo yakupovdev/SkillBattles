@@ -1,6 +1,6 @@
 # SkillBattles — backend v0.3
 
-Реализованы этапы A–E и 40 продуктовых REST-операций контракта v0.3, включая входящие приглашения на реванш,
+Реализованы этапы A–E и 41 продуктовую REST-операцию контракта v0.3, включая входящие приглашения на реванш,
 а также публичные GET/HEAD иллюстраций вопросов (42 HTTP-операции в полном OpenAPI). Generated Swagger
 имеет версию `0.3.0` и строится из действующих controllers/DTO. Контрактная
 проверка сопоставляет маршруты, успешные статусы, request/response-поля,
@@ -653,7 +653,7 @@ GET и GET `/users/me/activity`. События могут теряться, д�
 
 ## Контракт и передача frontend
 
-Swagger `/v3/api-docs` содержит 40 продуктовых REST-операций и 2 media GET/HEAD. OpenAPI 3.1 может
+Swagger `/v3/api-docs` содержит 41 продуктовую REST-операцию и 2 media GET/HEAD. OpenAPI 3.1 может
 представлять nullable как `type: [integer, null]`, эквивалент nullable=true целевого
 OpenAPI 3.0.3. Имена схем могут отличаться; публичные поля и типы сверяются.
 Webhook дополнительно документирует фактический 503 BILLING_UNAVAILABLE для retry
@@ -745,3 +745,35 @@ fallback, квоту, masked review, ACCOUNT_CHANGED, profile/reset availability
 seed-вопросы сохраняются, но деактивируются перед импортом детерминированных fixtures;
 пользовательская БД этим runner не затрагивается. Дополнительный банк по-прежнему
 можно загрузить через dry-run/apply importer.
+
+
+## Временные стикеры в батле
+
+`POST /api/v1/battles/{id}/stickers`, access Bearer JWT. Тело только
+`{"stickerId":"gg","submissionId":"<UUID>"}`. Девять точных ID:
+`gg`, `fire`, `facepalm`, `lol`, `hmm`, `too_slow`, `ez`, `wait_what`, `crying`.
+Доступ одинаков для Free/Pro, RANKED/PRIVATE и обеих дисциплин. Новые отправки
+разрешены только в WAITING_READY, COUNTDOWN, QUESTION, REVEAL.
+
+200 возвращает `battleId, submissionId, senderUserId, stickerId, sentAt, nextAllowedAt`.
+Это приём команды, а не подтверждение доставки/прочтения. Соперник получает
+`BATTLE_STICKER` через существующий native STOMP `/user/queue/events`;
+отправитель не получает echo. Envelope.version — отдельный счётчик стикеров батла,
+не battle.version. Команды STOMP SEND по-прежнему запрещены.
+
+Cooldown ровно 4000 мс на пользователя, общий для вкладок/сеансов/батлов.
+429 `STICKER_COOLDOWN` содержит точный `resetsAt` и `Retry-After` с округлением
+секунд вверх, минимум 1. Frontend тихо синхронизирует таймер; другие окончательные
+ошибки обозначает Not sent. Все ответы проходят существующий no-store filter.
+
+Принятые submissionId хранятся 120 секунд в памяти процесса: одинаковый payload
+возвращает первоначальный ACK, включая повтор после окончания батла, без нового
+события/кулдауна. Изменённый payload — 409 IDEMPOTENCY_CONFLICT. На рестарте
+состояние стикеров исчезает. Доставка best-effort: offline/drop не отменяет ACK,
+повтор не переотправляет событие. Истории/replay, SQL-записей и миграций нет.
+Таймеры/счёт/Elo/квоты/presence не меняются. Анимации принадлежат frontend.
+
+Подробный контракт и проверки: [BATTLE_STICKERS_HANDOFF.md](BATTLE_STICKERS_HANDOFF.md).
+Focused проверки из backend/: `./mvnw.cmd -B -ntp '-Dtest=BattleStickerStateTest,BattleStickerRealtimeTest,BattleStickersPostgresTest' test`.
+Существующие runners `scripts/verify_e2e.py` и `scripts/verify_compose.py`
+также проверяют стикеры и очистку их receipts при реальном рестарте JAR.

@@ -2927,5 +2927,45 @@
       "401": "UNAUTHORIZED",
       "500": "INTERNAL_ERROR"
     }
+  },
+  "POST /api/v1/battles/{id}/stickers": {
+    "success": {
+      "200": {
+        "battleId": {
+          "$type": "string"
+        },
+        "submissionId": {
+          "$type": "string"
+        },
+        "senderUserId": {
+          "$type": "string"
+        },
+        "stickerId": {
+          "$type": "string"
+        },
+        "sentAt": {
+          "$type": "string"
+        },
+        "nextAllowedAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {
+      "stickerId": {
+        "$type": "string"
+      },
+      "submissionId": {
+        "$type": "string"
+      }
+    },
+    "errors": {
+      "400": "VALIDATION_ERROR; INVALID_STICKER_ID",
+      "401": "UNAUTHORIZED",
+      "404": "BATTLE_NOT_FOUND",
+      "409": "STICKERS_NOT_ALLOWED; IDEMPOTENCY_CONFLICT",
+      "429": "STICKER_COOLDOWN",
+      "500": "INTERNAL_ERROR"
+    }
   }
 }

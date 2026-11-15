@@ -541,11 +541,11 @@ class StageDEPostgresTest {
   Assertions.assertThat(jdbc.queryForObject("select id from retired_practice_upgrade.question_reports",UUID.class)).isEqualTo(report.getId());
   Assertions.assertThat(jdbc.queryForObject("select result::text from retired_practice_upgrade.battles",String.class)).isEqualTo(jdbc.queryForObject("select result::text from public.battles where id=?",String.class,source.getId()));
  }
- @Test void allFortyProductRestOperationsMatchTargetResponseAndRequestShapes()throws Exception{
+ @Test void allProductRestOperationsMatchTargetResponseAndRequestShapes()throws Exception{
   var actual=rest("GET","/v3/api-docs",null,null,200);Files.writeString(Path.of("target/generated-openapi.json"),actual.toPrettyString());
   var expected=json.readTree(getClass().getResourceAsStream("/contracts/v03-shapes.json"));
   var found=new TreeSet<String>();actual.path("paths").fields().forEachRemaining(p->p.getValue().fieldNames().forEachRemaining(m->{if(p.getKey().startsWith("/api/v1/") && Set.of("get","post","patch","delete").contains(m))found.add(m.toUpperCase()+" "+p.getKey());}));
-  var target=new TreeSet<String>();expected.fieldNames().forEachRemaining(target::add);Assertions.assertThat(found).isEqualTo(target).hasSize(40);
+  var target=new TreeSet<String>();expected.fieldNames().forEachRemaining(target::add);Assertions.assertThat(found).isEqualTo(target).hasSize(41);
   var failures=new ArrayList<String>();
   expected.fields().forEachRemaining(e->{String[] key=e.getKey().split(" ",2);var operation=actual.path("paths").path(key[1]).path(key[0].toLowerCase(Locale.ROOT));
    e.getValue().path("success").fields().forEachRemaining(response->{var generated=operation.path("responses").path(response.getKey());if(generated.isMissingNode())failures.add(e.getKey()+" missing success "+response.getKey());else compareShape(response.getValue(),schema(generated),actual,e.getKey()+" response "+response.getKey(),failures);});
