@@ -9,6 +9,8 @@ public interface MatchmakingProcessor {
     void cancelEntry(UUID userId, UUID id);
     DuelDto createDuel(UUID userId, String disciplineCode);
     DuelDto join(UUID userId, String code);
+    /** Internal core; caller must already be in registry.transact. */
+    DuelDto joinInRegistry(MatchmakingStateDto state,UUID userId,UUID duelId);
     DuelDto duel(UUID userId, UUID id);
     DuelDto present(DuelDto duel);
     void cancelDuel(UUID userId, UUID id);

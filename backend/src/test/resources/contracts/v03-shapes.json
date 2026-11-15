@@ -2928,6 +2928,2692 @@
       "500": "INTERNAL_ERROR"
     }
   },
+  "GET /api/v1/users/me/friend-code": {
+    "success": {
+      "200": {
+        "friendCode": {
+          "$type": "string"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "GET /api/v1/friends": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "relationshipId": {
+              "$type": "string"
+            },
+            "friend": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "friendsSince": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "pagination": {
+          "page": {
+            "$type": "integer"
+          },
+          "size": {
+            "$type": "integer"
+          },
+          "totalElements": {
+            "$type": "integer"
+          },
+          "totalPages": {
+            "$type": "integer"
+          }
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "GET /api/v1/friends/{friendId}": {
+    "success": {
+      "200": {
+        "friend": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "friendsSince": {
+          "$type": "string"
+        },
+        "disciplines": {
+          "[]": {
+            "disciplineCode": {
+              "$type": "string"
+            },
+            "rating": {
+              "$type": "integer"
+            },
+            "rank": {
+              "rankCode": {
+                "$type": "string"
+              },
+              "rankName": {
+                "$type": "string"
+              },
+              "leagueCode": {
+                "$type": "string"
+              },
+              "divisionRpCurrent": {
+                "$type": "integer"
+              },
+              "divisionRpTarget": {
+                "$type": "integer"
+              },
+              "floorRating": {
+                "$type": "integer"
+              },
+              "ceilingExclusive": {
+                "$type": "integer"
+              }
+            },
+            "calibration": {
+              "completedMatches": {
+                "$type": "integer"
+              },
+              "matchesRemaining": {
+                "$type": "integer"
+              },
+              "isCalibrating": {
+                "$type": "boolean"
+              },
+              "nextKFactor": {
+                "$type": "integer"
+              }
+            },
+            "allTimePeakRating": {
+              "$type": "integer"
+            },
+            "allTimePeakRankCode": {
+              "$type": "string"
+            },
+            "seasonId": {
+              "$type": "string"
+            },
+            "seasonPeakRating": {
+              "$type": "integer"
+            },
+            "seasonPeakRankCode": {
+              "$type": "string"
+            },
+            "seasonRolloverPending": {
+              "$type": "boolean"
+            },
+            "ranked": {
+              "wins": {
+                "$type": "integer"
+              },
+              "losses": {
+                "$type": "integer"
+              },
+              "draws": {
+                "$type": "integer"
+              },
+              "played": {
+                "$type": "integer"
+              },
+              "winRatePercent": {
+                "$type": "number"
+              },
+              "currentWinStreak": {
+                "$type": "integer"
+              },
+              "bestWinStreak": {
+                "$type": "integer"
+              },
+              "accuracyPercent": {
+                "$type": "number"
+              },
+              "avgAnswerTimeMs": {
+                "$type": "integer"
+              },
+              "questionCount": {
+                "$type": "integer"
+              }
+            },
+            "privateMatches": {
+              "wins": {
+                "$type": "integer"
+              },
+              "losses": {
+                "$type": "integer"
+              },
+              "draws": {
+                "$type": "integer"
+              },
+              "played": {
+                "$type": "integer"
+              },
+              "winRatePercent": {
+                "$type": "number"
+              },
+              "currentWinStreak": {
+                "$type": "integer"
+              },
+              "bestWinStreak": {
+                "$type": "integer"
+              },
+              "accuracyPercent": {
+                "$type": "number"
+              },
+              "avgAnswerTimeMs": {
+                "$type": "integer"
+              },
+              "questionCount": {
+                "$type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "DELETE /api/v1/friends/{friendId}": {
+    "success": {
+      "204": {}
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/friend-requests": {
+    "success": {
+      "201": {
+        "id": {
+          "$type": "string"
+        },
+        "requester": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "status": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "updatedAt": {
+          "$type": "string"
+        },
+        "acceptedAt": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      },
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "requester": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "status": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "updatedAt": {
+          "$type": "string"
+        },
+        "acceptedAt": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "429": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {
+      "friendCode": {
+        "$type": "string"
+      }
+    }
+  },
+  "GET /api/v1/friend-requests": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "id": {
+              "$type": "string"
+            },
+            "requester": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "recipient": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "status": {
+              "$type": "string"
+            },
+            "createdAt": {
+              "$type": "string"
+            },
+            "updatedAt": {
+              "$type": "string"
+            },
+            "acceptedAt": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "pagination": {
+          "page": {
+            "$type": "integer"
+          },
+          "size": {
+            "$type": "integer"
+          },
+          "totalElements": {
+            "$type": "integer"
+          },
+          "totalPages": {
+            "$type": "integer"
+          }
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "GET /api/v1/friend-requests/{id}": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "requester": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "status": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "updatedAt": {
+          "$type": "string"
+        },
+        "acceptedAt": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "DELETE /api/v1/friend-requests/{id}": {
+    "success": {
+      "204": {}
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/friend-requests/{id}/accept": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "requester": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "status": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "updatedAt": {
+          "$type": "string"
+        },
+        "acceptedAt": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/friend-requests/{id}/decline": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "requester": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "status": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "updatedAt": {
+          "$type": "string"
+        },
+        "acceptedAt": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/duels/{duelId}/invitations": {
+    "success": {
+      "201": {
+        "id": {
+          "$type": "string"
+        },
+        "duelId": {
+          "$type": "string"
+        },
+        "host": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "disciplineCode": {
+          "$type": "string"
+        },
+        "format": {
+          "$type": "string"
+        },
+        "status": {
+          "$type": "string"
+        },
+        "reason": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "expiresAt": {
+          "$type": "string"
+        },
+        "battleId": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      },
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "duelId": {
+          "$type": "string"
+        },
+        "host": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "disciplineCode": {
+          "$type": "string"
+        },
+        "format": {
+          "$type": "string"
+        },
+        "status": {
+          "$type": "string"
+        },
+        "reason": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "expiresAt": {
+          "$type": "string"
+        },
+        "battleId": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "410": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "429": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {
+      "friendId": {
+        "$type": "string"
+      },
+      "requestId": {
+        "$type": "string"
+      }
+    }
+  },
+  "GET /api/v1/duels/{duelId}/invitations": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "id": {
+              "$type": "string"
+            },
+            "duelId": {
+              "$type": "string"
+            },
+            "host": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "recipient": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "disciplineCode": {
+              "$type": "string"
+            },
+            "format": {
+              "$type": "string"
+            },
+            "status": {
+              "$type": "string"
+            },
+            "reason": {
+              "$type": "string"
+            },
+            "createdAt": {
+              "$type": "string"
+            },
+            "expiresAt": {
+              "$type": "string"
+            },
+            "battleId": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "serverTime": {
+          "$type": "string"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "GET /api/v1/users/me/duel-invitations": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "id": {
+              "$type": "string"
+            },
+            "duelId": {
+              "$type": "string"
+            },
+            "host": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "recipient": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "disciplineCode": {
+              "$type": "string"
+            },
+            "format": {
+              "$type": "string"
+            },
+            "status": {
+              "$type": "string"
+            },
+            "reason": {
+              "$type": "string"
+            },
+            "createdAt": {
+              "$type": "string"
+            },
+            "expiresAt": {
+              "$type": "string"
+            },
+            "battleId": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "serverTime": {
+          "$type": "string"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "GET /api/v1/duel-invitations/{id}": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "duelId": {
+          "$type": "string"
+        },
+        "host": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "disciplineCode": {
+          "$type": "string"
+        },
+        "format": {
+          "$type": "string"
+        },
+        "status": {
+          "$type": "string"
+        },
+        "reason": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "expiresAt": {
+          "$type": "string"
+        },
+        "battleId": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "DELETE /api/v1/duel-invitations/{id}": {
+    "success": {
+      "204": {}
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/duel-invitations/{id}/accept": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "duelId": {
+          "$type": "string"
+        },
+        "host": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "disciplineCode": {
+          "$type": "string"
+        },
+        "format": {
+          "$type": "string"
+        },
+        "status": {
+          "$type": "string"
+        },
+        "reason": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "expiresAt": {
+          "$type": "string"
+        },
+        "battleId": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "410": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
+  "POST /api/v1/duel-invitations/{id}/decline": {
+    "success": {
+      "200": {
+        "id": {
+          "$type": "string"
+        },
+        "duelId": {
+          "$type": "string"
+        },
+        "host": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "recipient": {
+          "id": {
+            "$type": "string"
+          },
+          "isPro": {
+            "$type": "boolean"
+          },
+          "nickname": {
+            "$type": "string"
+          }
+        },
+        "disciplineCode": {
+          "$type": "string"
+        },
+        "format": {
+          "$type": "string"
+        },
+        "status": {
+          "$type": "string"
+        },
+        "reason": {
+          "$type": "string"
+        },
+        "createdAt": {
+          "$type": "string"
+        },
+        "expiresAt": {
+          "$type": "string"
+        },
+        "battleId": {
+          "$type": "string"
+        },
+        "version": {
+          "$type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "400": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "401": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "500": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "403": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "404": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      },
+      "409": {
+        "code": {
+          "$type": "string"
+        },
+        "message": {
+          "$type": "string"
+        },
+        "fieldErrors": {
+          "[]": {
+            "field": {
+              "$type": "string"
+            },
+            "message": {
+              "$type": "string"
+            }
+          }
+        },
+        "resetsAt": {
+          "$type": "string"
+        }
+      }
+    },
+    "request": {}
+  },
   "POST /api/v1/battles/{id}/stickers": {
     "success": {
       "200": {

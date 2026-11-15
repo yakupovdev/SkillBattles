@@ -530,7 +530,7 @@ class StageDEPostgresTest {
   var a=register();var b=register();var source=source(a,b,BattleMode.PRIVATE);var round=source.getState().getRounds().getFirst();
   var report=actions.report(source.getId(),round.getId(),id(a),"TYPO",null);String schema="retired_practice_upgrade";
   var v10=org.flywaydb.core.Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).target("10").load();v10.migrate();
-  jdbc.update("insert into retired_practice_upgrade.users select * from public.users where id in (?,?)",id(a),id(b));
+  jdbc.update("insert into retired_practice_upgrade.users select (jsonb_populate_record(null::retired_practice_upgrade.users,to_jsonb(u))).* from public.users u where u.id in (?,?)",id(a),id(b));
   jdbc.update("insert into retired_practice_upgrade.battles select * from public.battles where id=?",source.getId());
   jdbc.update("insert into retired_practice_upgrade.question_reports select * from public.question_reports where id=?",report.getId());
   jdbc.update("insert into retired_practice_upgrade.practice_sessions(id,created_at,updated_at,user_id,source_battle_id,source_round_id,discipline_code,expires_at,question) values (?,now(),now(),?,?,?,'SAT_MATH',now()+interval '30 minutes','{}'::jsonb)",UUID.randomUUID(),id(a),source.getId(),round.getId());
@@ -545,7 +545,7 @@ class StageDEPostgresTest {
   var actual=rest("GET","/v3/api-docs",null,null,200);Files.writeString(Path.of("target/generated-openapi.json"),actual.toPrettyString());
   var expected=json.readTree(getClass().getResourceAsStream("/contracts/v03-shapes.json"));
   var found=new TreeSet<String>();actual.path("paths").fields().forEachRemaining(p->p.getValue().fieldNames().forEachRemaining(m->{if(p.getKey().startsWith("/api/v1/") && Set.of("get","post","patch","delete").contains(m))found.add(m.toUpperCase()+" "+p.getKey());}));
-  var target=new TreeSet<String>();expected.fieldNames().forEachRemaining(target::add);Assertions.assertThat(found).isEqualTo(target).hasSize(41);
+  var target=new TreeSet<String>();expected.fieldNames().forEachRemaining(target::add);Assertions.assertThat(found).isEqualTo(target).hasSize(expected.size());
   var failures=new ArrayList<String>();
   expected.fields().forEachRemaining(e->{String[] key=e.getKey().split(" ",2);var operation=actual.path("paths").path(key[1]).path(key[0].toLowerCase(Locale.ROOT));
    e.getValue().path("success").fields().forEachRemaining(response->{var generated=operation.path("responses").path(response.getKey());if(generated.isMissingNode())failures.add(e.getKey()+" missing success "+response.getKey());else compareShape(response.getValue(),schema(generated),actual,e.getKey()+" response "+response.getKey(),failures);});

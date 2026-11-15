@@ -19,7 +19,7 @@ class BattleStickerRealtimeTest {
     final ThreadPoolTaskExecutor executor = mock(ThreadPoolTaskExecutor.class);
     final BattleService battles = mock(BattleService.class);
     final RealtimeProcessorImpl realtime = new RealtimeProcessorImpl(battles, mock(BattleProcessor.class), mock(BattleSnapshotMapper.class), sessions, messaging,
-            Clock.systemUTC(), mock(PlatformTransactionManager.class), executor, mock(MatchmakingMapper.class), mock(BattleAccessProcessor.class), mock(MatchmakingProcessor.class));
+            Clock.systemUTC(), mock(PlatformTransactionManager.class), executor, mock(MatchmakingMapper.class), mock(BattleAccessProcessor.class), mock(MatchmakingProcessor.class), mock(FriendMapper.class), mock(DuelInvitationProcessor.class));
     BattleStickerAcceptedEvent event() {
         UUID battle = UUID.randomUUID();
         return new BattleStickerAcceptedEvent(UUID.randomUUID(), new RealtimeEvent<>(UUID.randomUUID(), "BATTLE_STICKER", battle, 1, BattleFixtures.START,

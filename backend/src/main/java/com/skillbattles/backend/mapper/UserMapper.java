@@ -19,6 +19,7 @@ public interface UserMapper {
     @Mapping(target = "emailNormalized", ignore = true)
     @Mapping(target = "nicknameNormalized", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
+    @Mapping(target = "friendCode", ignore = true)
     User toEntity(RegisterDto dto);
 
     UserResponse toResponse(UserDto dto);
