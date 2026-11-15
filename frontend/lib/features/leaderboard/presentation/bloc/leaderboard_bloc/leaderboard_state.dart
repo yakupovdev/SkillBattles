@@ -7,6 +7,7 @@ final class LeaderboardState extends Equatable {
     this.boardStatus = LoadStatus.initial,
     this.board,
     this.failure,
+    this.ranks,
     this.statistics,
     this.seasons,
   });
@@ -16,6 +17,9 @@ final class LeaderboardState extends Equatable {
   final LoadStatus boardStatus;
   final LeaderboardEntity? board;
   final Failure? failure;
+
+  /// Server rank thresholds; optional when the catalogue request fails.
+  final RankLadderEntity? ranks;
 
   /// Own peaks; `null` when they could not be loaded.
   final StatisticsEntity? statistics;
@@ -29,10 +33,12 @@ final class LeaderboardState extends Equatable {
     LoadStatus? boardStatus,
     LeaderboardEntity? board,
     Failure? failure,
+    RankLadderEntity? ranks,
     StatisticsEntity? statistics,
     SeasonHistoryPageEntity? seasons,
     bool resetBoard = false,
     bool resetFailure = false,
+    bool resetRanks = false,
   }) {
     return LeaderboardState(
       disciplines: disciplines ?? this.disciplines,
@@ -40,6 +46,7 @@ final class LeaderboardState extends Equatable {
       boardStatus: boardStatus ?? this.boardStatus,
       board: resetBoard ? null : board ?? this.board,
       failure: resetFailure ? null : failure ?? this.failure,
+      ranks: resetRanks ? null : ranks ?? this.ranks,
       statistics: statistics ?? this.statistics,
       seasons: seasons ?? this.seasons,
     );
@@ -52,6 +59,7 @@ final class LeaderboardState extends Equatable {
     boardStatus,
     board,
     failure,
+    ranks,
     statistics,
     seasons,
   ];

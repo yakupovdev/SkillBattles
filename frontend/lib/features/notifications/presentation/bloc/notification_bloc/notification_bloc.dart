@@ -152,10 +152,6 @@ final class NotificationBloc
     );
     on<_FriendshipReceived>(_onFriendshipReceived);
     on<_DuelInvitationReceived>(_onDuelInvitationReceived);
-    on<_OutgoingInvitationCheckRequested>(
-      _onOutgoingInvitationCheckRequested,
-      transformer: droppable(),
-    );
   }
 
   final WatchRematchesUsecase _watchRematches;
@@ -318,10 +314,10 @@ final class NotificationBloc
     );
     if (emit.isDone || session != _session || run != _activityRun) return;
     // A failed read keeps the last known value.
-    result.match((_) {}, (ActivityEntity activity) {
-      emit(state.copyWith(isBusy: !activity.isNone));
-      _checkOutgoingInvitation(activity);
-    });
+    final ActivityEntity? activity = result.toNullable();
+    if (activity == null) return;
+    emit(state.copyWith(isBusy: !activity.isNone));
+    await _checkOutgoingInvitation(activity, session, run, emit);
   }
 
   // ---------------------------------------------------------------------
@@ -1638,33 +1634,44 @@ final class NotificationBloc
   /// When an activity read shows the room of the host's own invitation is
   /// no longer the own activity, the invitation is re-read: a lost
   /// ACCEPTED push still reaches the host.
-  void _checkOutgoingInvitation(ActivityEntity activity) {
+  Future<void> _checkOutgoingInvitation(
+    ActivityEntity activity,
+    int session,
+    int activityRun,
+    Emitter<NotificationState> emit,
+  ) async {
     final NotificationItem? item = _outgoingItem();
     final DuelInvitationNotificationPayload? payload = _invitationPayload(item);
     if (item == null || payload == null) return;
     final bool stillWaiting =
         activity.type == ActivityType.privateDuel &&
         activity.resourceId == payload.invitation.duelId;
-    if (!stillWaiting) add(const _OutgoingInvitationCheckRequested());
-  }
-
-  Future<void> _onOutgoingInvitationCheckRequested(
-    _OutgoingInvitationCheckRequested event,
-    Emitter<NotificationState> emit,
-  ) async {
-    final NotificationItem? item = _outgoingItem();
-    if (!_isSignedIn || item == null) return;
-    final int session = _session;
+    if (stillWaiting) return;
     final Either<Failure, DuelInvitationEntity> result =
         await _getDuelInvitation(
           DuelInvitationParamsEntity(invitationId: item.resourceId),
         );
-    if (emit.isDone || session != _session) return;
+    if (emit.isDone || session != _session || activityRun != _activityRun) {
+      return;
+    }
     result.match(
       (Failure failure) {
         if (failure.hasCode(ApiErrorCodes.duelInvitationNotFound)) {
           _tombstoneInvitation(item.resourceId);
           _removeItem(item.id, emit);
+          final String? battleId = activity.type == ActivityType.battle
+              ? activity.battleId
+              : null;
+          if (battleId != null) {
+            _openBattle(
+              battleId,
+              emit,
+              kind: NotificationKind.duelInvitation,
+              resourceId: item.resourceId,
+              nickname: _playerNickname(item),
+              isOutgoing: true,
+            );
+          }
         }
       },
       (DuelInvitationEntity record) =>

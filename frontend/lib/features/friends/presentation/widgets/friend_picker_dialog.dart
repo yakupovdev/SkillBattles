@@ -48,13 +48,14 @@ final class FriendPickerDialog extends StatelessWidget {
     this.isChangingPage = false,
     this.isSending = false,
     this.errorText,
+    this.pageErrorText,
     super.key,
   });
 
   final String disciplineName;
   final FriendPickerStatus status;
 
-  /// The loaded friends (every appended page).
+  /// The friends on the current page.
   final List<FriendListItemEntity> friends;
 
   /// Paging of the list; `null` until the first page arrived.
@@ -75,6 +76,7 @@ final class FriendPickerDialog extends StatelessWidget {
   final bool isChangingPage;
   final bool isSending;
   final String? errorText;
+  final String? pageErrorText;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +84,7 @@ final class FriendPickerDialog extends StatelessWidget {
     final bool isEmpty = status == FriendPickerStatus.ready && friends.isEmpty;
     final bool isReady = status == FriendPickerStatus.ready && !isEmpty;
     final String? error = errorText;
+    final String? pageError = pageErrorText;
     return FriendsDialogShell(
       width: 520,
       eyebrow: 'Private duel · $disciplineName',
@@ -116,6 +119,7 @@ final class FriendPickerDialog extends StatelessWidget {
                     onSelected: onSelected,
                   ),
         },
+        if (pageError != null) AppInlineError(pageError),
         if (isReady && paging != null && paging.totalPages > 1)
           FriendsPagination(
             page: paging,

@@ -12,6 +12,7 @@ import 'package:skill_battles/core/presentation/bloc/load_status.dart';
 import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
+import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/features/friends/domain/entity/duel_invitation_entity.dart';
 import 'package:skill_battles/features/friends/domain/entity/duel_invitation_reason.dart';
 import 'package:skill_battles/features/friends/domain/entity/duel_invitation_status.dart';
@@ -55,6 +56,7 @@ final class RoomInvitationScope extends StatelessWidget {
             .getDep<WatchDuelInvitationChangesUsecase>(),
         watchConnection: dependencies.getDep<WatchConnectionUsecase>(),
         generateId: dependencies.getDep<GenerateIdUsecase>(),
+        pageSize: 5,
       )..add(RoomInvitationStarted(duelId)),
       child: child,
     );
@@ -110,7 +112,10 @@ final class _RoomInvitationActionsState extends State<RoomInvitationActions> {
     final Failure? failure = state.sendFailure;
     if (failure is ApiFailure && failure.hasCode(ApiErrorCodes.rateLimited)) {
       final Duration wait = failure.retryAfter ?? const Duration(seconds: 60);
-      setState(() => _rateLimitedUntil = DateTime.now().add(wait));
+      setState(
+        () =>
+            _rateLimitedUntil = DateTime.now().add(state.clockOffset).add(wait),
+      );
     }
   }
 
@@ -232,9 +237,13 @@ final class _PickerHostState extends State<_PickerHost> {
     }.contains(failure.errorCode);
   }
 
-  static String? _errorOf(RoomInvitationState state) {
+  String? _errorOf(RoomInvitationState state) {
     final Failure? failure = state.sendFailure;
-    if (failure == null || !state.sendStatus.isFailure) return null;
+    if (failure == null ||
+        !state.sendStatus.isFailure ||
+        state.sendFriendId != _selectedId) {
+      return null;
+    }
     if (failure.hasCode(ApiErrorCodes.friendNotFound)) {
       return 'You are no longer friends with this player.';
     }
@@ -248,9 +257,19 @@ final class _PickerHostState extends State<_PickerHost> {
           previous.sendStatus != current.sendStatus && _closesDialog(current),
       listener: (BuildContext context, RoomInvitationState state) =>
           Navigator.of(context).pop(),
+      buildWhen: (RoomInvitationState previous, RoomInvitationState current) =>
+          previous.friendsStatus != current.friendsStatus ||
+          previous.friends != current.friends ||
+          previous.friendsPage != current.friendsPage ||
+          previous.friendsPageStatus != current.friendsPageStatus ||
+          previous.friendsPageFailure != current.friendsPageFailure ||
+          previous.sendStatus != current.sendStatus ||
+          previous.sendFriendId != current.sendFriendId ||
+          previous.sendFailure != current.sendFailure,
       builder: (BuildContext context, RoomInvitationState state) {
         final bool isRemovedFriend =
-            state.sendFailure?.hasCode(ApiErrorCodes.friendNotFound) ?? false;
+            state.sendFriendId == _selectedId &&
+            (state.sendFailure?.hasCode(ApiErrorCodes.friendNotFound) ?? false);
         final bool hasSelection =
             _selectedId != null &&
             !isRemovedFriend &&
@@ -271,8 +290,13 @@ final class _PickerHostState extends State<_PickerHost> {
           page: state.friendsPage,
           selectedFriendId: hasSelection ? _selectedId : null,
           isSending: state.sendStatus.isLoading,
-          isChangingPage: state.friendsPageStatus.isLoading,
+          isChangingPage:
+              state.friendsStatus.isLoading ||
+              state.friendsPageStatus.isLoading,
           errorText: _errorOf(state),
+          pageErrorText: state.friendsPageStatus.isFailure
+              ? state.friendsPageFailure?.userMessage
+              : null,
           onSelected: (String id) => setState(() => _selectedId = id),
           onSend: () {
             final String? id = _selectedId;

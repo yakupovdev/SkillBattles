@@ -56,7 +56,7 @@ final class FriendRequestRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 6,
+          spacing: 8,
           children: <Widget>[
             Row(
               spacing: 14,

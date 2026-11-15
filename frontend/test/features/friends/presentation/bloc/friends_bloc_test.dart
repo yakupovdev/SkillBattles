@@ -240,6 +240,25 @@ void main() {
       expect(f.state.friends.items.first.relationshipId, 'rel0');
     });
 
+    test(
+      'a refresh clears a previous page error and loads the target page',
+      () async {
+        f.repo.onGetFriends = (p) => _serve(p, 5);
+        await f.start();
+        f.repo.onGetFriends = (p) async => failed(const ConnectionFailure());
+        await f.send(const FriendsPageRequested(FriendsList.friends, 1));
+        expect(f.state.friends.pageFailure, const ConnectionFailure());
+
+        f.repo.onGetFriends = (p) => _serve(p, 5);
+        await f.send(const FriendsRefreshRequested());
+
+        expect(f.state.friends.loadStatus, LoadStatus.success);
+        expect(f.state.friends.pageStatus, LoadStatus.initial);
+        expect(f.state.friends.pageFailure, isNull);
+        expect(f.state.friends.page!.page, 1);
+      },
+    );
+
     test('out-of-range pages are clamped to the known pages', () async {
       f.repo.onGetFriends = (p) => _serve(p, 5);
       await f.start();
@@ -619,6 +638,18 @@ void main() {
     });
 
     test('an action of a row that left the list is pruned', () async {
+      // Relationship ids are globally unique: the outgoing request being
+      // cancelled must not also exist in the incoming list.
+      f.repo.onGetFriendRequests = (p) async => ok(
+        requestsPage([
+          relationship(
+            p.direction == FriendRequestDirection.incoming
+                ? 'incoming-r1'
+                : 'r1',
+            incoming: p.direction == FriendRequestDirection.incoming,
+          ),
+        ]),
+      );
       await f.start();
       f.repo.onCancelFriendRequest = (id) async => ok(unit);
       f.repo.onGetFriendRequests = (p) async =>

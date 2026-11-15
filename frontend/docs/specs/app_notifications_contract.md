@@ -18,7 +18,7 @@ when B accepts.
 | Layer | Where | What |
 |---|---|---|
 | Generic widgets | `lib/core/presentation/widgets/` | `AppNotificationCard`, `AppNotificationToast`, `AppNotificationPill`, `AppConnectionIndicator`, `AppButton(isLoading:)`, `AppShadows.overlay` (or equivalent). Know nothing about rematches or friends. |
-| Composition | `lib/app/notifications/` | `AppNotificationsOverlay` (mounted once in `AppShell`), the generic prompt/toast view data, and one adapter per source (`rematch_notifications.dart`) mapping a feature state to that view data. Adding a source later (friends room invitations, friend requests) = one adapter + one more `BlocBuilder`/`BlocListener` in the overlay. |
+| Composition | `lib/app/notifications/` | `AppNotificationsOverlay` (mounted once in `AppShell`), generic prompt/toast view data, and an adapter per source (`rematch_notifications.dart`, `friends_notifications.dart`). A new notification kind adds payload/handlers in `NotificationBloc` and mapper cases; the overlay stays unchanged. |
 | State | `lib/features/notifications/presentation/bloc/notification_bloc/` | `NotificationBloc`: one app-scope BLoC for every notification kind, provided next to `AccountBloc`. |
 
 Friend requests and room invitations are kinds of `NotificationBloc` too
@@ -198,6 +198,12 @@ Exactly as in `rematch_notifications.md` (sizes, colors, states), but generic:
   A new kind must not rely on effects that arrive while the shell is
   unmounted. For the host's accepted room invitation the fallback paths are
   in `friends_logic_contract.md` §1 ("Host paths").
+
+  Host recovery on a route change also handles an invitation 404 with own
+  BATTLE activity: it opens that activity's battle through the same deduped
+  path as reconnect recovery. A newer activity refresh cancels an older
+  pending check. Friends HTTP results from a previous signed-in account
+  are not published into the current account's notification streams.
 - Rebuild scoping per `state_managment.md`: separate selectors for the
   indicator, the pill, the cards and the toasts.
 

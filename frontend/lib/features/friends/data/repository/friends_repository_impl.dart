@@ -115,10 +115,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String friendCode,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final RelationshipModel model = await _remote.sendFriendRequest(
         SendFriendRequestModel(friendCode: friendCode),
       );
-      return Right(_emitRelationship(model));
+      return Right(_emitRelationship(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -129,12 +130,13 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     FriendRequestsParamsEntity params,
   ) async {
     try {
+      final String viewerId = _viewerId;
       final FriendRequestsPageModel model = await _remote.getFriendRequests(
         direction: FriendRequestDirectionModel.fromEntity(params.direction),
         page: params.page,
         size: params.size,
       );
-      return Right(model.toEntity(viewerId: _viewerId));
+      return Right(model.toEntity(viewerId: viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -145,8 +147,9 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String requestId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final RelationshipModel model = await _remote.getFriendRequest(requestId);
-      return Right(_emitRelationship(model));
+      return Right(_emitRelationship(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -157,10 +160,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String requestId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final RelationshipModel model = await _remote.acceptFriendRequest(
         requestId,
       );
-      return Right(_emitRelationship(model));
+      return Right(_emitRelationship(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -171,10 +175,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String requestId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final RelationshipModel model = await _remote.declineFriendRequest(
         requestId,
       );
-      return Right(_emitRelationship(model));
+      return Right(_emitRelationship(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -195,11 +200,12 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     SendDuelInvitationParamsEntity params,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final DuelInvitationModel model = await _remote.sendDuelInvitation(
         params.duelId,
         SendDuelInvitationRequestModel.fromEntity(params),
       );
-      return Right(_emitInvitation(model));
+      return Right(_emitInvitation(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -210,10 +216,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String duelId,
   ) async {
     try {
+      final String viewerId = _viewerId;
       final DuelInvitationsSnapshotModel model = await _remote
           .getRoomInvitations(duelId);
       return Right(
-        model.toEntity(viewerId: _viewerId, receivedAt: _clock.now()),
+        model.toEntity(viewerId: viewerId, receivedAt: _clock.now()),
       );
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
@@ -224,10 +231,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
   Future<Either<Failure, DuelInvitationsSnapshotEntity>>
   getIncomingDuelInvitations() async {
     try {
+      final String viewerId = _viewerId;
       final DuelInvitationsSnapshotModel model = await _remote
           .getIncomingDuelInvitations();
       return Right(
-        model.toEntity(viewerId: _viewerId, receivedAt: _clock.now()),
+        model.toEntity(viewerId: viewerId, receivedAt: _clock.now()),
       );
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
@@ -239,10 +247,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String invitationId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final DuelInvitationModel model = await _remote.getDuelInvitation(
         invitationId,
       );
-      return Right(_emitInvitation(model));
+      return Right(_emitInvitation(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -253,10 +262,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String invitationId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final DuelInvitationModel model = await _remote.acceptDuelInvitation(
         invitationId,
       );
-      return Right(_emitInvitation(model));
+      return Right(_emitInvitation(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -267,10 +277,11 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     String invitationId,
   ) async {
     try {
+      final String? viewerId = _session.userId;
       final DuelInvitationModel model = await _remote.declineDuelInvitation(
         invitationId,
       );
-      return Right(_emitInvitation(model));
+      return Right(_emitInvitation(model, viewerId));
     } on Exception catch (exception, stackTrace) {
       return Left(mapExceptionToFailure(exception, stackTrace));
     }
@@ -324,15 +335,33 @@ final class FriendsRepositoryImpl implements FriendsRepository {
     await _ownInvitations.close();
   }
 
-  RelationshipEntity _emitRelationship(RelationshipModel model) {
-    final RelationshipEntity entity = model.toEntity(viewerId: _viewerId);
-    if (!_ownRelationships.isClosed) _ownRelationships.add(entity);
+  RelationshipEntity _emitRelationship(
+    RelationshipModel model,
+    String? viewerId,
+  ) {
+    final RelationshipEntity entity = model.toEntity(viewerId: viewerId ?? '');
+    // An old account's HTTP answer still belongs to its caller, but must
+    // never become a push in the newly signed-in account's inbox.
+    if (viewerId != null &&
+        viewerId == _session.userId &&
+        !_ownRelationships.isClosed) {
+      _ownRelationships.add(entity);
+    }
     return entity;
   }
 
-  DuelInvitationEntity _emitInvitation(DuelInvitationModel model) {
-    final DuelInvitationEntity entity = model.toEntity(viewerId: _viewerId);
-    if (!_ownInvitations.isClosed) _ownInvitations.add(entity);
+  DuelInvitationEntity _emitInvitation(
+    DuelInvitationModel model,
+    String? viewerId,
+  ) {
+    final DuelInvitationEntity entity = model.toEntity(
+      viewerId: viewerId ?? '',
+    );
+    if (viewerId != null &&
+        viewerId == _session.userId &&
+        !_ownInvitations.isClosed) {
+      _ownInvitations.add(entity);
+    }
     return entity;
   }
 

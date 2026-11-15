@@ -7,7 +7,7 @@ UI; the BLoCs never navigate.
 
 Approved product decisions (`docs/specs/friends.md`, "Decisions") applied
 here: page size 20 for friends and for each request direction, shown one
-page at a time (Previous / Next and page numbers); recovery
+page at a time (Previous / Next); recovery
 re-shows every pending item; × is a session-only local hide; the invitee is
 busy for every activity other than NONE; the host gets the "accepted" toast
 and goes to Ready from any route; `questionCount` stays in
@@ -57,6 +57,11 @@ by this app's own send/get/accept/decline calls, so several BLoCs converge
 by id + version even when a push is lost. Commands answered with 204
 (cancel request, remove friend, withdraw invitation) emit nothing; their
 BLoCs refetch instead.
+
+Direction is mapped for the user who started the HTTP operation. Its result
+is published to the watch streams only while that user is still signed in;
+an old account's late response never becomes a new account's notification.
+Refreshing tokens for the same user keeps the streams working.
 
 ## 1. Overlay notifications: `NotificationBloc` (app scope)
 
@@ -158,8 +163,9 @@ accepts. If the ACCEPTED push is lost: (1) the room screen, when open,
 still navigates on MATCHED (`PrivateDuelBloc` polls); (2) every activity
 read (each route change, via `NotificationActivityRefreshRequested`) whose
 activity is no longer that room re-reads the own invitation by id; (3) every
-reconnect recovery does the same, and a 404 with own BATTLE activity opens
-that battle.
+reconnect recovery does the same. Both route-change checks and reconnect
+recovery open the activity's battle if the invitation returns 404 while
+own activity is BATTLE. A newer activity read supersedes a pending check.
 
 ### Overlay copy (adapter `lib/app/notifications/friends_notifications.dart`)
 
@@ -218,7 +224,9 @@ while the next loads), `pageFailure`, getters `hasPrevious`, `hasNext`,
 first load (mock items via skeleton data); a refresh with items keeps them
 visible. Empty success shows the empty state. A refresh started during a
 page change supersedes it (`pageStatus` back to `initial`) and loads the
-requested page.
+requested page. A refresh also clears a previous page-change error. Page
+failures keep the current rows visible, show an inline error, and leave
+Previous / Next available to retry.
 
 Lists are refetched on every relevant FRIENDSHIP_CHANGED push, on own
 command results and on reconnect, at their CURRENT page (latest-wins per
@@ -269,6 +277,9 @@ the room is WAITING (from `PrivateDuelBloc`).
 `watchDuelInvitationChanges`, `watchConnection`, `generateId`; optional
 `pageSize` (default 20).
 
+The room UI passes `pageSize: 5` for the picker, as drawn in Paper. The
+Friends screen and its request lists keep page size 20.
+
 Request id policy: a Send creates an intent (duelId, friendId, requestId).
 It is kept after `ConnectionFailure`, `TimeoutFailure`, 5xx, parsing
 failures and 429, so a Send to the same friend reuses the id
@@ -276,6 +287,14 @@ failures and 429, so a Send to the same friend reuses the id
 intent, and so does a push or restore showing an invitation to that friend
 in this room (the uncertain send went through). The next Send, or one to
 another friend, then gets a new id.
+
+A matching push or restore resolves the intent even while Send's HTTP
+request is pending. The late HTTP answer of that resolved intent is ignored;
+it cannot restore a retry with the old request id.
+Resolved results can be dismissed without forgetting their versions. A
+replayed older invitation cannot become pending again or resolve a later
+Send; newer invitations are ordered by creation time across resource ids.
+After a terminal push, a new Send may start before the old HTTP call ends.
 
 | Event | Payload | Use |
 |---|---|---|

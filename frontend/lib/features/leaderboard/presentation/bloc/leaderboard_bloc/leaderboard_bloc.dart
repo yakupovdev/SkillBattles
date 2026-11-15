@@ -12,7 +12,9 @@ import 'package:skill_battles/features/account/domain/entity/statistics_entity.d
 import 'package:skill_battles/features/account/domain/usecases/get_season_history_usecase.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
+import 'package:skill_battles/features/catalog/domain/entity/rank_ladder_entity.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_disciplines_usecase.dart';
+import 'package:skill_battles/features/catalog/domain/usecases/get_ranks_usecase.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_params_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/usecases/get_leaderboard_usecase.dart';
@@ -22,10 +24,12 @@ part 'leaderboard_state.dart';
 
 /// Season leaderboard per discipline; the latest selected tab wins. The own
 /// peaks and past seasons of the side panel load once, next to the
-/// catalogue; without them the panel just leaves those lines out.
+/// catalogue. The rank ladder enriches climb progress; optional data failures
+/// leave the corresponding details out without blocking the leaderboard.
 final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   LeaderboardBloc({
     required this._getDisciplines,
+    required this._getRanks,
     required this._getLeaderboard,
     required this._getStatistics,
     required this._getSeasonHistory,
@@ -35,6 +39,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
   }
 
   final GetDisciplinesUsecase _getDisciplines;
+  final GetRanksUsecase _getRanks;
   final GetLeaderboardUsecase _getLeaderboard;
   final GetStatisticsUsecase _getStatistics;
   final GetSeasonHistoryUsecase _getSeasonHistory;
@@ -46,16 +51,20 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     emit(state.copyWith(boardStatus: LoadStatus.loading));
     final (
       Either<Failure, List<DisciplineEntity>> result,
+      Either<Failure, RankLadderEntity> ranks,
       Either<Failure, StatisticsEntity> statistics,
       Either<Failure, SeasonHistoryPageEntity> seasons,
     ) = await (
       _getDisciplines(const NoParams()),
+      _getRanks(const NoParams()),
       _getStatistics(const NoParams()),
       _getSeasonHistory(const SeasonHistoryParamsEntity()),
     ).wait;
     if (emit.isDone) return;
     emit(
       state.copyWith(
+        ranks: ranks.toNullable(),
+        resetRanks: ranks.isLeft(),
         statistics: statistics.toNullable(),
         seasons: seasons.toNullable(),
       ),

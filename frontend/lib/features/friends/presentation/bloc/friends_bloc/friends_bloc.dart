@@ -195,9 +195,8 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
             : slice.copyWith(
                 loadStatus: LoadStatus.loading,
                 // A refresh supersedes a running page change.
-                pageStatus: slice.pageStatus.isLoading
-                    ? LoadStatus.initial
-                    : null,
+                pageStatus: LoadStatus.initial,
+                resetPageFailure: true,
               ),
       ),
     );

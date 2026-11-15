@@ -408,6 +408,7 @@ final class BattleStickersBloc
     _IncomingStickerReceived event,
     Emitter<BattleStickersState> emit,
   ) {
+    if (state.connection != RealtimeStatus.connected) return;
     final IncomingStickerEntity sticker = event.sticker;
     final String? opponent = _opponentUserId;
     if (sticker.battleId != battleId ||

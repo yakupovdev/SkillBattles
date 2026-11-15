@@ -61,7 +61,7 @@ final class RoomInvitationBloc
       _onFriendsPageRequested,
       transformer: droppable(),
     );
-    on<RoomInvitationSendRequested>(_onSend, transformer: droppable());
+    on<RoomInvitationSendRequested>(_onSend, transformer: concurrent());
     on<RoomInvitationWithdrawRequested>(_onWithdraw, transformer: droppable());
     on<RoomInvitationResultCleared>(_onResultCleared);
     on<_InvitationReceived>(_onInvitationReceived);
@@ -84,6 +84,11 @@ final class RoomInvitationBloc
   int _restoreVersion = 0;
   int _friendsVersion = 0;
 
+  // Dismissing a result only clears its UI. Retain its version so a late
+  // HTTP replay in the repository stream cannot resolve the next Send.
+  final Map<String, int> _invitationVersions = <String, int>{};
+  DuelInvitationEntity? _latestInvitation;
+
   /// The open Send intent: kept after an uncertain failure for a retry.
   _SendIntent? _intent;
 
@@ -105,6 +110,8 @@ final class RoomInvitationBloc
         });
     if (state.duelId != event.duelId) {
       _intent = null;
+      _invitationVersions.clear();
+      _latestInvitation = null;
       emit(RoomInvitationState(duelId: event.duelId));
     }
     await _restore(emit);
@@ -196,25 +203,23 @@ final class RoomInvitationBloc
     Emitter<RoomInvitationState> emit,
   ) {
     if (invitation.duelId != state.duelId || invitation.isIncoming) return;
-    final DuelInvitationEntity? current = state.invitation;
-    if (current != null) {
-      if (current.id == invitation.id) {
-        if (invitation.version <= current.version) return;
-      } else if (current.status.isPending && !invitation.status.isPending) {
-        return;
-      } else if (current.status.isPending == invitation.status.isPending &&
-          !invitation.createdAt.isAfter(current.createdAt)) {
-        return;
-      }
+    final int? knownVersion = _invitationVersions[invitation.id];
+    if (knownVersion != null && invitation.version <= knownVersion) return;
+    _invitationVersions[invitation.id] = invitation.version;
+    final DuelInvitationEntity? current = _latestInvitation;
+    if (current != null &&
+        current.id != invitation.id &&
+        invitation.createdAt.isBefore(current.createdAt)) {
+      return;
     }
+    _latestInvitation = invitation;
     // The server knows this friend's invitation: an open intent for them is
     // resolved (an uncertain send did go through), so a later send must
     // get a new request id and no retry is offered.
     final _SendIntent? intent = _intent;
     if (intent != null &&
         intent.duelId == invitation.duelId &&
-        intent.friendId == invitation.recipient.id &&
-        !state.sendStatus.isLoading) {
+        intent.friendId == invitation.recipient.id) {
       _intent = null;
       emit(
         state.copyWith(
@@ -363,7 +368,10 @@ final class RoomInvitationBloc
             requestId: intent.requestId,
           ),
         );
-    if (emit.isDone || duelId != state.duelId) return;
+    // A push or restore can resolve this intent before the HTTP request
+    // finishes. Its later answer must not reopen a retry or replace a newer
+    // invitation (including when this bloc has switched rooms meanwhile).
+    if (emit.isDone || duelId != state.duelId || _intent != intent) return;
     final Failure? failure = result.getLeft();
     if (failure == null) {
       _intent = null;

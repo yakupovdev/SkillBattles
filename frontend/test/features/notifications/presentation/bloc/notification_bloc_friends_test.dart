@@ -1135,6 +1135,59 @@ void main() {
       expect(f.repo.getInvitationCalls, <String>['o1']);
     });
 
+    testWidgets('route change with invitation 404 restores the activity battle '
+        'exactly once', (WidgetTester tester) async {
+      final FriendsNotificationFixture f = await _started(tester);
+      await _pushInvitation(tester, f, invitation('o1', incoming: false));
+      f.account.onGetActivity = () async => const Right(_battleActivity);
+      f.repo.onGetDuelInvitation = (_) async =>
+          failed(apiFailure(ApiErrorCodes.duelInvitationNotFound, status: 404));
+
+      f.bloc.add(const NotificationActivityRefreshRequested());
+      await _flush(tester);
+
+      expect(f.state.battleToOpen, 'b9');
+      expect(f.state.item(_invitationId('o1')), isNull);
+      expect(f.state.notices.single.isOutgoing, isTrue);
+      expect(f.state.notices.single.type, NotificationNoticeType.accepted);
+
+      f.bloc.add(const NotificationBattleOpened('b9'));
+      f.bloc.add(const NotificationActivityRefreshRequested());
+      await _flush(tester);
+      f.reconnect();
+      await _flush(tester);
+
+      expect(f.state.battleToOpen, isNull);
+      expect(_noticeCount(f, NotificationNoticeType.accepted), 1);
+    });
+
+    testWidgets('a newer activity read supersedes a pending host check', (
+      WidgetTester tester,
+    ) async {
+      final FriendsNotificationFixture f = await _started(tester);
+      await _pushInvitation(tester, f, invitation('o1', incoming: false));
+      final Completer<Either<Failure, DuelInvitationEntity>> oldCheck =
+          Completer<Either<Failure, DuelInvitationEntity>>();
+      f.account.onGetActivity = () async => const Right(_battleActivity);
+      f.repo.onGetDuelInvitation = (_) => oldCheck.future;
+
+      f.bloc.add(const NotificationActivityRefreshRequested());
+      await _flush(tester);
+      expect(f.repo.getInvitationCalls, <String>['o1']);
+
+      f.account.onGetActivity = () async => const Right(_roomActivity);
+      f.bloc.add(const NotificationActivityRefreshRequested());
+      await _flush(tester);
+      oldCheck.complete(
+        failed(apiFailure(ApiErrorCodes.duelInvitationNotFound, status: 404)),
+      );
+      await _flush(tester);
+
+      expect(f.state.battleToOpen, isNull);
+      expect(f.state.item(_invitationId('o1')), isNotNull);
+      expect(f.state.notices, isEmpty);
+    });
+
     testWidgets('recovery restores the room invitation of a waiting room', (
       WidgetTester tester,
     ) async {
