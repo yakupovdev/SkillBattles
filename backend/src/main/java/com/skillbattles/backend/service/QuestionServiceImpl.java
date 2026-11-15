@@ -21,6 +21,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final QuestionMapper mapper;
     private final Validator validator;
     private final Clock clock;
+    private final QuestionImageService images;
 
     @Override
     @Transactional
@@ -117,6 +118,9 @@ public class QuestionServiceImpl implements QuestionService {
                 invalid("Invalid fields at question index " + i + ": " + fields + ".");
             }
             Set<String> optionKeys = dto.getOptions().stream().map(QuestionOptionImportDto::getKey).collect(Collectors.toSet());
+            if (dto.getImageKey() != null && !images.isPackagedForQuestion(dto.getImageKey(), dto.getExternalKey(), dto.getDisciplineCode())) {
+                invalid("Invalid or unavailable imageKey at question index " + i + ".");
+            }
             if (optionKeys.size() != 4 || !optionKeys.contains(dto.getCorrectOptionKey())) {
                 invalid("Question at index " + i + " must have four distinct option keys and a matching correctOptionKey.");
             }

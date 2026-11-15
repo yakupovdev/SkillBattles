@@ -15,7 +15,7 @@ import static org.mockito.Mockito.*;
 class QuestionSelectionTest {
     private final QuestionRepository repository = mock(QuestionRepository.class);
     private final QuestionService service = new QuestionServiceImpl(repository, Mappers.getMapper(QuestionMapper.class),
-            mock(Validator.class), Clock.systemUTC());
+            mock(Validator.class), Clock.systemUTC(), new QuestionImageServiceImpl());
     private final Instant recent = Instant.parse("2026-11-14T12:00:00Z");
 
     @Test

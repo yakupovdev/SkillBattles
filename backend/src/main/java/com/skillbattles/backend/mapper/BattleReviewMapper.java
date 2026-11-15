@@ -4,12 +4,14 @@ import com.skillbattles.backend.config.CommonMapperConfig;
 import com.skillbattles.backend.dto.*;
 import org.mapstruct.*;
 
-@Mapper(config = CommonMapperConfig.class, uses = BattleSnapshotMapper.class)
+@Mapper(config = CommonMapperConfig.class, uses = {BattleSnapshotMapper.class, QuestionImageMapper.class})
 public interface BattleReviewMapper {
     BattleReview toResponse(BattleReviewDto dto);
     @Mapping(target = "roundId", source = "id")
     ReviewRoundDto round(BattleRoundDto dto);
     ReviewQuestionDto question(FrozenQuestionDto dto);
+    @Mapping(target = "imageUrl", source = "imageKey", qualifiedByName = "questionImageUrl")
+    ReviewQuestionResponse toResponse(ReviewQuestionDto dto);
 
     default BattleReviewDto review(BattleDto battle) {
         BattleReviewDto dto = new BattleReviewDto();

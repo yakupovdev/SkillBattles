@@ -15,4 +15,5 @@ public class QuestionViewDto {
     private String topicName;
     private String prompt;
     private List<OptionViewDto> options;
+    private String imageKey;
 }

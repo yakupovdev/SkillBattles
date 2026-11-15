@@ -1,4 +1,4 @@
--- Full supplied SAT bank: 240 questions, 120 per discipline, 40 per difficulty.
+-- Current SAT bank: 239 questions (119 Math, 120 Reading & Writing).
 -- Original prompts, explanations and 217 original choice sets are unchanged.
 -- The owner authorized A-D conversion for 23 numeric-response Math questions.
 -- authored_distractors=true identifies their three added wrong choices.
@@ -8621,9 +8621,9 @@ $sat_question_bank$::jsonb) AS q(
 
 -- Abort atomically on a collision instead of changing an existing question/revision.
 DO $$ BEGIN
-    IF (SELECT count(*) FROM sat_question_seed) <> 240
-       OR (SELECT count(DISTINCT external_key) FROM sat_question_seed) <> 240 THEN
-        RAISE EXCEPTION 'SAT seed must contain 240 distinct questions';
+    IF (SELECT count(*) FROM sat_question_seed) <> 239
+       OR (SELECT count(DISTINCT external_key) FROM sat_question_seed) <> 239 THEN
+        RAISE EXCEPTION 'SAT seed must contain 239 distinct questions';
     END IF;
     IF EXISTS (
         SELECT 1 FROM questions q JOIN sat_question_seed s ON q.external_key=s.external_key
