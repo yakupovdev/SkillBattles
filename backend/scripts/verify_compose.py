@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import secrets
 import socket
+import ssl
 import subprocess
 import time
 from urllib.error import URLError
@@ -21,19 +22,20 @@ import uuid
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument('--backend-image', help='Optional freshly built image to check without restarting the main backend')
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     cache = root / 'backend/.cache'
     cache.mkdir(exist_ok=True)
     project = 'skillbattles-compose-check-' + uuid.uuid4().hex[:10]
     env = os.environ.copy()
     for key in list(env):
-        if key.startswith(('POSTGRES_', 'DB_', 'JWT_', 'STRIPE_', 'BILLING_', 'SMTP_', 'PASSWORD_RESET_')) or key in ('MAIL_FROM', 'NODE_OPTIONS'):
+        if key.startswith(('POSTGRES_', 'DB_', 'JWT_', 'STRIPE_', 'BILLING_', 'SMTP_', 'PASSWORD_RESET_')) or key in ('MAIL_FROM', 'NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'NODE_TLS_REJECT_UNAUTHORIZED'):
             env.pop(key)
     # Shell environment overrides root .env only for this child Compose project.
     # Docker reassigns published port 0 on restart. Pick distinct free host ports
     # so the runner and browser keep the same origin across the restart check.
-    reservations = [socket.socket() for _ in range(3)]
+    reservations = [socket.socket() for _ in range(4)]
     for reservation in reservations:
         reservation.bind(('127.0.0.1', 0))
     ports = [str(reservation.getsockname()[1]) for reservation in reservations]
@@ -41,18 +43,27 @@ def main():
         reservation.close()
     env.update(POSTGRES_DB='compose_check', POSTGRES_USER='compose_check',
                POSTGRES_PASSWORD=secrets.token_hex(24), JWT_SECRET=base64.b64encode(secrets.token_bytes(32)).decode(),
-               POSTGRES_PORT=ports[0], BACKEND_PORT=ports[1], FRONTEND_PORT=ports[2],
+               POSTGRES_PORT=ports[0], BACKEND_PORT=ports[1], FRONTEND_PORT=ports[2], FRONTEND_HTTPS_PORT=ports[3],
                COUNTDOWN_SECONDS='1', REVEAL_SECONDS='1',
                STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='', STRIPE_PRICE_PRO_MONTHLY='', STRIPE_PRICE_PRO_ANNUAL='',
                BILLING_SUCCESS_URL='', BILLING_CANCEL_URL='', BILLING_PORTAL_RETURN_URL='',
                SMTP_HOST='', SMTP_USERNAME='', SMTP_PASSWORD='', MAIL_FROM='', PASSWORD_RESET_BASE_URL='')
+    ca_file = root / 'backend/.cache/local-tls/ca.crt'
+    if not ca_file.is_file():
+        parser.error('Initialize local HTTPS certificates first: backend/scripts/Initialize-LocalHttps.ps1')
+    tls = ssl.create_default_context(cafile=str(ca_file))
+    env['NODE_EXTRA_CA_CERTS'] = str(ca_file)
     hidden = {'creationflags': subprocess.CREATE_NO_WINDOW} if os.name == 'nt' else {}
 
     def run(parts, **kwargs):
         return subprocess.check_output(parts, cwd=root, env=env, text=True, stderr=subprocess.STDOUT, **hidden, **kwargs).strip()
 
     # Resolve the actual images built by the main project without reading/printing ENV.
-    images = {service: run(['docker', 'compose', 'images', '-q', service]) for service in ('backend', 'frontend')}
+    images = {
+        'backend': run(['docker', 'image', 'inspect', '--format', '{{.Id}}', args.backend_image])
+                   if args.backend_image else run(['docker', 'compose', 'images', '-q', 'backend']),
+        'frontend': run(['docker', 'compose', 'images', '-q', 'frontend']),
+    }
     if not all(images.values()):
         parser.error('Build/start the root Compose project first.')
     override = cache / (project + '.json')
@@ -71,7 +82,7 @@ def main():
         deadline = time.monotonic() + 90
         while time.monotonic() < deadline:
             try:
-                with urlopen(base + '/v3/api-docs', timeout=2) as response:
+                with urlopen(base + '/v3/api-docs', timeout=2, context=tls) as response:
                     if response.status == 200:
                         return
             except (URLError, OSError, HTTPException):
@@ -91,8 +102,8 @@ def main():
         created = True
         subprocess.run(compose + ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120'], cwd=root, env=env,
                        check=True, stdout=log, stderr=subprocess.STDOUT, timeout=150, **hidden)
-        port = command('port', 'frontend', '8080').rsplit(':', 1)[1]
-        base = 'http://127.0.0.1:' + port
+        port = command('port', 'frontend', '8443').rsplit(':', 1)[1]
+        base = 'https://127.0.0.1:' + port
         wait_ready()
         assert command('exec', '-T', 'postgres', 'psql', '-U', 'compose_check', '-d', 'compose_check', '-Atc',
                        "select max(version::int) from flyway_schema_history where success") == '13'

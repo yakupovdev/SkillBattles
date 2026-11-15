@@ -2875,5 +2875,45 @@
       "400": "VALIDATION_ERROR, INVALID_WEBHOOK_SIGNATURE, INVALID_WEBHOOK_EVENT",
       "500": "INTERNAL_ERROR"
     }
+  },
+  "GET /api/v1/users/me/rematch-invitations": {
+    "success": {
+      "200": {
+        "data": {
+          "[]": {
+            "sourceBattleId": {
+              "$type": "string"
+            },
+            "requester": {
+              "id": {
+                "$type": "string"
+              },
+              "isPro": {
+                "$type": "boolean"
+              },
+              "nickname": {
+                "$type": "string"
+              }
+            },
+            "disciplineCode": {
+              "$type": "string"
+            },
+            "expiresAt": {
+              "$type": "string"
+            },
+            "version": {
+              "$type": "integer"
+            }
+          }
+        },
+        "serverTime": {
+          "$type": "string"
+        }
+      }
+    },
+    "errors": {
+      "401": "UNAUTHORIZED",
+      "500": "INTERNAL_ERROR"
+    }
   }
 }
