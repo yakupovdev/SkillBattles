@@ -2,7 +2,11 @@
 
 Flutter Web frontend и Java 21 / Spring Boot backend v0.3 с PostgreSQL. Один
 backend-процесс: несколько replicas пока не поддерживаются. REST-контракт —
-39 операций, OpenAPI `0.3.0`; функция похожих вопросов удалена.
+57 продуктовых операций и 2 публичные media GET/HEAD, OpenAPI `0.3.0`;
+функция похожих вопросов удалена. Иллюстрации вопросов упакованы в backend image:
+подробности в [handoff](backend/QUESTION_IMAGES_HANDOFF.md).
+Друзья, базовые профили друзей и приглашения в существующие приватные комнаты —
+[FRIENDS_HANDOFF.md](backend/FRIENDS_HANDOFF.md).
 
 ## Локальный запуск
 
@@ -17,8 +21,10 @@ Maven и PostgreSQL на хосте для основного запуска н�
 ```
 
 Скрипт копирует `.env.example` только при отсутствии `.env`, генерирует только
-незаполненные PostgreSQL/JWT secrets и сохраняет остальные значения. Можно
-скопировать пример вручную и заполнить эти два секрета. Не меняйте пароль уже
+незаполненные PostgreSQL/JWT secrets и сохраняет остальные значения. Он также
+подготавливает локальные HTTPS-сертификаты, сохраняя существующий локальный CA.
+Для существующего `.env` сертификаты можно подготовить отдельно командой
+`.\backend\scripts\Initialize-LocalHttps.ps1`. Не меняйте пароль уже
 созданного PostgreSQL volume редактированием ENV. Не публикуйте `.env` и вывод
 раскрытого `docker compose config`; безопасная проверка — `config --quiet`.
 
@@ -33,17 +39,37 @@ Compose ждёт готовности PostgreSQL, затем backend, затем
 
 | Адрес | Назначение |
 | --- | --- |
-| http://localhost:8081 | Приложение Flutter Web |
-| http://localhost:8081/swagger-ui/index.html | Swagger через frontend proxy |
-| http://localhost:8081/v3/api-docs | Фактический generated OpenAPI |
+| https://localhost:8443 | Приложение Flutter Web |
+| https://localhost:8443/swagger-ui/index.html | Swagger через frontend proxy |
+| https://localhost:8443/v3/api-docs | Фактический generated OpenAPI |
+| http://localhost:8081 | Перенаправление на HTTPS |
 | http://localhost:8080 | Backend при прямом доступе для разработки |
 | 127.0.0.1:55432 | PostgreSQL для локальных инструментов |
 
-Порты задают `FRONTEND_PORT`, `BACKEND_PORT`, `POSTGRES_PORT`; опубликованы только
-на loopback. При смене frontend-порта согласуйте `BILLING_SUCCESS_URL`,
+Порты задают `FRONTEND_PORT` (HTTP), `FRONTEND_HTTPS_PORT` (HTTPS), `BACKEND_PORT`,
+`POSTGRES_PORT`. Frontend опубликован на `0.0.0.0`: устройства в общей сети
+открывают `https://<LAN-IP компьютера>:8443`. Старый HTTP-адрес перенаправляет на HTTPS.
+HTTPS нужен Flutter Secure Storage для сохранения токенов в secure context.
+Backend и PostgreSQL опубликованы на loopback. При смене frontend-порта согласуйте `BILLING_SUCCESS_URL`,
 `BILLING_CANCEL_URL`, `BILLING_PORTAL_RETURN_URL`, `PASSWORD_RESET_BASE_URL`.
 В примере они ссылаются на `${FRONTEND_PORT}`. Существующие значения локального
 `.env` скрипт инициализации не переписывает.
+
+Один раз установите **публичный** `backend/.cache/local-tls/ca.crt` в доверенные
+корневые сертификаты каждого устройства, с которого открывается приложение.
+Для Windows / текущего пользователя, из корня PowerShell:
+
+```powershell
+Import-Certificate -FilePath .\backend\.cache\local-tls\ca.crt -CertStoreLocation Cert:\CurrentUser\Root
+```
+
+Сертификат также доступен по `http://<LAN-IP компьютера>:8081/local-ca.crt`;
+сверьте его SHA-256 с выводом `Initialize-LocalHttps.ps1`. Скрипт сам доверие не
+устанавливает. Не переносите файлы `.key` на другие устройства. Ключ локального
+CA не передаётся контейнерам; nginx получает через read-only Compose secrets
+только серверные certificate/key и публичный CA. Эти файлы игнорируются Git и
+не входят в Docker images. Сертификат сервера действителен 90 дней; после смены
+IP/обновления повторите инициализацию и `docker compose restart frontend`.
 
 Браузер обращается к своему origin: REST `/api/v1`, native WebSocket
 `/ws/v1/events`. Nginx сохраняет пути, проксирует Swagger и Upgrade, передаёт
@@ -67,16 +93,33 @@ docker compose down
 ```
 
 `down` сохраняет named volume. Не добавляйте `-v`, не удаляйте существующие БД
-или volumes для обновления. Миграции V1–V11 сохранены; V6 намеренно отклоняет
+или volumes для обычного обновления. Flyway выполняет обычную цепочку V1–V15.
+V1–V11 сохранены без изменения checksums; отдельной baseline-миграции нет.
+V6 намеренно отклоняет
 старую v0.2 БД с вопросами/батлами. Для такого случая нужна отдельная новая БД,
 а причина ошибки должна быть установлена до любых действий с данными.
 
 ## Банк вопросов
 
-Чистая схема содержит справочники, но не production-банк. Без достаточного
-контента сервер честно возвращает `contentAvailable=false`. Для игр импортируйте
-валидный банк через существующий offline importer; случайные вопросы при запуске
-не добавляются. Схема JSON и правила объёма/сложностей описаны в
+`V12` содержит **239 вопросов** из предоставленных SAT Markdown: 119 Math
+и 120 Reading & Writing. Удалённый `SAT_MATH:15ce8207` не восстанавливается.
+Отдельный импорт для начала игры не нужен. Все 216 оставшихся исходных
+наборов A–D сохранены; для 23 числовых Math-вопросов по согласованию добавлены
+три неверных варианта, правильные ответы и объяснения сохранены. Полный аудит —
+в [backend/QUESTION_BANK.md](backend/QUESTION_BANK.md). `V14` добавляет 22 ревизии
+с изображениями: 239 активных вопросов, 261 seed-ревизия. Все 23 PNG включены
+в backend image; один файл отложен без привязки к удалённому вопросу.
+По подтверждению владельца устаревшая проверка количества V12 исправлена 240 → 239.
+Для существующей БД перед обновлением нужно явно сверить checksum/content V12;
+автоматический repair или сброс данных не выполняется.
+
+`V13` добавляет локальные демонстрационные аккаунты `admin@gmail.com` (ник `admin`,
+Free) и `adminpro@gmail.com` (ник `adminpro`, Pro); пароль обоих — `qwerty12`,
+в БД только независимые BCrypt-хеши. Административных ролей нет. Pro — явная
+локальная демонстрационная выдача, без Stripe customer/subscription/receipt;
+оплата и webhook этим не проверяются. Существующие аккаунты не перезаписываются.
+
+Для дополнительного контента остаётся offline importer. Схема JSON и правила объёма/сложностей описаны в
 [backend/README.md](backend/README.md). Например, из корня PowerShell:
 
 ```powershell
@@ -127,7 +170,8 @@ git diff --cached --check
 ```
 
 Compose-проверка создаёт отдельный уникальный project/volume и случайные порты,
-проверяет чистую схему, dry/apply импорт 19 test-only вопросов, две независимые
+проверяет чистую схему V1–V15, 239 активных вопросов и 261 seed-ревизию. Только внутри этой
+тестовой БД seed-банк деактивируется, затем проверяется dry/apply импорт 19 test-only вопросов, две независимые
 сессии REST/STOMP через frontend proxy, результат/review и перезапуск всего стека
 с сохранением данных. Пользовательская БД не затрагивается. Тестовые контейнеры
 и сеть удаляются, имя сохранённого тестового volume выводится в конце.

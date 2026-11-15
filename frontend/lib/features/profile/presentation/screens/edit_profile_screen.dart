@@ -19,7 +19,6 @@ import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
-import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_field.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
@@ -75,37 +74,21 @@ final class EditProfileScreen extends StatefulWidget
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-/// Sections of the page, in order; the left menu scrolls to them.
-enum _Section {
-  profile('Profile'),
-  password('Password'),
-  subscription('Subscription');
-
-  const _Section(this.label);
-
-  final String label;
-}
-
 final class _EditProfileScreenState extends State<EditProfileScreen> {
   late final GlobalKey<FormState> _nicknameForm;
   late final GlobalKey<FormState> _passwordForm;
-  late final Map<_Section, GlobalKey> _sectionKeys;
   late final TextEditingController _nickname;
   late final TextEditingController _email;
   late final TextEditingController _current;
   late final TextEditingController _next;
   late final FocusNode _currentFocus;
   late final FocusNode _nextFocus;
-  late final ValueNotifier<_Section> _section;
 
   @override
   void initState() {
     super.initState();
     _nicknameForm = GlobalKey<FormState>();
     _passwordForm = GlobalKey<FormState>();
-    _sectionKeys = <_Section, GlobalKey>{
-      for (final _Section section in _Section.values) section: GlobalKey(),
-    };
     final UserEntity? user = context.read<AccountBloc>().state.account?.user;
     _nickname = TextEditingController(text: user?.nickname ?? '');
     _email = TextEditingController(text: user?.email ?? '');
@@ -113,7 +96,6 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
     _next = TextEditingController();
     _currentFocus = FocusNode();
     _nextFocus = FocusNode();
-    _section = ValueNotifier<_Section>(_Section.profile);
   }
 
   @override
@@ -124,7 +106,6 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
     _next.dispose();
     _currentFocus.dispose();
     _nextFocus.dispose();
-    _section.dispose();
     super.dispose();
   }
 
@@ -148,17 +129,6 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
           newPassword: _next.text,
         ),
       ),
-    );
-  }
-
-  void _showSection(_Section section) {
-    _section.value = section;
-    final BuildContext? target = _sectionKeys[section]?.currentContext;
-    if (target == null) return;
-    Scrollable.ensureVisible(
-      target,
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
     );
   }
 
@@ -228,14 +198,7 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: 80,
             children: <Widget>[
-              SizedBox(
-                width: 300,
-                child: ValueListenableBuilder<_Section>(
-                  valueListenable: _section,
-                  builder: (BuildContext context, _Section section, _) =>
-                      _SideColumn(selected: section, onSelected: _showSection),
-                ),
-              ),
+              const SizedBox(width: 300, child: _SideColumn()),
               Expanded(
                 child: Align(
                   alignment: Alignment.topLeft,
@@ -246,7 +209,6 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
                       spacing: 36,
                       children: <Widget>[
                         _SectionBlock(
-                          key: _sectionKeys[_Section.profile],
                           child: _ProfileSection(
                             formKey: _nicknameForm,
                             nickname: _nickname,
@@ -255,7 +217,6 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
                           ),
                         ),
                         _SectionBlock(
-                          key: _sectionKeys[_Section.password],
                           child: _PasswordSection(
                             formKey: _passwordForm,
                             current: _current,
@@ -265,10 +226,7 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
                             onSave: _savePassword,
                           ),
                         ),
-                        KeyedSubtree(
-                          key: _sectionKeys[_Section.subscription],
-                          child: const _SubscriptionSection(),
-                        ),
+                        const _SubscriptionSection(),
                       ],
                     ),
                   ),
@@ -293,44 +251,18 @@ String _profileMessage(Failure failure) {
   return failure.userMessage;
 }
 
-/// Title, identity and the section menu.
+/// Title and identity; log-out lives in the top bar's account menu.
 final class _SideColumn extends StatelessWidget {
-  const _SideColumn({required this.selected, required this.onSelected});
-
-  final _Section selected;
-  final ValueChanged<_Section> onSelected;
+  const _SideColumn();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 20,
       children: <Widget>[
-        const Text('Account', style: AppTextStyles.displayXs),
-        const _Identity(),
-        Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 2,
-            children: <Widget>[
-              for (final _Section section in _Section.values)
-                _MenuItem(
-                  label: section.label,
-                  isSelected: section == selected,
-                  onTap: () => onSelected(section),
-                ),
-              _MenuItem(
-                label: 'Log out',
-                isSelected: false,
-                isDanger: true,
-                onTap: () => context.read<AccountBloc>().add(
-                  const AccountLogoutRequested(),
-                ),
-              ),
-            ],
-          ),
-        ),
+        Text('Account', style: AppTextStyles.displayXs),
+        _Identity(),
       ],
     );
   }
@@ -394,50 +326,6 @@ final class _Identity extends StatelessWidget {
   }
 }
 
-final class _MenuItem extends StatelessWidget {
-  const _MenuItem({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-    this.isDanger = false,
-  });
-
-  final String label;
-  final bool isSelected;
-  final bool isDanger;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final BorderRadius radius = BorderRadius.circular(8);
-    return AppTappable(
-      onTap: onTap,
-      isSelected: isSelected,
-      borderRadius: radius,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.surface : null,
-          borderRadius: radius,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Text(
-            label,
-            style: AppTextStyles.bodyMd.copyWith(
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isDanger
-                  ? AppColors.danger
-                  : isSelected
-                  ? AppColors.ink
-                  : AppColors.muted,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// A server error under a block, or nothing.
 final class _FailureLine extends StatelessWidget {
   const _FailureLine({required this.message});
@@ -457,7 +345,7 @@ final class _FailureLine extends StatelessWidget {
 
 /// A settings block with a line and 32 px below it.
 final class _SectionBlock extends StatelessWidget {
-  const _SectionBlock({required this.child, super.key});
+  const _SectionBlock({required this.child});
 
   final Widget child;
 

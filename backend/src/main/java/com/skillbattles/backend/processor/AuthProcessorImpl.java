@@ -16,11 +16,19 @@ public class AuthProcessorImpl implements AuthProcessor {
     private final TokenService tokenService;
     private final RatingService ratingService;
     private final SubscriptionService subscriptions;
+    private final org.springframework.transaction.PlatformTransactionManager transactions;
 
     @Override
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public AuthDto register(RegisterDto dto) {
-        UserDto user = userService.register(dto);
-        return issue(user);
+        // A unique-code violation aborts PostgreSQL's transaction. Retry the entire
+        // registration, ratings/subscription initialization and token issuance.
+        for(int attempt=0;attempt<8;attempt++) {
+            try { return new org.springframework.transaction.support.TransactionTemplate(transactions)
+                    .execute(status -> issue(userService.register(dto)));
+            } catch(org.springframework.dao.DataIntegrityViolationException ex){if(!FriendCodeGenerator.collision(ex))throw ex;}
+        }
+        throw new IllegalStateException("Could not allocate a unique friend code.");
     }
 
     @Override

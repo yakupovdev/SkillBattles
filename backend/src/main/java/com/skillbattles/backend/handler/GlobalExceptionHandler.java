@@ -73,7 +73,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
-    public ResponseEntity<ErrorResponse> missing(NoResourceFoundException ex) {
+    public ResponseEntity<ErrorResponse> missing(NoResourceFoundException ex, jakarta.servlet.http.HttpServletRequest request) {
+        if (HttpMethod.HEAD.matches(request.getMethod())) return ResponseEntity.notFound().build();
         return ResponseEntity.status(404).body(ErrorResponse.of("NOT_FOUND", "Resource not found."));
     }
 

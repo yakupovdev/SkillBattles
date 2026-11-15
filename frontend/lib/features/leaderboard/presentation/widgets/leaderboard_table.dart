@@ -4,7 +4,9 @@ import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
+import 'package:skill_battles/core/presentation/league/league_rank.dart';
 import 'package:skill_battles/core/presentation/widgets/app_avatar.dart';
+import 'package:skill_battles/core/presentation/widgets/league_emblem.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entry_entity.dart';
@@ -219,10 +221,7 @@ final class _Row extends StatelessWidget {
           ),
           SizedBox(
             width: _Columns.rank,
-            child: Text(
-              formatRankCode(entry.rankCode),
-              style: AppTextStyles.bodyMd,
-            ),
+            child: _RankCell(rankCode: entry.rankCode, isStrong: isMe),
           ),
           SizedBox(
             width: _Columns.elo,
@@ -237,6 +236,36 @@ final class _Row extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Rank column: the league emblem and the rank name. An unknown rank code
+/// shows the name only.
+final class _RankCell extends StatelessWidget {
+  const _RankCell({required this.rankCode, required this.isStrong});
+
+  final String rankCode;
+  final bool isStrong;
+
+  @override
+  Widget build(BuildContext context) {
+    final LeagueRank? league = LeagueRank.tryParse(rankCode);
+    return Row(
+      spacing: 10,
+      children: <Widget>[
+        if (league != null) LeagueEmblem(rank: league, size: 32),
+        Expanded(
+          child: Text(
+            formatRankCode(rankCode),
+            style: AppTextStyles.bodyMd.copyWith(
+              fontWeight: isStrong ? FontWeight.w600 : null,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

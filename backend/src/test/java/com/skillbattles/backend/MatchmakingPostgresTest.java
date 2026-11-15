@@ -79,6 +79,7 @@ class MatchmakingPostgresTest {
     @Autowired MatchmakingProperties properties;
     @Autowired QuestionService questions;
     @Autowired QuestionImportFileService files;
+    @Autowired DuelInvitationReconciler invitations;
     @Autowired MutableClock clock;
     @Autowired JdbcTemplate jdbc;
     @Autowired MockMvc mvc;
@@ -386,7 +387,7 @@ class MatchmakingPostgresTest {
         var entry = matchmaking.search(id(queued), "SAT_RW");
         var room = matchmaking.createDuel(id(host), "SAT_MATH");
         UUID battleId = processor.create(new CreateBattleDto(id(a), id(b), "SAT_MATH", BattleMode.RANKED));
-        var fresh = new MatchmakingProcessorImpl(new MatchmakingRegistryServiceImpl(transactions, publisher, clock), battles, processor, users, ratings, ratingProcessor, usage, subscriptions, questions, disciplines, properties, clock);
+        var fresh = new MatchmakingProcessorImpl(new MatchmakingRegistryServiceImpl(transactions, publisher, clock), battles, processor, users, ratings, ratingProcessor, usage, subscriptions, questions, disciplines, properties, clock, invitations);
         assertThat(fresh.activity(id(queued)).getType()).isEqualTo(ActivityType.NONE);
         assertThat(fresh.activity(id(host)).getType()).isEqualTo(ActivityType.NONE);
         assertCode(() -> fresh.entry(id(queued), entry.getId()), "QUEUE_ENTRY_NOT_FOUND");

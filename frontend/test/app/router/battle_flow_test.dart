@@ -5,8 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
-import 'package:skill_battles/dev/dev_scenario.dart';
-import 'package:skill_battles/dev/mock_backend.dart';
 import 'package:skill_battles/features/battle/presentation/screens/battle_screen.dart';
 import 'package:skill_battles/features/matchmaking/presentation/screens/ranked_search_screen.dart';
 
@@ -18,7 +16,6 @@ void main() {
     'correct option',
     (WidgetTester tester) async {
       final AppDependencies deps = await pumpApp(tester, signedIn: true);
-      deps.getDep<MockBackend>().scenario.opponent = DevOpponent.alwaysWrong;
       await settle(tester, 8);
 
       await tester.tap(find.text('Find ranked match'));
@@ -68,9 +65,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final AppDependencies deps = await pumpApp(tester, signedIn: true);
-    await tester.runAsync(() async {
-      deps.getDep<MockBackend>().setDailyLimitReached(true);
-    });
+
     deps.getDep<GoRouter>().goNamed(AppRoutes.profile.name);
     await settle(tester, 6);
     deps.getDep<GoRouter>().goNamed(AppRoutes.home.name);

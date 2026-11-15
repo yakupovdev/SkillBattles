@@ -20,8 +20,29 @@ public class UserServiceImpl implements UserService {
     private final UserMapper mapper;
     private final PasswordEncoder passwordEncoder;
     private final AgePolicy agePolicy;
+    private final FriendCodeGenerator friendCodes;
+    private final org.springframework.transaction.PlatformTransactionManager transactions;
+
+    @Override public Optional<UserDto> findByFriendCode(String code) { return repository.findByFriendCode(code).map(mapper::toDto); }
+
+    @Override @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public String friendCode(UUID id) {
+        for(int attempt=0;attempt<8;attempt++) {
+            try { return new org.springframework.transaction.support.TransactionTemplate(transactions).execute(status->{
+                User user=repository.lockById(id).orElseThrow(UnauthorizedException::new);
+                if(user.getFriendCode()==null){user.setFriendCode(friendCodes.next());repository.saveAndFlush(user);}
+                return user.getFriendCode();
+            }); } catch(org.springframework.dao.DataIntegrityViolationException ex){if(!FriendCodeGenerator.collision(ex))throw ex;}
+        }
+        throw new IllegalStateException("Could not allocate a unique friend code.");
+    }
     // Valid BCrypt hash for timing equalisation when an email is unknown.
     private static final String DUMMY_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+    @Override
+    public List<UserDto> findByIds(Collection<UUID> ids) {
+        return ids.isEmpty() ? List.of() : repository.findAllById(ids).stream().map(mapper::toDto).toList();
+    }
 
     @Override
     @Transactional
@@ -39,6 +60,7 @@ public class UserServiceImpl implements UserService {
         user.setEmailNormalized(email);
         user.setNicknameNormalized(nickname);
         user.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+        user.setFriendCode(friendCodes.next());
         return mapper.toDto(repository.saveAndFlush(user));
     }
 

@@ -179,7 +179,9 @@ final class _Side extends StatelessWidget {
         child: LeaderboardSidePanel(
           board: shown,
           disciplines: state.disciplines,
-          stats: state.statistics?.forDiscipline(shown.disciplineCode),
+          stats: board == null
+              ? LeaderboardSkeletonData.stats
+              : state.statistics?.forDiscipline(shown.disciplineCode),
           seasons: seasons,
         ),
       ),

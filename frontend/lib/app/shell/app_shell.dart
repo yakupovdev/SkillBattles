@@ -1,8 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-
-import 'package:skill_battles/app/di/app_dependencies_provider.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
 import 'package:skill_battles/core/presentation/widgets/app_top_bar.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
@@ -42,8 +40,6 @@ final class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isDev =
-        AppDependenciesProvider.maybeOf(context)?.config.useDevMocks ?? false;
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -56,7 +52,6 @@ final class AppShell extends StatelessWidget {
               activeTab: activeTab,
               nickname: state.account?.user.nickname,
               isPro: state.isPro,
-              environmentLabel: isDev ? 'DEV MOCKS' : null,
               onLogoPressed: () => context.goNamed(AppRoutes.home.name),
               onProPressed: () => context.goNamed(AppRoutes.pro.name),
               onAccountAction: (AppAccountAction action) =>

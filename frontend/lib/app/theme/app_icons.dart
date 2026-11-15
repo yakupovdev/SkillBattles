@@ -71,6 +71,9 @@ abstract final class AppIcons {
   /// Muted clock of the "Taking longer than usual" callout (22 x 22).
   static const String clock = '$_dir/clock.svg';
 
+  /// Red door-and-arrow of the "Log out" menu item (16 x 16).
+  static const String logOut = '$_dir/log_out.svg';
+
   static const List<String> all = <String>[
     logoMark,
     logoMarkInverse,
@@ -94,5 +97,27 @@ abstract final class AppIcons {
     close,
     info,
     clock,
+    logOut,
   ];
+}
+
+/// Paths of the league emblems (`assets/leagues/`, viewBox 96, intrinsic 48).
+abstract final class AppLeagueAssets {
+  static const String _dir = 'assets/leagues';
+
+  /// `bronze_2.svg` for a divisional league, `master.svg` for a single one.
+  ///
+  /// [leagueFile] is the lower-case league code (`gold`). A missing or
+  /// out-of-range [division] of a divisional league falls back to `_1`.
+  static String emblem({
+    required String leagueFile,
+    required bool isDivisional,
+    int? division,
+  }) {
+    if (!isDivisional) return '$_dir/$leagueFile.svg';
+    final int shown = division != null && division >= 1 && division <= 3
+        ? division
+        : 1;
+    return '$_dir/${leagueFile}_$shown.svg';
+  }
 }

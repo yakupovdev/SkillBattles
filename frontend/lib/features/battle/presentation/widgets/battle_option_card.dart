@@ -3,7 +3,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/domain/entity/question_option_entity.dart';
+import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
 import 'package:skill_battles/core/presentation/widgets/app_avatar.dart';
+import 'package:skill_battles/core/presentation/widgets/app_markdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 
 /// Visual state of an answer option.
@@ -90,7 +92,7 @@ final class BattleOptionCard extends StatelessWidget {
       onTap: onPressed,
       borderRadius: BorderRadius.circular(14),
       isSelected: state == BattleOptionState.selected,
-      semanticLabel: 'Answer $letter: ${option.text}',
+      semanticLabel: 'Answer $letter: ${MarkdownSpans.plainText(option.text)}',
       semanticValue: semanticValue.isEmpty ? null : semanticValue,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
@@ -118,7 +120,7 @@ final class BattleOptionCard extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Text(
+              child: AppMarkdownLine(
                 option.text,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,

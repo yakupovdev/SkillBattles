@@ -29,6 +29,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
     private final DisciplineService disciplines;
     private final MatchmakingProperties properties;
     private final Clock clock;
+    private final DuelInvitationReconciler invitations;
 
     @Override public QueueEntryDto search(UUID userId, String disciplineCode) {
         return registry.transact(state -> {
@@ -77,22 +78,34 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
     @Override public DuelDto join(UUID userId, String code) {
         String normalized = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
         if (!normalized.matches("[A-Z0-9]{6}")) throw new BusinessValidationException("VALIDATION_ERROR", "Code must contain six letters or digits.");
-        return registry.transact(state -> {
+        DuelDto result=registry.transact(state -> {
             refresh(state, now());
             DuelDto duel = state.getDuels().values().stream().filter(item -> item.getCode().equals(normalized)).findFirst().orElseThrow(MatchmakingProcessorImpl::duelMissing);
-            if (duel.getStatus() == DuelStatus.EXPIRED) throw new GoneException("DUEL_EXPIRED", "Duel code has expired.");
-            if (duel.getHost().getId().equals(userId)) throw new ConflictException("SELF_JOIN_NOT_ALLOWED", "Cannot join your own duel.");
-            if (duel.getStatus() != DuelStatus.WAITING) throw new ConflictException("DUEL_NOT_JOINABLE", "Duel is no longer joinable.");
-            ensureIdle(state, userId); requireContent(duel.getDisciplineCode(), userId);
-            UserDto guest = users.getById(userId);
-            // The staged reservation is removed while the same lock remains held through DB commit.
-            state.getActivities().remove(duel.getHost().getId());
-            UUID battleId = processor.create(new CreateBattleDto(duel.getHost().getId(), userId, duel.getDisciplineCode(), BattleMode.PRIVATE));
-            DuelDto joined = duel.toBuilder().status(DuelStatus.MATCHED).guest(PublicPlayerDto.builder().id(userId).nickname(guest.getNickname()).build())
-                    .battleId(battleId).version(duel.getVersion() + 1).build();
-            state.getDuels().put(joined.getId(), joined);
-            return present(joined);
+            if(duel.getStatus()==DuelStatus.EXPIRED)return duel; // Commit expiry/reconciliation before returning 410.
+            return joinInRegistry(state,userId,duel.getId());
         });
+        if(result.getStatus()==DuelStatus.EXPIRED)throw new GoneException("DUEL_EXPIRED","Duel code has expired.");
+        return result;
+    }
+
+    @Override public DuelDto joinInRegistry(MatchmakingStateDto state,UUID userId,UUID duelId) {
+        DuelDto duel=state.getDuels().get(duelId);
+        if(duel==null)throw duelMissing();
+        if(duel.getHost().getId().equals(userId))throw new ConflictException("SELF_JOIN_NOT_ALLOWED","Cannot join your own duel.");
+        if(duel.getStatus()!=DuelStatus.WAITING)throw new ConflictException("DUEL_NOT_JOINABLE","Duel is no longer joinable.");
+        var pair=FriendPair.of(duel.getHost().getId(),userId);
+        users.lockActiveById(pair.low());users.lockActiveById(pair.high());
+        if(!new ActivityReservationDto(ActivityType.PRIVATE_DUEL,duelId).equals(state.getActivities().get(duel.getHost().getId())))
+            throw new ConflictException("ACTIVITY_CONFLICT","The room host is unavailable.");
+        ensureIdle(state,userId);requireContent(duel.getDisciplineCode(),userId);
+        UserDto guest=users.getById(userId);
+        state.getActivities().remove(duel.getHost().getId(),new ActivityReservationDto(ActivityType.PRIVATE_DUEL,duelId));
+        UUID battleId=processor.create(new CreateBattleDto(duel.getHost().getId(),userId,duel.getDisciplineCode(),BattleMode.PRIVATE));
+        DuelDto joined=duel.toBuilder().status(DuelStatus.MATCHED).guest(PublicPlayerDto.builder().id(userId).nickname(guest.getNickname()).build())
+                .battleId(battleId).version(duel.getVersion()+1).build();
+        state.getDuels().put(joined.getId(),joined);
+        invitations.refresh(state,now());
+        return present(joined);
     }
 
     @Override public DuelDto duel(UUID userId, UUID id) {
@@ -111,6 +124,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
             refresh(state, now()); DuelDto duel = ownedDuel(state, userId, id, true);
             if (duel.getStatus() == DuelStatus.MATCHED) throw matched();
             if (duel.getStatus() == DuelStatus.WAITING) endDuel(state, duel, DuelStatus.CANCELLED);
+            invitations.refresh(state,now());
             return null;
         });
     }
@@ -148,6 +162,7 @@ public class MatchmakingProcessorImpl implements MatchmakingProcessor {
         for (DuelDto duel : List.copyOf(state.getDuels().values())) {
             if (duel.getStatus() == DuelStatus.WAITING && !duel.getExpiresAt().isAfter(now)) endDuel(state, duel, DuelStatus.EXPIRED);
         }
+        invitations.refresh(state,now);
     }
 
     private void match(MatchmakingStateDto state, Instant now) {

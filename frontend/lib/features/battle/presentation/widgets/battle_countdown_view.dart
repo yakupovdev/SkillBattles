@@ -29,7 +29,7 @@ final class BattleCountdownView extends StatelessWidget {
                 child: AppCountdownText(
                   target: endsAt,
                   clockOffset: snapshot.clockOffset,
-                  format: AppCountdownFormat.compact,
+                  format: AppCountdownFormat.seconds,
                   style: AppTextStyles.displayXl.copyWith(
                     color: AppColors.primary,
                   ),

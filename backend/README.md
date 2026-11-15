@@ -1,11 +1,106 @@
 # SkillBattles — backend v0.3
 
-Реализованы этапы A–E и 39 REST-операций контракта v0.3. Generated Swagger
+Реализованы этапы A–E и 57 продуктовых REST-операций контракта v0.3, включая приглашения на реванш,
+друзей, их базовые профили и приглашения в существующие комнаты. Вместе с публичными
+GET/HEAD иллюстраций это 59 HTTP-операций в полном OpenAPI. Generated Swagger
 имеет версию `0.3.0` и строится из действующих controllers/DTO. Контрактная
 проверка сопоставляет маршруты, успешные статусы, request/response-поля,
 типы и единый ErrorResponse. Локальные спецификации остаются игнорируемыми Git.
 Stripe работает только в TEST: настоящий Checkout → webhook → Pro round trip
 пока не проверен из-за недоступного локального listener.
+
+Текущий запуск БД использует обычную цепочку V1–V15, без отдельного baseline.
+`V12` содержит 239 вопросов (удалённый `SAT_MATH:15ce8207` не восстанавливается), `V13` —
+демонстрационные Free/Pro аккаунты. [QUESTION_BANK.md](QUESTION_BANK.md)
+описывает происхождение контента, 23 согласованных преобразования в A–D и
+проверки сохранности данных. `V14` добавляет nullable `image_key` и 22 ревизии 2
+с изображениями: 239 активных логических вопросов, 261 сохранённая seed-ревизия.
+Предыдущие ревизии и старые JSONB батлов не переписываются.
+
+## Друзья и приглашения в комнату
+
+`V15__add_friends.sql` добавляет nullable уникальный `users.friend_code` и
+постоянный aggregate `friend_relations`. Старые миграции не меняются, seed-друзей
+нет. Новая регистрация получает SecureRandom-код из 12 символов; существующий
+пользователь — при первом `GET /api/v1/users/me/friend-code`. Код стабилен,
+глобально уникален и не переиспользуется после soft delete. Коллизия повторяет
+целую транзакцию, включая регистрацию, без частичных аккаунтов/рейтингов/токенов.
+SQL diagnostics с кодами подавлены; обработчик пишет только класс исключения.
+
+Все новые REST-операции требуют access JWT и имеют `Cache-Control: no-store`.
+`POST /friend-requests {friendCode}` создаёт запрос, а не дружбу. Получатель
+явно принимает/отклоняет; встречный запрос не принимается автоматически.
+Повторный собственный PENDING возвращает 200, новый — 201. Списки друзей и
+INCOMING/OUTGOING запросов имеют page/size; терминальные запросы читаются по id.
+`DELETE /friends/{friendId}` доступен обеим сторонам; friendId — UUID другого
+пользователя, а не relationshipId. Новый запрос после завершения получает новый id.
+
+`GET /friends/{friendId}` возвращает только PublicPlayer, friendsSince и базовые
+дисциплинарные статистики. Набор полей одинаков для всех Free/Pro комбинаций;
+email, возраст, friendCode, entitlements, история и аналитика не возвращаются.
+Расчёты используют текущие rating/season/rank правила и StatisticsCalculator;
+проценты/время без данных — null. После удаления дружбы профиль недоступен.
+
+Хост сначала создаёт обычную комнату `POST /duels`, затем отправляет
+`POST /duels/{duelId}/invitations {friendId,requestId}`. Принимается именно эта
+комната через общий join core; создаётся один PRIVATE battle, затем оба проходят
+обычный Ready. До принятия invitee не получает room code или доступ GET комнаты.
+Получение инвайта не занимает получателя и не отменяет его текущую активность.
+Busy/content failures сохраняют PENDING и чужие reservations.
+
+TTL приглашения — min(60 секунд, исходный срок комнаты), без продления при retry.
+Одна PENDING цель на комнату; requestId receipts привязаны к host/room/recipient,
+включая новые requestId, ссылающиеся на тот же PENDING. Вход по коду приглашённого
+даёт ACCEPTED для того же battleId; вход другого — CANCELLED/DUEL_FILLED без
+раскрытия чужого battleId. Cancel/expiry комнаты и удаление дружбы согласованы с
+приглашениями; уже принятый батл не отменяется удалением дружбы.
+
+FRIENDSHIP_CHANGED и DUEL_INVITATION_CHANGED используют тот же STOMP envelope,
+`/ws/v1/events` и `/user/queue/events`. Только after commit, оба разрешённых
+участника и их текущие сессии; unchanged retries не публикуются. Новые GET
+восстанавливают pending lists/известный ресурс. Друзья и запросы сохраняются в БД;
+комнаты, инвайты и receipts — в существующем staged registry одного процесса и
+теряются при backend restart. Принятый батл восстанавливается через activity/snapshot.
+
+Лимиты существующего RequestRateLimiter: 20 попыток friend-code запросов и 30
+новых room-invites за 20 минут на пользователя, разные purpose keys. Retry инвайта
+не расходует new-send limit. Cooldown пары/того же room-target после завершения —
+60 секунд; 429 RATE_LIMITED с Retry-After. Accept/decline/remove/чтение не
+блокируются send limiter. Отдельного брокера, inbox, WS или внешней интеграции нет.
+
+Полные маршруты, примеры и recovery: [FRIENDS_HANDOFF.md](FRIENDS_HANDOFF.md).
+
+## Иллюстрации вопросов
+
+23 оригинальных PNG находятся в `src/main/resources/question-images/{disciplineCode}/{sourceId}/{sha256}.png`
+и включаются Maven в JAR, затем в Docker image. Никаких дополнительных сервисов,
+volumes, ENV или ручного копирования после запуска не требуется. 22 привязки готовы;
+изображение `SAT_MATH:15ce8207` сохранено без привязки к удалённому вопросу.
+
+`QuestionResponse` и `ReviewQuestionResponse` содержат обязательное nullable
+`imageUrl`, например `/media/questions/SAT_MATH/3f5a3602/224eefc655e44ddac7e07d499e9fad2ba90e28bd8db675e8cd15b31156b7a203.png`.
+Это origin-relative URL из замороженной ревизии; без картинки возвращается `null`.
+REST и `BATTLE_CHANGED` используют один снимок, включая overtime. Правильные ответы,
+объяснения и доступ к истории продолжают определяться Free/Pro-политикой.
+
+Публичные GET/HEAD `/media/questions/{disciplineCode}/{sourceId}/{sha256}.png`
+возвращают PNG с `nosniff` и `Cache-Control: public, max-age=31536000, immutable`
+(порядок директив не значим). HEAD не имеет тела; неизвестный ключ даёт 404,
+GET — существующий ErrorResponse, HEAD — без тела. Поддерживается Last-Modified/304.
+Nginx проксирует media на том же HTTPS origin с сохранением COOP/COEP.
+
+Чтобы добавить изображение, сохраните новые оригинальные байты под новым SHA-256
+ключом и создайте следующую ревизию вопроса через новую миграцию или JSON-импорт.
+Optional `imageKey` в импорте принимает только packaged PNG с правильным externalKey;
+старые JSON без поля валидны. Не заменяйте файл по старому ключу и сохраняйте все
+ранее опубликованные assets для истории. Повтор одной ревизии идемпотентен;
+изменение содержимого или imageKey под прежней версией — revision conflict.
+
+Обычный запуск из корня: `docker compose up -d --build`. Для существующей БД
+с ранее применённым другим V12 необходима отдельная проверка Flyway checksum:
+в этой задаче по подтверждению владельца исправлена оставшаяся проверка количества
+240 → 239. Автоматический repair/сброс рабочей БД не выполняется.
+Контракт и передача фронтендеру: [QUESTION_IMAGES_HANDOFF.md](QUESTION_IMAGES_HANDOFF.md).
 
 Java 21, Spring Boot 3.5.16, MVC/JPA/Security Resource Server, PostgreSQL 17.12,
 Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3.4
@@ -35,7 +130,19 @@ Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3
 
 ## Отдельная база для обновления
 
-V1–V8 сохранены. V9 добавляет данные age-screen, reset hashes и ratingReachedAt;
+Сохранена цепочка V1–V13, добавлены V14 и V15. Исторические V1–V11 не переписаны;
+дополнительного B11 нет. После всей цепочки остаются 14 итоговых таблиц, без
+practice_sessions и старых subject-колонок. Для обновления существующей V11-БД
+не нужны `repair`, ручное изменение history или удаление данных.
+
+Далее `V12__seed_sat_question_bank.sql` содержит 239 вопросов и дополняет topics
+двух дисциплин. `V13__seed_local_demo_accounts.sql` добавляет только два заданных
+демо-аккаунта и их рейтинги/подписки. Повторный запуск не меняет seed-данные;
+коллизия чужого email/ника или другой ревизии вопроса останавливает миграцию
+вместо перезаписи. Перед использованием таких данных вне локальной демонстрации
+следует отдельно согласовать демо-аккаунты.
+
+Историческая цепочка: V9 добавляет данные age-screen, reset hashes и ratingReachedAt;
 V10 сохранена без изменения checksum; V11 удаляет только устаревшую таблицу
 practice_sessions. Таблица question_reports и остальные данные сохраняются. V8 добавляет подписки/receipt, quota ledger, qualifying days
 и индексы истории по finishedAt. V7 добавляет калибровку, пики и архивы сезонов. V5 создаёт каталоги дисциплин/рангов, V6 переводит ключи на
@@ -63,8 +170,10 @@ ENV: это не изменяет пароль роли в БД. Данные/vo
 
 По умолчанию COMPOSE_PROJECT_NAME=`skillbattles-local`, отдельная БД
 `skillbattles_v03`, PostgreSQL публикуется на 127.0.0.1:55432, backend —
-127.0.0.1:8080, frontend — 127.0.0.1:8081 (`FRONTEND_PORT`). Браузер открывает
-http://localhost:8081; Swagger доступен на этом же origin по
+127.0.0.1:8080, frontend — `0.0.0.0:8443` (HTTPS, `FRONTEND_HTTPS_PORT`),
+HTTP `0.0.0.0:8081` (`FRONTEND_PORT`) перенаправляет на HTTPS. Подготовку
+локального CA и установку доверия на устройствах см. в корневом README.
+Браузер открывает https://localhost:8443; Swagger доступен на этом же origin по
 `/swagger-ui/index.html`, OpenAPI — `/v3/api-docs`. Backend доверяет forwarded
 headers от локального nginx; proxy перезаписывает переданные клиентом заголовки.
 Compose автоматически читает корневой `.env` из корня проекта.
@@ -563,9 +672,42 @@ POST `/api/v1/battles/{id}/rounds/{roundId}/report`: показанный reveal
 непустой comment. Первый report(user,battle,round) — 201, точный повтор — 200 с тем же
 объектом, другой payload — 409 REPORT_ALREADY_EXISTS. Контент/результат/Elo не меняются.
 
+## Входящие приглашения на реванш
+
+`GET /api/v1/users/me/rematch-invitations`, access Bearer JWT, без body/query и
+пагинации. Ответ: `{data: [{sourceBattleId, requester: {id,isPro,nickname},
+disciplineCode, expiresAt, version}], serverTime}`. Всегда присутствуют оба
+верхних поля, пустой `data` — нормальный 200, `Cache-Control: no-store`.
+Owner определяется только из JWT sub. Учитываются только входящие WAITING со
+строгим `expiresAt > serverTime`, порядок expiresAt/sourceBattleId. Исходящие,
+чужие, MATCHED/CANCELLED/EXPIRED и обычные комнаты не включаются.
+
+Снимок и expiration используют Clock под существующей registry-блокировкой;
+nickname и Pro-флаги затем загружаются двумя пакетными запросами вне блокировки.
+Минимальный список доступен Free/Pro и не расширяет history/answer access.
+Принять — прежний POST `/battles/{sourceBattleId}/rematch`, отклонить — прежний
+DELETE (204, CANCELLED). Входящее приглашение не резервирует получателя, не
+покидает его activity и не отменяет другие приглашения. Исходные 60 секунд не
+продлеваются. После MATCHED оба проходят Ready; DELETE возвращает 409
+MATCH_ALREADY_FOUND и не удаляет созданный матч.
+
+Используется прежний `REMATCH_CHANGED` на `/user/queue/events`, включая начальный
+WAITING обоим участникам после commit. Wire-поля RematchResponse и envelope не
+изменены. На клиентском startup/reconnect: слушатель → CONNECT/SUBSCRIBE → новый
+GET и GET `/users/me/activity`. События могут теряться, дублироваться и менять
+порядок; клиент объединяет их по sourceBattleId/version и поколению reconnect.
+Список incoming не восстанавливает потерянный MATCHED: для него нужны activity
+и snapshot нового battleId. При backend restart непринятые приглашения теряются;
+персистентный созданный батл использует существующее recovery, включая отмену
+незавершённого матча с SERVER_INTERRUPTION. Поддерживается один процесс backend.
+
+Полный generated контракт после `verify`: `backend/target/generated-openapi.json`.
+Точный контракт, примеры и сценарий двух аккаунтов —
+[REMATCH_NOTIFICATIONS_HANDOFF.md](REMATCH_NOTIFICATIONS_HANDOFF.md).
+
 ## Контракт и передача frontend
 
-Swagger `/v3/api-docs` содержит 39 реализованных REST-операций. OpenAPI 3.1 может
+Swagger `/v3/api-docs` содержит 57 продуктовых REST-операций и 2 media GET/HEAD. OpenAPI 3.1 может
 представлять nullable как `type: [integer, null]`, эквивалент nullable=true целевого
 OpenAPI 3.0.3. Имена схем могут отличаться; публичные поля и типы сверяются.
 Webhook дополнительно документирует фактический 503 BILLING_UNAVAILABLE для retry
@@ -586,7 +728,7 @@ Practice DTO/mapper/service/repository/entity, соответствующего 
 описаниях Pro. Цены и остальные права не менялись. Версия API осталась 0.3.0.
 V11 удаляет только practice_sessions; V10 и более старые миграции не редактируются.
 Frontend не изменён, отдельной frontend-спецификации в репозитории нет.
-Production-банк и реальные платежи вне задачи. Stripe TEST остаётся fail-closed:
+Предоставленный банк теперь включён в V12; реальные платежи вне задачи. Stripe TEST остаётся fail-closed:
 STRIPE_WEBHOOK_SECRET пустой, Windows Application Control блокирует stripe.exe.
 Полный внешний Checkout → webhook → Pro не проверен; политики ОС не менялись.
 
@@ -651,7 +793,9 @@ Runner принудительно исключает STRIPE_/BILLING_ deployment
 fallback, квоту, masked review, ACCOUNT_CHANGED, profile/reset availability, leaderboard, report и rematch consent/activity/REMATCH_CHANGED наряду с прежними flow. Он не
 выполняет платежи даже при наличии ключей в пользовательском окружении.
 
-Frontend-спецификация отсутствует; сокращённая замена не создавалась. Production-банк
-не поставляется. До предметного демо нужны разрешённые/проверенные SAT-вопросы,
-достаточные пулы всех требуемых сложностей, успешный dry-run/apply и frontend,
-согласованный с API v0.3.
+Текущий банк: V12 содержит 239 SAT-вопросов; удалённый источник не восстанавливается,
+с достаточными пулами всех сложностей обеих дисциплин. Оригиналы и изменения
+23 наборов вариантов описаны в QUESTION_BANK.md. В изолированном runner эти
+seed-вопросы сохраняются, но деактивируются перед импортом детерминированных fixtures;
+пользовательская БД этим runner не затрагивается. Дополнительный банк по-прежнему
+можно загрузить через dry-run/apply importer.

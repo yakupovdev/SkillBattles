@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.*;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
+    Optional<User> findByFriendCode(String friendCode);
     @Query("select u.id from User u order by u.id")
     java.util.List<UUID> activeIds();
     Optional<User> findByEmailNormalized(String email);

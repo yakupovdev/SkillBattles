@@ -79,6 +79,10 @@ final class _DisciplineMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       tooltip: 'Discipline',
       position: PopupMenuPosition.under,
+      // The shell's nested navigator leaves the top bar uncovered: a tab tap
+      // would switch pages under an open menu. On the root navigator the
+      // barrier covers the tabs too, so the tap closes the menu first.
+      useRootNavigator: true,
       initialValue: selected ?? _all,
       onSelected: (String code) => onSelected(code == _all ? null : code),
       color: AppColors.white,

@@ -16,6 +16,7 @@ final class QuestionModel {
     required this.difficulty,
     required this.prompt,
     required this.options,
+    this.imageUrl,
   });
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) =>
@@ -39,6 +40,11 @@ final class QuestionModel {
   @JsonKey(required: true)
   final List<QuestionOptionModel> options;
 
+  /// Origin-relative illustration URL (`/media/questions/...png`), `null`
+  /// when the question has none. Not `required`: older payloads and saved
+  /// snapshots omit the key, which means no illustration.
+  final String? imageUrl;
+
   QuestionEntity toEntity() => QuestionEntity(
     id: id,
     topicCode: topicCode,
@@ -48,5 +54,6 @@ final class QuestionModel {
     options: options
         .map((QuestionOptionModel option) => option.toEntity())
         .toList(growable: false),
+    imageUrl: imageUrl,
   );
 }
