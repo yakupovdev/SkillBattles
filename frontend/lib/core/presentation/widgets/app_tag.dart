@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/core/presentation/widgets/app_markdown_text.dart';
 
 /// Color pair of an [AppTag].
 enum AppTagTone {
@@ -37,6 +38,7 @@ final class AppTag extends StatelessWidget {
     this.style,
     this.leading,
     this.foregroundColor,
+    this.isMarkdown = false,
     super.key,
   });
 
@@ -55,12 +57,21 @@ final class AppTag extends StatelessWidget {
   /// Replaces the tone's text color ("You: B · $60.00 · incorrect").
   final Color? foregroundColor;
 
+  /// Renders [label] as inline Markdown with LaTeX (a quoted answer option).
+  final bool isMarkdown;
+
   @override
   Widget build(BuildContext context) {
     final TextStyle textStyle =
         (style ?? AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w600))
             .copyWith(color: foregroundColor ?? tone.foreground);
     final Widget? icon = leading;
+    // Without an icon the label is a bare Text, so a long label (an answer
+    // quote in the round review) wraps inside the parent's width instead of
+    // overflowing a min-size Row.
+    final Widget text = isMarkdown
+        ? AppMarkdownLine(label, style: textStyle)
+        : Text(label, style: textStyle);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -69,14 +80,13 @@ final class AppTag extends StatelessWidget {
       ),
       child: Padding(
         padding: padding,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 6,
-          children: <Widget>[
-            ?icon,
-            Text(label, style: textStyle),
-          ],
-        ),
+        child: icon == null
+            ? text
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 6,
+                children: <Widget>[icon, text],
+              ),
       ),
     );
   }

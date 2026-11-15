@@ -10,7 +10,6 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
-import 'package:skill_battles/dev/mock_backend.dart';
 
 import '../helpers/app_test_harness.dart';
 
@@ -77,7 +76,20 @@ void main() {
     final AppDependencies deps = await pumpApp(tester);
     await settle(tester, 6);
     final DateTime now = DateTime.now();
-    const List<String> months = <String>['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const List<String> months = <String>[
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
     await tester.tap(find.byType(DropdownButtonFormField<int>).first);
     await settle(tester, 2);
     await tester.dragUntilVisible(
@@ -131,9 +143,6 @@ void main() {
 
   testWidgets('home limit', (WidgetTester tester) async {
     final AppDependencies deps = await pumpApp(tester, signedIn: true);
-    await tester.runAsync(() async {
-      deps.getDep<MockBackend>().setDailyLimitReached(true);
-    });
     deps.getDep<GoRouter>().goNamed(AppRoutes.profile.name);
     await settle(tester, 6);
     deps.getDep<GoRouter>().goNamed(AppRoutes.home.name);

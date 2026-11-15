@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -11,6 +12,7 @@ import 'package:skill_battles/core/domain/usecases/generate_id_usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/extensions/play_failure_message.dart';
 import 'package:skill_battles/core/presentation/widgets/app_confirm_dialog.dart';
+import 'package:skill_battles/core/presentation/widgets/app_context_menu_blocker.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_notice.dart';
 import 'package:skill_battles/core/presentation/widgets/app_status_view.dart';
@@ -27,6 +29,7 @@ import 'package:skill_battles/features/battle/domain/usecases/watch_battle_useca
 import 'package:skill_battles/features/battle/presentation/bloc/battle_bloc/battle_bloc.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_countdown_view.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_ended_view.dart';
+import 'package:skill_battles/features/battle/presentation/widgets/battle_focus_guard.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_header.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_ready_check.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/battle_round_view.dart';
@@ -108,26 +111,28 @@ final class BattleScreen extends StatelessWidget implements GoRouterWrapper {
         backgroundColor: AppColors.white,
         body: AppDesktopViewport(
           fullBleed: true,
-          child: BlocBuilder<BattleBloc, BattleState>(
-            builder: (BuildContext context, BattleState state) {
-              final BattleSnapshotEntity? snapshot = state.snapshot;
-              if (snapshot == null) {
-                if (state.loadStatus.isFailure) {
-                  return AppErrorView(
-                    title: "Couldn't open this match",
-                    message: state.failure?.playMessage(DateTime.now()) ?? '',
-                    onRetry: () => context.read<BattleBloc>().add(
-                      const BattleRefreshRequested(),
-                    ),
+          child: AppContextMenuBlocker(
+            child: BlocBuilder<BattleBloc, BattleState>(
+              builder: (BuildContext context, BattleState state) {
+                final BattleSnapshotEntity? snapshot = state.snapshot;
+                if (snapshot == null) {
+                  if (state.loadStatus.isFailure) {
+                    return AppErrorView(
+                      title: "Couldn't open this match",
+                      message: state.failure?.playMessage(DateTime.now()) ?? '',
+                      onRetry: () => context.read<BattleBloc>().add(
+                        const BattleRefreshRequested(),
+                      ),
+                    );
+                  }
+                  return const Padding(
+                    padding: EdgeInsets.only(top: 160),
+                    child: Center(child: CircularProgressIndicator()),
                   );
                 }
-                return const Padding(
-                  padding: EdgeInsets.only(top: 160),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return _BattleBody(snapshot: snapshot, state: state);
-            },
+                return _BattleBody(snapshot: snapshot, state: state);
+              },
+            ),
           ),
         ),
       ),
@@ -206,11 +211,16 @@ final class _BattleBody extends StatelessWidget {
               ),
               BattlePhase.countdown => BattleCountdownView(snapshot: snapshot),
               BattlePhase.question ||
-              BattlePhase.reveal when round != null => Center(
-                child: BattleRoundView(
-                  snapshot: snapshot,
-                  round: round,
-                  state: state,
+              BattlePhase.reveal when round != null => BattleFocusGuard(
+                // Web only for now; mobile platforms are a separate task.
+                enabled: kIsWeb,
+                roundId: round.id,
+                child: Center(
+                  child: BattleRoundView(
+                    snapshot: snapshot,
+                    round: round,
+                    state: state,
+                  ),
                 ),
               ),
               BattlePhase.cancelled => BattleCancelledView(

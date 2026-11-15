@@ -12,12 +12,15 @@ import 'package:skill_battles/core/domain/entity/question_option_entity.dart';
 import 'package:skill_battles/core/domain/entity/round_answer_entity.dart';
 import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
+import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_countdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
+import 'package:skill_battles/core/presentation/widgets/app_markdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
+import 'package:skill_battles/core/presentation/widgets/question_illustration.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_phase.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_round_entity.dart';
@@ -243,6 +246,7 @@ final class _Question extends StatelessWidget {
     final bool isLast =
         round.isOvertime || round.number >= snapshot.questionCount;
     final String topic = '${question.topicName} · ${question.difficulty.label}';
+    final String? imageUrl = question.imageUrl;
     return BattleColumn(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -289,9 +293,15 @@ final class _Question extends StatelessWidget {
                 ),
             ],
           ),
-          SelectionArea(
-            child: Text(question.prompt, style: AppTextStyles.headlineMd),
-          ),
+          // Above the prompt; the URL comes only from the current round, so
+          // nothing is fetched for rounds that are not revealed yet.
+          if (imageUrl != null)
+            QuestionIllustration(
+              key: ValueKey<String>(imageUrl),
+              imageUrl: imageUrl,
+            ),
+          // Not selectable: the prompt must not be copied out of a live round.
+          AppMarkdownText(question.prompt, style: AppTextStyles.headlineMd),
         ],
       ),
     );
@@ -791,9 +801,7 @@ final class _RevealStatus extends StatelessWidget {
               ),
       );
     }
-    final String answer =
-        '${BattleOptionCard.letterAt(correctIndex)} · '
-        '${options[correctIndex].text}';
+    final TextStyle answerStyle = base.copyWith(fontWeight: FontWeight.w600);
     return _Status(
       dot: AppColors.accent,
       message: Wrap(
@@ -804,8 +812,12 @@ final class _RevealStatus extends StatelessWidget {
               children: <InlineSpan>[
                 const TextSpan(text: 'Correct answer: '),
                 TextSpan(
-                  text: answer,
-                  style: base.copyWith(fontWeight: FontWeight.w600),
+                  text: '${BattleOptionCard.letterAt(correctIndex)} · ',
+                  style: answerStyle,
+                ),
+                MarkdownSpans.build(
+                  options[correctIndex].text,
+                  style: answerStyle,
                 ),
                 const TextSpan(text: '. '),
               ],

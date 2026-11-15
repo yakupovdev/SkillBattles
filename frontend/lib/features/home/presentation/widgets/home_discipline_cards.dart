@@ -4,15 +4,20 @@ import 'package:skeletonizer/skeletonizer.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/app/theme/league_colors.dart';
+import 'package:skill_battles/core/presentation/league/league_rank.dart';
 import 'package:skill_battles/core/presentation/widgets/app_progress_bar.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
+import 'package:skill_battles/core/presentation/widgets/division_pips.dart';
+import 'package:skill_battles/core/presentation/widgets/league_emblem.dart';
 import 'package:skill_battles/features/account/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/statistics_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/rank_ladder_entity.dart';
+import 'package:skill_battles/features/catalog/domain/entity/rank_tier_entity.dart';
 import 'package:skill_battles/features/catalog/presentation/extensions/catalog_labels.dart';
 
 /// Selectable discipline cards from the catalogue: rating, rank, RP
@@ -107,7 +112,7 @@ final class _DisciplineCard extends StatelessWidget {
         padding: EdgeInsets.all(isSelected ? 28 : 29),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 24,
+          spacing: 20,
           children: <Widget>[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,7 +141,12 @@ final class _DisciplineCard extends StatelessWidget {
                 Skeleton.ignore(child: _SelectionMark(isSelected: isSelected)),
               ],
             ),
-            if (stats != null) _RatingRow(stats: stats, isSelected: isSelected),
+            if (stats != null)
+              _LeagueSection(
+                stats: stats,
+                ranks: ranks,
+                isSelected: isSelected,
+              ),
             _Footer(
               discipline: discipline,
               stats: stats,
@@ -150,65 +160,270 @@ final class _DisciplineCard extends StatelessWidget {
   }
 }
 
-final class _RatingRow extends StatelessWidget {
-  const _RatingRow({required this.stats, required this.isSelected});
+/// The league hero and the RP progress of one discipline.
+final class _LeagueSection extends StatelessWidget {
+  const _LeagueSection({
+    required this.stats,
+    required this.ranks,
+    required this.isSelected,
+  });
 
   final DisciplineStatsEntity stats;
+  final RankLadderEntity? ranks;
   final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
-    final RankProgressEntity rank = stats.rank;
-    final int? target = rank.divisionRpTarget;
-    final String progress = target == null
-        ? '${rank.divisionRpCurrent} RP'
-        : '${rank.divisionRpCurrent} / $target RP';
+    final LeagueRank? league = LeagueRank.tryParse(stats.rank.rankCode);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 20,
+      children: <Widget>[
+        _LeagueHero(stats: stats, league: league, isSelected: isSelected),
+        _LeagueProgress(
+          rank: stats.rank,
+          league: league,
+          ranks: ranks,
+          isSelected: isSelected,
+        ),
+      ],
+    );
+  }
+}
 
+final class _LeagueHero extends StatelessWidget {
+  const _LeagueHero({
+    required this.stats,
+    required this.league,
+    required this.isSelected,
+  });
+
+  final DisciplineStatsEntity stats;
+  final LeagueRank? league;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final LeagueRank? league = this.league;
+    final LeaguePalette? palette = league == null
+        ? null
+        : LeagueColors.of(league.league);
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
       spacing: 16,
       children: <Widget>[
+        if (league != null && palette != null)
+          _EmblemCircle(league: league, palette: palette),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 4,
+            spacing: 6,
             children: <Widget>[
               Text(
-                '${stats.rating}',
-                style: AppTextStyles.monoXl.copyWith(
-                  color: isSelected ? AppColors.primary : AppColors.ink,
+                'YOUR LEAGUE',
+                style: AppTextStyles.monoCaption.copyWith(
+                  letterSpacing: 0.1 * 11,
+                  color: AppColors.muted,
                 ),
               ),
-              Text(
-                rank.rankName,
-                style: AppTextStyles.bodyMd.copyWith(
-                  fontWeight: FontWeight.w600,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  stats.rank.rankName,
+                  style: AppTextStyles.titleXl.copyWith(
+                    fontSize: 34,
+                    height: 38 / 34,
+                    letterSpacing: -0.02 * 34,
+                    color: palette?.nameText,
+                  ),
+                  maxLines: 1,
                 ),
               ),
+              if (league != null && league.division != null)
+                Skeleton.leaf(
+                  child: DivisionPips(
+                    division: league.division,
+                    color: LeagueColors.of(league.league).deep,
+                    emptyColor: isSelected
+                        ? AppColors.primaryLine
+                        : AppColors.divider,
+                  ),
+                ),
             ],
           ),
         ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,
-          spacing: 8,
+          spacing: 2,
           children: <Widget>[
             Text(
-              progress,
-              style: AppTextStyles.eyebrow.copyWith(letterSpacing: 0),
-            ),
-            SizedBox(
-              width: 160,
-              child: AppProgressBar(
-                fraction: rank.fraction ?? 1,
+              '${stats.rating}',
+              style: AppTextStyles.monoXl.copyWith(
+                fontSize: 28,
+                height: 32 / 28,
+                letterSpacing: -0.02 * 28,
                 color: isSelected ? AppColors.primary : AppColors.ink,
-                trackColor: isSelected
-                    ? AppColors.primaryLine
-                    : AppColors.divider,
               ),
+            ),
+            Text(
+              'Elo rating',
+              style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
             ),
           ],
         ),
       ],
+    );
+  }
+}
+
+final class _EmblemCircle extends StatelessWidget {
+  const _EmblemCircle({required this.league, required this.palette});
+
+  final LeagueRank league;
+  final LeaguePalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Skeleton.leaf(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: palette.tint,
+          border: Border.all(color: palette.base),
+        ),
+        child: SizedBox.square(
+          dimension: 112,
+          child: Center(child: LeagueEmblem(rank: league, size: 96)),
+        ),
+      ),
+    );
+  }
+}
+
+final class _LeagueProgress extends StatelessWidget {
+  const _LeagueProgress({
+    required this.rank,
+    required this.league,
+    required this.ranks,
+    required this.isSelected,
+  });
+
+  final RankProgressEntity rank;
+  final LeagueRank? league;
+  final RankLadderEntity? ranks;
+  final bool isSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final int? target = rank.divisionRpTarget;
+    final RankTierEntity? nextTier = ranks?.next(rank.rankCode);
+    final TextStyle mono = AppTextStyles.eyebrow.copyWith(
+      letterSpacing: 0,
+      color: AppColors.inkSoft,
+    );
+    final LeagueRank? current = league;
+    final Color fill = current == null
+        ? (isSelected ? AppColors.primary : AppColors.ink)
+        : LeagueColors.of(current.league).deep;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 10,
+      children: <Widget>[
+        Row(
+          spacing: 12,
+          children: <Widget>[
+            Expanded(
+              child: Text.rich(
+                TextSpan(
+                  text: target == null
+                      ? 'Open tier · no RP cap'
+                      : '${rank.divisionRpCurrent} / $target RP',
+                  children: <InlineSpan>[
+                    if (target != null && nextTier != null)
+                      TextSpan(
+                        text: ' · to ${nextTier.displayName}',
+                        style: const TextStyle(color: AppColors.muted),
+                      ),
+                  ],
+                ),
+                style: mono,
+              ),
+            ),
+            if (current != null)
+              Skeleton.ignore(
+                child: _NextLeague(
+                  nextLeague: _nextLeague(ranks, rank.rankCode, current),
+                ),
+              ),
+          ],
+        ),
+        if (target != null)
+          Skeleton.leaf(
+            child: AppProgressBar(
+              fraction: rank.fraction ?? 1,
+              color: fill,
+              trackColor: isSelected
+                  ? AppColors.primaryLine
+                  : AppColors.divider,
+              height: 8,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The first tier of the next league, from the server ladder; `null` while
+/// the ladder is missing or in the top league.
+RankTierEntity? _nextLeague(
+  RankLadderEntity? ranks,
+  String rankCode,
+  LeagueRank current,
+) {
+  if (ranks == null) return null;
+  final List<RankTierEntity> tiers = ranks.tiers;
+  final int index = tiers.indexWhere((RankTierEntity t) => t.code == rankCode);
+  if (index < 0) return null;
+  for (int i = index + 1; i < tiers.length; i++) {
+    if (LeagueRank.tryParse(tiers[i].code)?.league != current.league) {
+      return tiers[i];
+    }
+  }
+  return null;
+}
+
+final class _NextLeague extends StatelessWidget {
+  const _NextLeague({required this.nextLeague});
+
+  final RankTierEntity? nextLeague;
+
+  @override
+  Widget build(BuildContext context) {
+    final RankTierEntity? tier = nextLeague;
+    final LeagueRank? rank = tier == null
+        ? null
+        : LeagueRank.tryParse(tier.code);
+    if (tier == null || rank == null) return const SizedBox.shrink();
+    return Opacity(
+      opacity: 0.55,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 6,
+        children: <Widget>[
+          Text(
+            'Next',
+            style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
+          ),
+          LeagueEmblem(rank: rank, size: 22, dimmed: true),
+          Text(
+            rank.league.displayName,
+            style: AppTextStyles.bodyXs.copyWith(
+              fontWeight: FontWeight.w600,
+              color: AppColors.inkSoft,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -234,6 +449,43 @@ final class _Footer extends StatelessWidget {
     final TextStyle textStyle = AppTextStyles.bodySm.copyWith(
       color: AppColors.muted,
     );
+    final List<Widget> children = <Widget>[
+      if (stats != null && calibration != null)
+        if (calibration.isCalibrating)
+          Row(
+            spacing: 8,
+            children: <Widget>[
+              const _CalibrationChip(),
+              Flexible(
+                child: Text(
+                  'Calibration · ${calibration.matchesRemaining} of '
+                  '${calibration.completedMatches + calibration.matchesRemaining} '
+                  'matches left',
+                  style: textStyle.copyWith(
+                    color: isSelected ? AppColors.primaryInk : null,
+                  ),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(
+            'Calibrated · Season peak ${stats.seasonPeakRating} '
+            '${ranks.nameOf(stats.seasonPeakRankCode)}',
+            style: textStyle,
+          ),
+      if (stats != null && stats.seasonRolloverPending)
+        Text(
+          'Season reset pending — finishing your last match of the '
+          'previous season.',
+          style: AppTextStyles.bodyXs.copyWith(color: AppColors.accentText),
+        ),
+      if (!discipline.contentAvailable)
+        Text(
+          'Questions are being restocked — not available right now.',
+          style: AppTextStyles.bodyXs.copyWith(color: AppColors.danger),
+        ),
+    ];
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -245,49 +497,15 @@ final class _Footer extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.only(top: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 8,
-          children: <Widget>[
-            if (stats != null && calibration != null)
-              if (calibration.isCalibrating)
-                Row(
-                  spacing: 8,
-                  children: <Widget>[
-                    const _CalibrationChip(),
-                    Flexible(
-                      child: Text(
-                        'Calibration · ${calibration.matchesRemaining} of '
-                        '${calibration.completedMatches + calibration.matchesRemaining} '
-                        'matches left',
-                        style: textStyle.copyWith(
-                          color: isSelected ? AppColors.primaryInk : null,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              else
-                Text(
-                  'Calibrated · Season peak ${stats.seasonPeakRating} '
-                  '${ranks.nameOf(stats.seasonPeakRankCode)}',
-                  style: textStyle,
-                ),
-            if (stats != null && stats.seasonRolloverPending)
-              Text(
-                'Season reset pending — finishing your last match of the '
-                'previous season.',
-                style: AppTextStyles.bodyXs.copyWith(
-                  color: AppColors.accentText,
-                ),
+        // An empty Column reports a negative intrinsic height (its spacing is
+        // subtracted once), which breaks the equal-height card row.
+        child: children.isEmpty
+            ? const SizedBox.shrink()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 8,
+                children: children,
               ),
-            if (!discipline.contentAvailable)
-              Text(
-                'Questions are being restocked — not available right now.',
-                style: AppTextStyles.bodyXs.copyWith(color: AppColors.danger),
-              ),
-          ],
-        ),
       ),
     );
   }

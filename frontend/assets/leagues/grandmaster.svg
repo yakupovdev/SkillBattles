@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 96 96" fill="none">
+<defs><linearGradient id="body" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#FF8A9C"/><stop offset="0.5" stop-color="#D3264B"/><stop offset="1" stop-color="#8E0F2C"/></linearGradient></defs>
+<path d="M48 18.52 L55.68 28.38 L67.68 24.91 L68.1 37.4 L79.84 41.65 L72.84 52 L79.84 62.35 L68.1 66.6 L67.68 79.09 L55.68 75.62 L48 85.48 L40.32 75.62 L28.32 79.09 L27.9 66.6 L16.16 62.35 L23.16 52 L16.16 41.65 L27.9 37.4 L28.32 24.91 L40.32 28.38 Z" fill="#3A040F"/>
+<path d="M48 17.76 L55.39 27.26 L66.95 23.92 L67.35 35.94 L78.66 40.04 L71.92 50 L78.66 59.96 L67.35 64.06 L66.95 76.08 L55.39 72.75 L48 82.24 L40.61 72.75 L29.05 76.08 L28.65 64.06 L17.34 59.96 L24.08 50 L17.34 40.04 L28.65 35.94 L29.05 23.92 L40.61 27.26 Z" fill="#5A0717"/>
+<path d="M48 17 L55.11 26.13 L66.22 22.92 L66.61 34.48 L77.48 38.42 L71 48 L77.48 57.58 L66.61 61.52 L66.22 73.08 L55.11 69.87 L48 79 L40.89 69.87 L29.78 73.08 L29.39 61.52 L18.52 57.58 L25 48 L18.52 38.42 L29.39 34.48 L29.78 22.92 L40.89 26.13 Z" fill="url(#body)" stroke="#5A0717" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="48" cy="48" r="19" stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="1.5"/>
+<path d="M48 17 V29 M66.22 22.92 L59.17 32.63 M77.48 38.42 L66.07 42.13 M77.48 57.58 L66.07 53.87 M66.22 73.08 L59.17 63.37 M48 79 V67 M29.78 73.08 L36.83 63.37 M18.52 57.58 L29.93 53.87 M18.52 38.42 L29.93 42.13 M29.78 22.92 L36.83 32.63" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="1.2"/>
+<circle cx="48" cy="48" r="15.5" stroke="#F5A524" stroke-width="3"/>
+<circle cx="48" cy="48" r="12" fill="#2A0710"/>
+<path d="M42.5 42.5 L47 48 L42.5 53.5" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M53.5 42.5 L49 48 L53.5 53.5" stroke="#FF8FA3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

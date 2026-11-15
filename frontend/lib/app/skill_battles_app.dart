@@ -7,7 +7,6 @@ import 'package:skill_battles/app/di/app_dependencies_provider.dart';
 import 'package:skill_battles/app/theme/app_skeleton_theme.dart';
 import 'package:skill_battles/app/theme/app_theme.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
-import 'package:skill_battles/dev/dev_panel.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_account_state_usecase.dart';
 import 'package:skill_battles/features/account/domain/usecases/watch_account_changes_usecase.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
@@ -38,11 +37,8 @@ final class SkillBattlesApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: router,
-        builder: (BuildContext context, Widget? child) => AppSkeletonTheme(
-          child: dependencies.config.useDevMocks
-              ? DevPanelOverlay(child: child ?? const SizedBox.shrink())
-              : child ?? const SizedBox.shrink(),
-        ),
+        builder: (BuildContext context, Widget? child) =>
+            AppSkeletonTheme(child: child ?? const SizedBox.shrink()),
       ),
     );
   }

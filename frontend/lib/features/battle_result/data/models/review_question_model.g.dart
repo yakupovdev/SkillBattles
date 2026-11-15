@@ -39,6 +39,7 @@ ReviewQuestionModel _$ReviewQuestionModelFromJson(
     ),
     correctOptionId: $checkedConvert('correctOptionId', (v) => v as String?),
     explanation: $checkedConvert('explanation', (v) => v as String?),
+    imageUrl: $checkedConvert('imageUrl', (v) => v as String?),
   );
   return val;
 });

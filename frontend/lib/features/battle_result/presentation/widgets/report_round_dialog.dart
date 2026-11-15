@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
@@ -94,9 +95,12 @@ final class _ReportRoundDialogState extends State<ReportRoundDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final String prompt = widget.prompt.length > _promptPreviewLength
-        ? '${widget.prompt.substring(0, _promptPreviewLength).trimRight()}…'
-        : widget.prompt;
+    // The preview quotes the question as plain text: cutting Markdown or a
+    // formula at a fixed length would leave half of its markup.
+    final String plain = MarkdownSpans.plainText(widget.prompt);
+    final String prompt = plain.length > _promptPreviewLength
+        ? '${plain.substring(0, _promptPreviewLength).trimRight()}…'
+        : plain;
     final TextStyle muted = AppTextStyles.bodyMd.copyWith(
       color: AppColors.muted,
       height: 20 / 14,

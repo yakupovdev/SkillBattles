@@ -9,10 +9,13 @@ import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/domain/entity/question_option_entity.dart';
 import 'package:skill_battles/core/domain/entity/round_answer_entity.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
+import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
+import 'package:skill_battles/core/presentation/widgets/app_markdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
+import 'package:skill_battles/core/presentation/widgets/question_illustration.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/report_params_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_question_entity.dart';
@@ -145,7 +148,8 @@ final class _RoundReviewListState extends State<RoundReviewList> {
 String _roundNumber(ReviewRoundEntity round) =>
     round.number.toString().padLeft(2, '0');
 
-/// `B · $60.00` — the letter and text of an option, `null` when unknown.
+/// `B · $60.00` — the letter and text (Markdown) of an option, `null` when
+/// unknown.
 String? _optionLabel(ReviewQuestionEntity question, String? optionId) {
   if (optionId == null) return null;
   final List<QuestionOptionEntity> options = question.question.options;
@@ -313,7 +317,7 @@ final class _RoundRow extends StatelessWidget {
                   if (explanation != null)
                     Padding(
                       padding: const EdgeInsets.only(left: 44),
-                      child: Text(
+                      child: AppMarkdownText(
                         explanation,
                         style: AppTextStyles.bodyLg.copyWith(
                           height: 24 / 15,
@@ -371,8 +375,24 @@ final class _RoundSummary extends StatelessWidget {
     final RoundAnswerEntity? mine = this.mine;
     final RoundAnswerEntity? theirs = this.theirs;
     final bool overtime = round.isOvertime;
+    // The illustration belongs to the full question, so it is shown only in
+    // the expanded row, above the prompt (the collapsed row is one line).
+    final String? imageUrl = isExpanded
+        ? round.question.question.imageUrl
+        : null;
+    final Widget prompt = AppMarkdownLine(
+      round.question.question.prompt,
+      style: AppTextStyles.bodyLg.copyWith(
+        fontWeight: isExpanded ? FontWeight.w600 : FontWeight.w500,
+      ),
+      maxLines: isExpanded ? 6 : 1,
+      overflow: TextOverflow.ellipsis,
+    );
     return Row(
       spacing: 16,
+      crossAxisAlignment: imageUrl == null
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
       children: <Widget>[
         SizedBox(
           width: 28,
@@ -385,14 +405,20 @@ final class _RoundSummary extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: Text(
-            round.question.question.prompt,
-            style: AppTextStyles.bodyLg.copyWith(
-              fontWeight: isExpanded ? FontWeight.w600 : FontWeight.w500,
-            ),
-            maxLines: isExpanded ? 6 : 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: imageUrl == null
+              ? prompt
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 14,
+                  children: <Widget>[
+                    QuestionIllustration(
+                      key: ValueKey<String>(imageUrl),
+                      imageUrl: imageUrl,
+                      maxHeight: 360,
+                    ),
+                    prompt,
+                  ],
+                ),
         ),
         _Points(
           answer: mine,
@@ -489,13 +515,13 @@ final class _AnswerTags extends StatelessWidget {
       if (theirs != null)
         (
           theirCorrect || theirPick == null
-              ? '$opponentNickname: '
+              ? '${MarkdownSpans.escape(opponentNickname)}: '
                     '${theirs.timedOut
                         ? 'no answer'
                         : theirCorrect
                         ? 'correct'
                         : 'incorrect'}'
-              : '$opponentNickname: $theirPick',
+              : '${MarkdownSpans.escape(opponentNickname)}: $theirPick',
           theirCorrect,
         ),
       if (!completed) ('Not finished', false),
@@ -510,6 +536,7 @@ final class _AnswerTags extends StatelessWidget {
             tone: good ? AppTagTone.success : AppTagTone.danger,
             foregroundColor: good ? null : AppColors.dangerText,
             style: AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w500),
+            isMarkdown: true,
           ),
       ],
     );

@@ -43,6 +43,14 @@
 
   <title>SkillBattles</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Printing (Ctrl/Cmd+P) would print the canvas, battle questions
+       included, so every printed page is blank. -->
+  <style>
+    @media print {
+      body { display: none !important; }
+    }
+  </style>
 </head>
 <body>
   <!--

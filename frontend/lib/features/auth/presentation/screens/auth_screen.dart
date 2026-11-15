@@ -295,7 +295,7 @@ final class _AuthFormState extends State<_AuthForm> {
     _nicknameFocus = FocusNode();
     _emailFocus = FocusNode();
     _passwordFocus = FocusNode();
-    _tab = _AuthTab.signUp;
+    _tab = _AuthTab.logIn;
     _month = null;
     _year = null;
   }
