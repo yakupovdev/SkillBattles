@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -30,18 +29,18 @@ part 'friend_profile_state.dart';
 /// this user triggers a refetch, so an old REMOVED never hides a newer
 /// friendship. The latest read wins.
 final class FriendProfileBloc
-    extends Bloc<FriendProfileEvent, FriendProfileState> {
+    extends SignalBloc<FriendProfileEvent, FriendProfileState> {
   FriendProfileBloc({
     required this._getFriendProfile,
     required this._removeFriend,
     required this._watchFriendshipChanges,
     required this._watchConnection,
   }) : super(const FriendProfileState()) {
-    on<FriendProfileStarted>(_onStarted, transformer: restartable());
-    on<FriendProfileRefreshRequested>(_onRefresh, transformer: restartable());
-    on<FriendProfileRemoveRequested>(_onRemove, transformer: droppable());
-    on<_FriendshipChanged>(_onFriendshipChanged);
-    on<_Reconnected>(_onReconnected);
+    handle<FriendProfileStarted>(_onStarted, transformer: restartable());
+    handle<FriendProfileRefreshRequested>(_onRefresh, transformer: restartable());
+    handle<FriendProfileRemoveRequested>(_onRemove, transformer: droppable());
+    handle<_FriendshipChanged>(_onFriendshipChanged);
+    handle<_Reconnected>(_onReconnected);
   }
 
   final GetFriendProfileUsecase _getFriendProfile;
@@ -87,20 +86,20 @@ final class FriendProfileBloc
   ) => _load(emit);
 
   void _onReconnected(_Reconnected event, Emitter<FriendProfileState> emit) {
-    if (state.friendId != null && !state.isNoLongerFriends) {
+    if (stateValue.friendId != null && !stateValue.isNoLongerFriends) {
       add(const FriendProfileRefreshRequested());
     }
   }
 
   Future<void> _load(Emitter<FriendProfileState> emit) async {
-    final String? friendId = state.friendId;
-    if (friendId == null || state.isNoLongerFriends) return;
+    final String? friendId = stateValue.friendId;
+    if (friendId == null || stateValue.isNoLongerFriends) return;
     final int version = ++_loadVersion;
-    emit(state.copyWith(loadStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(loadStatus: LoadStatus.loading));
     final Either<Failure, FriendProfileEntity> result = await _getFriendProfile(
       FriendParamsEntity(friendId: friendId),
     );
-    if (emit.isDone || version != _loadVersion || state.isNoLongerFriends) {
+    if (emit.isDone || version != _loadVersion || stateValue.isNoLongerFriends) {
       return;
     }
     result.match(
@@ -110,10 +109,10 @@ final class FriendProfileBloc
           return;
         }
         // A failed refetch keeps the profile on screen.
-        emit(state.copyWith(loadStatus: LoadStatus.failure, failure: failure));
+        emit(stateValue.copyWith(loadStatus: LoadStatus.failure, failure: failure));
       },
       (FriendProfileEntity profile) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           loadStatus: LoadStatus.success,
           profile: profile,
           resetFailure: true,
@@ -127,10 +126,10 @@ final class FriendProfileBloc
     Emitter<FriendProfileState> emit,
   ) {
     final RelationshipEntity record = event.relationship;
-    final String? friendId = state.friendId;
-    if (friendId == null || state.isNoLongerFriends) return;
+    final String? friendId = stateValue.friendId;
+    if (friendId == null || stateValue.isNoLongerFriends) return;
     if (record.otherPlayer.id != friendId) return;
-    final String? relationshipId = state.relationshipId;
+    final String? relationshipId = stateValue.relationshipId;
     if (record.status == RelationshipStatus.removed &&
         relationshipId != null &&
         record.id == relationshipId) {
@@ -148,10 +147,10 @@ final class FriendProfileBloc
     FriendProfileRemoveRequested event,
     Emitter<FriendProfileState> emit,
   ) async {
-    final String? friendId = state.friendId;
-    if (friendId == null || state.isNoLongerFriends) return;
+    final String? friendId = stateValue.friendId;
+    if (friendId == null || stateValue.isNoLongerFriends) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         removeStatus: LoadStatus.loading,
         resetRemoveFailure: true,
       ),
@@ -162,21 +161,21 @@ final class FriendProfileBloc
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           removeStatus: LoadStatus.failure,
           removeFailure: failure,
         ),
       ),
       (_) {
         _loadVersion++;
-        emit(state.copyWith(removeStatus: LoadStatus.success));
+        emit(stateValue.copyWith(removeStatus: LoadStatus.success));
         _clear(emit);
       },
     );
   }
 
   void _clear(Emitter<FriendProfileState> emit) => emit(
-    state.copyWith(
+    stateValue.copyWith(
       loadStatus: LoadStatus.success,
       isNoLongerFriends: true,
       resetProfile: true,

@@ -1,5 +1,6 @@
-import 'package:flutter/services.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
@@ -7,7 +8,6 @@ import 'package:skill_battles/app/theme/app_shadows.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_avatar.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
-import 'package:skill_battles/core/presentation/widgets/app_card.dart';
 import 'package:skill_battles/core/presentation/widgets/app_countdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_deadline_track.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
@@ -20,8 +20,9 @@ import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 ///
 /// Knows nothing about what it announces; the owner passes copy, state flags
 /// and callbacks. A `null` [onPrimary] / [onSecondary] disables that button;
-/// a `null` [onHide] hides the × but keeps its slot.
-final class AppNotificationCard extends StatelessWidget {
+/// a `null` [onHide] hides the × but keeps its slot. Esc while the focus is
+/// inside the card hides it.
+final class AppNotificationCard extends StatelessComponent {
   const AppNotificationCard({
     required this.avatarName,
     required this.title,
@@ -88,7 +89,7 @@ final class AppNotificationCard extends StatelessWidget {
   final VoidCallback? onHide;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final DateTime? deadline = expiresAt;
     final String? expired = isExpired ? expiredText : null;
     final String? warning = warningText;
@@ -96,84 +97,61 @@ final class AppNotificationCard extends StatelessWidget {
     final String? done = doneText;
     final VoidCallback? hide = onHide;
 
-    final Widget card = Semantics(
-      liveRegion: true,
-      container: true,
-      label: emphasis == null ? '$title. $text' : '$title. $emphasis$text',
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: AppShadows.overlay,
-        ),
-        child: AppCard(
-          color: AppColors.white,
-          padding: const EdgeInsets.all(21),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 16,
-            children: <Widget>[
-              _Header(
-                avatarName: avatarName,
-                title: title,
-                emphasis: emphasis,
-                text: text,
-                onHide: onHide,
-              ),
-              if (deadline != null)
-                _Deadline(
-                  expiresAt: deadline,
-                  lifetime: lifetime,
-                  clockOffset: clockOffset,
-                  isExpired: isExpired,
-                  label: deadlineLabel,
-                ),
-              if (expired != null) _ExpiredLine(text: expired),
-              if (warning != null)
-                AppNotice(message: warning, tone: AppNoticeTone.warning),
-              if (done != null)
-                _DoneLine(text: done)
-              else
-                Row(
-                  spacing: 10,
-                  children: <Widget>[
-                    Expanded(
-                      child: AppButton(
-                        label: primaryLabel,
-                        onPressed: onPrimary,
-                        isLoading: isPrimaryLoading,
-                        size: AppButtonSize.medium,
-                        expand: true,
-                      ),
-                    ),
-                    Expanded(
-                      child: AppButton(
-                        label: secondaryLabel,
-                        onPressed: onSecondary,
-                        isLoading: isSecondaryLoading,
-                        variant: AppButtonVariant.outline,
-                        size: AppButtonSize.medium,
-                        expand: true,
-                      ),
-                    ),
-                  ],
-                ),
-              if (error != null) AppInlineError(error),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (hide == null) return card;
-    return CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        const SingleActivator(LogicalKeyboardKey.escape): hide,
+    return div(
+      classes: 'app-notification-card',
+      attributes: <String, String>{
+        'role': 'group',
+        'aria-live': 'polite',
+        'aria-label': emphasis == null ? '$title. $text' : '$title. $emphasis$text',
       },
-      child: card,
+      events: hide == null
+          ? null
+          : <String, void Function(web.Event)>{
+              'keydown': (web.Event event) {
+                if ((event as web.KeyboardEvent).key != 'Escape') return;
+                event.preventDefault();
+                hide();
+              },
+            },
+      <Component>[
+        _Header(avatarName: avatarName, title: title, emphasis: emphasis, text: text, onHide: onHide),
+        if (deadline != null)
+          _Deadline(
+            expiresAt: deadline,
+            lifetime: lifetime,
+            clockOffset: clockOffset,
+            isExpired: isExpired,
+            label: deadlineLabel,
+          ),
+        if (expired != null) p(classes: 'app-notification-card__line', <Component>[Component.text(expired)]),
+        if (warning != null) AppNotice(message: warning, tone: AppNoticeTone.warning),
+        if (done != null)
+          _DoneLine(text: done)
+        else
+          div(classes: 'app-notification-card__actions', <Component>[
+            AppButton(
+              label: primaryLabel,
+              onPressed: onPrimary,
+              isLoading: isPrimaryLoading,
+              size: AppButtonSize.medium,
+              expand: true,
+            ),
+            AppButton(
+              label: secondaryLabel,
+              onPressed: onSecondary,
+              isLoading: isSecondaryLoading,
+              variant: AppButtonVariant.outline,
+              size: AppButtonSize.medium,
+              expand: true,
+            ),
+          ]),
+        if (error != null) AppInlineError(error),
+      ],
     );
   }
 }
 
-final class _Header extends StatelessWidget {
+final class _Header extends StatelessComponent {
   const _Header({
     required this.avatarName,
     required this.title,
@@ -189,89 +167,33 @@ final class _Header extends StatelessWidget {
   final VoidCallback? onHide;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String? lead = emphasis;
     final VoidCallback? hide = onHide;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 14,
-      children: <Widget>[
-        AppAvatar(
-          nickname: avatarName,
-          size: AppAvatarSize.md,
-          tone: AppAvatarTone.accent,
+    return div(classes: 'app-notification-card__header', <Component>[
+      AppAvatar(nickname: avatarName, size: AppAvatarSize.md, tone: AppAvatarTone.accent),
+      div(classes: 'app-notification-card__copy', <Component>[
+        p(classes: 'app-notification-card__title', <Component>[Component.text(title)]),
+        p(classes: 'app-notification-card__text', <Component>[
+          if (lead != null) span(classes: 'app-notification-card__lead', <Component>[Component.text(lead)]),
+          span(<Component>[Component.text(text)]),
+        ]),
+      ]),
+      if (hide == null)
+        const span(classes: 'app-notification-card__hide-slot', <Component>[])
+      else
+        AppTappable(
+          onTap: hide,
+          radius: 24,
+          semanticLabel: 'Hide notification',
+          classes: 'app-notification-card__hide',
+          child: const AppSvgIcon(AppIcons.close, width: 20, height: 20, color: AppColors.muted),
         ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 4,
-              children: <Widget>[
-                Text(title, style: AppTextStyles.titleSm),
-                Text.rich(
-                  TextSpan(
-                    children: <InlineSpan>[
-                      if (lead != null)
-                        TextSpan(
-                          text: lead,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      TextSpan(text: text),
-                    ],
-                  ),
-                  style: AppTextStyles.bodySm.copyWith(
-                    height: 18 / 13,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (hide == null)
-          const SizedBox.square(dimension: 48)
-        else
-          _HideButton(onPressed: hide),
-      ],
-    );
+    ]);
   }
 }
 
-final class _HideButton extends StatelessWidget {
-  const _HideButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Hide notification',
-      button: true,
-      excludeSemantics: true,
-      child: AppTappable(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(24),
-        child: const SizedBox.square(
-          dimension: 48,
-          child: Center(
-            child: AppSvgIcon(
-              AppIcons.close,
-              width: 20,
-              height: 20,
-              color: AppColors.muted,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-final class _Deadline extends StatelessWidget {
+final class _Deadline extends StatelessComponent {
   const _Deadline({
     required this.expiresAt,
     required this.lifetime,
@@ -287,79 +209,109 @@ final class _Deadline extends StatelessWidget {
   final String? label;
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle style = AppTextStyles.monoBodySm.copyWith(
-      fontWeight: FontWeight.w600,
-      color: isExpired ? AppColors.faint : AppColors.primary,
-    );
-    final String? override = label;
-    return Row(
-      spacing: 12,
-      children: <Widget>[
-        Expanded(
-          child: AppDeadlineTrack(
-            expiresAt: expiresAt,
-            lifetime: lifetime,
-            clockOffset: clockOffset,
-            isExpired: isExpired,
-          ),
-        ),
-        if (override != null)
-          Text(override, style: style)
-        else
-          AppCountdownText(
-            target: expiresAt,
-            clockOffset: clockOffset,
-            suffix: ' left',
-            style: style,
-          ),
-      ],
-    );
-  }
-}
-
-final class _ExpiredLine extends StatelessWidget {
-  const _ExpiredLine({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: AppTextStyles.bodyMd.copyWith(
-        fontWeight: FontWeight.w500,
-        color: AppColors.inkSoft,
+  Component build(BuildContext context) {
+    final Styles style = AppTextStyles.monoBodySm.combine(
+      Styles(
+        color: isExpired ? AppColors.faint : AppColors.primary,
+        fontWeight: FontWeight.w600,
       ),
     );
+    final String? override = label;
+    return div(classes: 'app-notification-card__deadline', <Component>[
+      div(classes: 'app-notification-card__track', <Component>[
+        AppDeadlineTrack(
+          expiresAt: expiresAt,
+          lifetime: lifetime,
+          clockOffset: clockOffset,
+          isExpired: isExpired,
+        ),
+      ]),
+      if (override != null)
+        span(styles: style, <Component>[Component.text(override)])
+      else
+        AppCountdownText(target: expiresAt, clockOffset: clockOffset, suffix: ' left', style: style),
+    ]);
   }
 }
 
 /// The 48 px success line that replaces the actions of a finished card.
-final class _DoneLine extends StatelessWidget {
+final class _DoneLine extends StatelessComponent {
   const _DoneLine({required this.text});
 
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Row(
-        spacing: 12,
-        children: <Widget>[
-          const AppSvgIcon(AppIcons.statusSuccess, width: 20, height: 20),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTextStyles.bodyMd.copyWith(
-                fontWeight: FontWeight.w500,
-                color: AppColors.inkSoft,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+  Component build(BuildContext context) {
+    return div(classes: 'app-notification-card__done', <Component>[
+      const AppSvgIcon(AppIcons.statusSuccess, width: 20, height: 20),
+      p(classes: 'app-notification-card__line app-notification-card__done-text', <Component>[Component.text(text)]),
+    ]);
   }
 }
+
+@css
+List<StyleRule> get appNotificationCardStyles => <StyleRule>[
+  css('.app-notification-card').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(21)),
+    border: Border.all(color: AppColors.border, width: const Unit.pixels(1)),
+    radius: const BorderRadius.circular(Unit.pixels(16)),
+    shadow: AppShadows.overlay,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(16)),
+    backgroundColor: AppColors.white,
+  ),
+  css('.app-notification-card__header').styles(
+    display: Display.flex,
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(14)),
+  ),
+  css('.app-notification-card__copy').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    padding: const Padding.only(top: Unit.pixels(2)),
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-notification-card__title').combine(AppTextStyles.titleSm),
+  css('.app-notification-card__text')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted, lineHeight: Unit.pixels(18))),
+  css('.app-notification-card__lead').styles(color: AppColors.ink, fontWeight: FontWeight.w600),
+  css('.app-notification-card__hide, .app-notification-card__hide-slot').styles(
+    display: Display.flex,
+    width: const Unit.pixels(48),
+    height: const Unit.pixels(48),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(shrink: 0),
+  ),
+  css('.app-notification-card__deadline').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.app-notification-card__track').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-notification-card__line')
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(color: AppColors.inkSoft, fontWeight: FontWeight.w500)),
+  css('.app-notification-card__actions').styles(display: Display.flex, gap: const Gap.column(Unit.pixels(10))),
+  css('.app-notification-card__actions > *').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-notification-card__done').styles(
+    display: Display.flex,
+    height: const Unit.pixels(48),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.app-notification-card__done-text').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+];

@@ -1,87 +1,95 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/features/battle/presentation/controllers/sticker_compositions.dart';
 
 /// Owns the [StickerCompositions] for the whole app and provides it to the
-/// sticker widgets. Placed once in `MaterialApp.router(builder:)`.
+/// sticker components. Placed once around the router (`SkillBattlesApp`).
 ///
 /// It does not start loading by itself: the signed-in shell
 /// ([StickerCompositionsPreload]) and the battle screen call
 /// `ensureLoaded`.
-final class StickerCompositionsScope extends StatefulWidget {
+final class StickerCompositionsScope extends StatefulComponent {
   const StickerCompositionsScope({required this.child, this.loader, super.key});
 
-  final Widget child;
+  final Component child;
 
   /// Replaces the asset loader (tests).
   final StickerCompositionLoader? loader;
 
   /// The compositions above [context], or `null` without a scope. With
-  /// [listen] the widget rebuilds when loading finishes.
-  static StickerCompositions? maybeOf(
-    BuildContext context, {
-    bool listen = true,
-  }) {
+  /// [listen] the component rebuilds when loading finishes.
+  static StickerCompositions? maybeOf(BuildContext context, {bool listen = true}) {
     if (listen) {
-      return context
-          .dependOnInheritedWidgetOfExactType<_CompositionsInherited>()
-          ?.notifier;
+      return context.dependOnInheritedComponentOfExactType<_CompositionsInherited>()?.compositions;
     }
-    return context
-        .getInheritedWidgetOfExactType<_CompositionsInherited>()
-        ?.notifier;
+    final _CompositionsInherited? inherited =
+        context.getElementForInheritedComponentOfExactType<_CompositionsInherited>()?.component
+            as _CompositionsInherited?;
+    return inherited?.compositions;
   }
 
   @override
-  State<StickerCompositionsScope> createState() =>
-      _StickerCompositionsScopeState();
+  State<StickerCompositionsScope> createState() => _StickerCompositionsScopeState();
 }
 
-final class _StickerCompositionsScopeState
-    extends State<StickerCompositionsScope> {
+final class _StickerCompositionsScopeState extends State<StickerCompositionsScope> {
   late StickerCompositions _compositions;
+  late int _version;
 
   @override
   void initState() {
     super.initState();
-    _compositions = StickerCompositions(loader: widget.loader);
+    _version = 0;
+    _compositions = StickerCompositions(loader: component.loader)..addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() => _version++);
   }
 
   @override
   void dispose() {
-    _compositions.dispose();
+    _compositions
+      ..removeListener(_onChanged)
+      ..dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    return _CompositionsInherited(notifier: _compositions, child: widget.child);
+  Component build(BuildContext context) {
+    return _CompositionsInherited(compositions: _compositions, version: _version, child: component.child);
   }
 }
 
-final class _CompositionsInherited
-    extends InheritedNotifier<StickerCompositions> {
-  const _CompositionsInherited({required super.child, super.notifier});
+/// Notifies its dependents every time the compositions change (the
+/// counterpart of Flutter's `InheritedNotifier`).
+final class _CompositionsInherited extends InheritedComponent {
+  const _CompositionsInherited({required this.compositions, required this.version, required super.child});
+
+  final StickerCompositions compositions;
+  final int version;
+
+  @override
+  bool updateShouldNotify(_CompositionsInherited oldComponent) =>
+      compositions != oldComponent.compositions || version != oldComponent.version;
 }
 
-/// Zero-size widget that starts loading the sticker compositions once the
-/// signed-in app is on screen, so they are parsed before a battle begins.
-final class StickerCompositionsPreload extends StatefulWidget {
+/// Zero-size component that starts loading the sticker compositions once
+/// the signed-in app is on screen, so they are ready before a battle begins.
+final class StickerCompositionsPreload extends StatefulComponent {
   const StickerCompositionsPreload({super.key});
 
   @override
-  State<StickerCompositionsPreload> createState() =>
-      _StickerCompositionsPreloadState();
+  State<StickerCompositionsPreload> createState() => _StickerCompositionsPreloadState();
 }
 
-final class _StickerCompositionsPreloadState
-    extends State<StickerCompositionsPreload> {
+final class _StickerCompositionsPreloadState extends State<StickerCompositionsPreload> {
   @override
   void initState() {
     super.initState();
-    StickerCompositionsScope.maybeOf(context, listen: false)?.ensureLoaded();
+    if (kIsWeb) StickerCompositionsScope.maybeOf(context, listen: false)?.ensureLoaded();
   }
 
   @override
-  Widget build(BuildContext context) => const SizedBox.shrink();
+  Component build(BuildContext context) => const Component.empty();
 }

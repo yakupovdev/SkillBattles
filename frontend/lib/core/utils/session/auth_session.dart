@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
-import 'package:flutter/foundation.dart';
+import 'package:jaspr/jaspr.dart' show ChangeNotifier;
 
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_mapper.dart';

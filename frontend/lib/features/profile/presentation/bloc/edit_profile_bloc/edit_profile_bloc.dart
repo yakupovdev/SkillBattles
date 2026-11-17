@@ -1,8 +1,7 @@
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/account/domain/entity/update_profile_params_entity.dart';
@@ -13,11 +12,11 @@ part 'edit_profile_event.dart';
 part 'edit_profile_state.dart';
 
 /// Nickname and password forms. A password change clears the session.
-final class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
+final class EditProfileBloc extends SignalBloc<EditProfileEvent, EditProfileState> {
   EditProfileBloc({required this._updateProfile})
     : super(const EditProfileState()) {
-    on<EditProfileNicknameSubmitted>(_onNickname, transformer: droppable());
-    on<EditProfilePasswordSubmitted>(_onPassword, transformer: droppable());
+    handle<EditProfileNicknameSubmitted>(_onNickname, transformer: droppable());
+    handle<EditProfilePasswordSubmitted>(_onPassword, transformer: droppable());
   }
 
   final UpdateProfileUsecase _updateProfile;
@@ -27,7 +26,7 @@ final class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     Emitter<EditProfileState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         nicknameStatus: LoadStatus.loading,
         resetNicknameFailure: true,
       ),
@@ -37,13 +36,13 @@ final class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           nicknameStatus: LoadStatus.failure,
           nicknameFailure: failure,
         ),
       ),
       (UpdateProfileResultEntity value) => emit(
-        state.copyWith(nicknameStatus: LoadStatus.success, result: value),
+        stateValue.copyWith(nicknameStatus: LoadStatus.success, result: value),
       ),
     );
   }
@@ -53,7 +52,7 @@ final class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     Emitter<EditProfileState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         passwordStatus: LoadStatus.loading,
         resetPasswordFailure: true,
       ),
@@ -63,13 +62,13 @@ final class EditProfileBloc extends Bloc<EditProfileEvent, EditProfileState> {
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           passwordStatus: LoadStatus.failure,
           passwordFailure: failure,
         ),
       ),
       (UpdateProfileResultEntity value) => emit(
-        state.copyWith(passwordStatus: LoadStatus.success, result: value),
+        stateValue.copyWith(passwordStatus: LoadStatus.success, result: value),
       ),
     );
   }

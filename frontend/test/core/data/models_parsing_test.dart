@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/data/models/battle_format_model.dart';
 import 'package:skill_battles/core/data/models/discipline_request_model.dart';

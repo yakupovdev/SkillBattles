@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
@@ -58,7 +58,7 @@ final class _Fixture {
   final FakeConnectionRepository connection = FakeConnectionRepository();
   late final FriendsBloc bloc;
 
-  FriendsState get state => bloc.state;
+  FriendsState get state => bloc.stateValue;
 
   Future<void> start() async {
     bloc.add(const FriendsStarted());

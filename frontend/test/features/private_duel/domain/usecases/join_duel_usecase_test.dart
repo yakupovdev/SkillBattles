@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';

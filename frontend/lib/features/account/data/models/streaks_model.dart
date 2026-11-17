@@ -19,8 +19,7 @@ final class StreaksModel {
     required this.currentWeekTarget,
   });
 
-  factory StreaksModel.fromJson(Map<String, dynamic> json) =>
-      _$StreaksModelFromJson(json);
+  factory StreaksModel.fromJson(Map<String, dynamic> json) => _$StreaksModelFromJson(json);
 
   @JsonKey(required: true)
   final String timezone;

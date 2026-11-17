@@ -1,11 +1,20 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:markdown/markdown.dart' as md;
 
-import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
 import 'package:skill_battles/core/presentation/markdown/math_syntax.dart';
 
+/// The document of `MarkdownSpans.document()` in the Flutter app (a UI file
+/// that is not part of the shared lib/): GitHub-flavored Markdown plus
+/// formulas.
+md.Document _document() => md.Document(
+  extensionSet: md.ExtensionSet.gitHubFlavored,
+  blockSyntaxes: const <md.BlockSyntax>[MathBlockSyntax()],
+  inlineSyntaxes: <md.InlineSyntax>[MathInlineSyntax()],
+  encodeHtml: false,
+);
+
 List<md.Node> _parse(String source) =>
-    MarkdownSpans.document().parseLines(source.split('\n'));
+    _document().parseLines(source.split('\n'));
 
 /// Every math element in [nodes], depth first.
 List<md.Element> _math(List<md.Node>? nodes) => <md.Element>[

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
@@ -165,7 +165,7 @@ void main() {
         _duel(status: DuelStatus.matched, guest: _guest, version: 2),
       );
       await _settle();
-      expect(bloc.state.battleId, 'battle-1');
+      expect(bloc.stateValue.battleId, 'battle-1');
 
       await bloc.close();
 
@@ -209,7 +209,7 @@ void main() {
     test('does not cancel after room creation fails', () async {
       repository.onCreate = () async => const Left(ConnectionFailure());
       await start();
-      expect(bloc.state.loadStatus, LoadStatus.failure);
+      expect(bloc.stateValue.loadStatus, LoadStatus.failure);
 
       await bloc.close();
 
@@ -225,12 +225,12 @@ void main() {
         () async {
           repository.onCancel = () async => Left(failure);
           await start();
-          final PrivateDuelState state = bloc.state;
+          final PrivateDuelState state = bloc.stateValue;
 
           await bloc.close();
 
           expect(repository.cancelCalls, <String>['duel-1']);
-          expect(bloc.state, state);
+          expect(bloc.stateValue, state);
           expect(bloc.isClosed, isTrue);
         },
       );
@@ -330,7 +330,7 @@ void main() {
         );
         repository.changes.add(matched);
         await _settle();
-        expect(bloc.state.duel, matched);
+        expect(bloc.stateValue.duel, matched);
 
         final Future<void> closing = bloc.close();
         await _settle();
@@ -339,8 +339,8 @@ void main() {
         await _settle();
 
         expect(repository.cancelCalls, isEmpty);
-        expect(bloc.state.duel, matched);
-        expect(bloc.state.battleId, 'battle-1');
+        expect(bloc.stateValue.duel, matched);
+        expect(bloc.stateValue.battleId, 'battle-1');
       },
     );
   });
@@ -352,7 +352,7 @@ void main() {
         await start();
         bloc.add(const PrivateDuelCancelRequested());
         await _settle();
-        expect(bloc.state.cancelStatus, LoadStatus.success);
+        expect(bloc.stateValue.cancelStatus, LoadStatus.success);
 
         await bloc.close();
 
@@ -368,7 +368,7 @@ void main() {
       bloc.add(const PrivateDuelCancelRequested());
       await _settle();
       expect(repository.cancelCalls, <String>['duel-1']);
-      final PrivateDuelState state = bloc.state;
+      final PrivateDuelState state = bloc.stateValue;
 
       final Future<void> closing = bloc.close();
       await _settle();
@@ -377,7 +377,7 @@ void main() {
       await _settle();
 
       expect(repository.cancelCalls, <String>['duel-1']);
-      expect(bloc.state, state);
+      expect(bloc.stateValue, state);
     });
 
     test('preserves a match found during explicit cancellation', () async {
@@ -390,8 +390,8 @@ void main() {
       );
       bloc.add(const PrivateDuelCancelRequested());
       await _settle();
-      expect(bloc.state.battleId, 'battle-1');
-      expect(bloc.state.cancelFailure, isNull);
+      expect(bloc.stateValue.battleId, 'battle-1');
+      expect(bloc.stateValue.cancelFailure, isNull);
 
       await bloc.close();
 

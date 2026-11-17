@@ -16,8 +16,7 @@ final class RatingHistoryPointModel {
     required this.ratingDelta,
   });
 
-  factory RatingHistoryPointModel.fromJson(Map<String, dynamic> json) =>
-      _$RatingHistoryPointModelFromJson(json);
+  factory RatingHistoryPointModel.fromJson(Map<String, dynamic> json) => _$RatingHistoryPointModelFromJson(json);
 
   @JsonKey(required: true)
   final String battleId;

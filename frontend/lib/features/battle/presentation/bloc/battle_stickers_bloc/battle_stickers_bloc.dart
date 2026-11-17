@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/generate_id_usecase.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -60,7 +59,7 @@ part 'battle_stickers_state.dart';
 /// also covers the single retry); every other handler is synchronous, so
 /// the default transformer keeps arrival order.
 final class BattleStickersBloc
-    extends Bloc<BattleStickersEvent, BattleStickersState> {
+    extends SignalBloc<BattleStickersEvent, BattleStickersState> {
   BattleStickersBloc({
     required this.battleId,
     required this._sendSticker,
@@ -76,14 +75,14 @@ final class BattleStickersBloc
     this.staleAfter = const Duration(seconds: 5),
   }) : _now = now ?? DateTime.now,
        super(const BattleStickersState()) {
-    on<BattleStickersStarted>(_onStarted);
-    on<BattleStickersBattleUpdated>(_onBattleUpdated);
-    on<BattleStickerSendRequested>(_onSendRequested, transformer: droppable());
-    on<BattleStickersOpponentHiddenToggled>(_onOpponentHiddenToggled);
-    on<_IncomingStickerReceived>(_onIncomingSticker);
-    on<_StickersConnectionChanged>(_onConnectionChanged);
-    on<_StickerBubbleExpired>(_onBubbleExpired);
-    on<_StickerCooldownEnded>(_onCooldownEnded);
+    handle<BattleStickersStarted>(_onStarted);
+    handle<BattleStickersBattleUpdated>(_onBattleUpdated);
+    handle<BattleStickerSendRequested>(_onSendRequested, transformer: droppable());
+    handle<BattleStickersOpponentHiddenToggled>(_onOpponentHiddenToggled);
+    handle<_IncomingStickerReceived>(_onIncomingSticker);
+    handle<_StickersConnectionChanged>(_onConnectionChanged);
+    handle<_StickerBubbleExpired>(_onBubbleExpired);
+    handle<_StickerCooldownEnded>(_onCooldownEnded);
   }
 
   /// Full length of a server cooldown, for the trigger ring.
@@ -161,7 +160,7 @@ final class BattleStickersBloc
     _myUserId = event.myUserId;
     _opponentUserId = event.opponentUserId;
     _clockOffset = event.clockOffset;
-    final bool phaseChanged = event.phase != state.phase;
+    final bool phaseChanged = event.phase != stateValue.phase;
     final bool terminal = event.phase.isTerminal;
     if (terminal) {
       // A late answer may still settle the request, but it finds no intent
@@ -170,7 +169,7 @@ final class BattleStickersBloc
       _opponentBubbleTimer?.cancel();
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         phase: event.phase,
         serverClosed: phaseChanged ? false : null,
         resetOwnBubble: terminal,
@@ -185,10 +184,10 @@ final class BattleStickersBloc
     Emitter<BattleStickersState> emit,
   ) async {
     final StickerId stickerId = event.stickerId;
-    if (!stickerId.isKnown || !state.canSend) return;
+    if (!stickerId.isKnown || !stateValue.canSend) return;
     final String submissionId = _generateId(const NoParams());
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         sendingSubmissionId: submissionId,
         ownBubble: OwnStickerBubble(
           submissionId: submissionId,
@@ -218,7 +217,7 @@ final class BattleStickersBloc
       }
     }
     // A terminal phase settled this intent meanwhile.
-    if (state.sendingSubmissionId != submissionId) return;
+    if (stateValue.sendingSubmissionId != submissionId) return;
     result.match(
       (Failure failure) => _onSendFailed(failure, params, emit),
       (StickerReceiptEntity receipt) => _onSendAccepted(receipt, params, emit),
@@ -241,10 +240,10 @@ final class BattleStickersBloc
   /// if its bubble's display window has passed.
   bool _canRetry(String submissionId, int epoch) =>
       !isClosed &&
-      state.sendingSubmissionId == submissionId &&
-      state.isPhaseAllowed &&
-      !state.serverClosed &&
-      state.connection == RealtimeStatus.connected &&
+      stateValue.sendingSubmissionId == submissionId &&
+      stateValue.isPhaseAllowed &&
+      !stateValue.serverClosed &&
+      stateValue.connection == RealtimeStatus.connected &&
       _connectionEpoch == epoch;
 
   /// A cancellable [retryDelay]; `close()` cancels the timer.
@@ -268,12 +267,12 @@ final class BattleStickersBloc
       _markNotSent(params, emit);
       return;
     }
-    final OwnStickerBubble? bubble = state.ownBubble;
+    final OwnStickerBubble? bubble = stateValue.ownBubble;
     final DateTime? cooldownUntil = _mergeCooldown(
       _toLocal(receipt.nextAllowedAt),
     );
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         resetSendingSubmissionId: true,
         // Already playing: only the status changes, the key stays.
         ownBubble: bubble != null && bubble.submissionId == submissionId
@@ -293,13 +292,13 @@ final class BattleStickersBloc
   ) {
     final String submissionId = params.submissionId;
     if (failure.hasCode(ApiErrorCodes.stickerCooldown)) {
-      final bool ownsBubble = state.ownBubble?.submissionId == submissionId;
+      final bool ownsBubble = stateValue.ownBubble?.submissionId == submissionId;
       if (ownsBubble) _ownBubbleTimer?.cancel();
       final DateTime? cooldownUntil = _mergeCooldown(
         _cooldownAfterRejection(failure),
       );
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           resetSendingSubmissionId: true,
           resetOwnBubble: ownsBubble,
           cooldownUntil: cooldownUntil,
@@ -318,7 +317,7 @@ final class BattleStickersBloc
       // The contract shows Not sent here only while the bubble is visible.
       onlyIfVisible: notAllowed,
       serverClosed: notAllowed ? true : null,
-      battleRefreshTicket: refreshBattle ? state.battleRefreshTicket + 1 : null,
+      battleRefreshTicket: refreshBattle ? stateValue.battleRefreshTicket + 1 : null,
     );
   }
 
@@ -333,7 +332,7 @@ final class BattleStickersBloc
     int? battleRefreshTicket,
   }) {
     final String submissionId = params.submissionId;
-    final OwnStickerBubble? bubble = state.ownBubble;
+    final OwnStickerBubble? bubble = stateValue.ownBubble;
     final bool isVisible = bubble?.submissionId == submissionId;
     final OwnStickerBubble? notSent = isVisible || !onlyIfVisible
         ? OwnStickerBubble(
@@ -343,7 +342,7 @@ final class BattleStickersBloc
           )
         : null;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         resetSendingSubmissionId: true,
         ownBubble: notSent,
         serverClosed: serverClosed,
@@ -380,7 +379,7 @@ final class BattleStickersBloc
   /// The later of the current deadline and [candidate]; `null` when that
   /// has already passed.
   DateTime? _mergeCooldown(DateTime candidate) {
-    final DateTime? current = state.cooldownUntil;
+    final DateTime? current = stateValue.cooldownUntil;
     final DateTime merged = current != null && current.isAfter(candidate)
         ? current
         : candidate;
@@ -400,15 +399,15 @@ final class BattleStickersBloc
     _StickerCooldownEnded event,
     Emitter<BattleStickersState> emit,
   ) {
-    if (state.cooldownUntil != event.deadline) return;
-    emit(state.copyWith(resetCooldownUntil: true));
+    if (stateValue.cooldownUntil != event.deadline) return;
+    emit(stateValue.copyWith(resetCooldownUntil: true));
   }
 
   void _onIncomingSticker(
     _IncomingStickerReceived event,
     Emitter<BattleStickersState> emit,
   ) {
-    if (state.connection != RealtimeStatus.connected) return;
+    if (stateValue.connection != RealtimeStatus.connected) return;
     final IncomingStickerEntity sticker = event.sticker;
     final String? opponent = _opponentUserId;
     if (sticker.battleId != battleId ||
@@ -431,13 +430,13 @@ final class BattleStickersBloc
     _seenSubmissionIds.add(sticker.submissionId);
     _lastSequence = sticker.sequence;
     if (!sticker.stickerId.isKnown ||
-        !state.isPhaseAllowed ||
-        state.opponentHidden ||
+        !stateValue.isPhaseAllowed ||
+        stateValue.opponentHidden ||
         _isStale(sticker)) {
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         opponentBubble: OpponentStickerBubble(
           eventId: sticker.eventId,
           stickerId: sticker.stickerId,
@@ -460,23 +459,23 @@ final class BattleStickersBloc
     _StickersConnectionChanged event,
     Emitter<BattleStickersState> emit,
   ) {
-    if (event.status == state.connection) return;
+    if (event.status == stateValue.connection) return;
     _connectionEpoch++;
     if (event.status == RealtimeStatus.connected) {
       // A new generation: the server may have restarted its sequence.
       // Missed stickers are never requested or replayed.
       _lastSequence = null;
     }
-    emit(state.copyWith(connection: event.status));
+    emit(stateValue.copyWith(connection: event.status));
   }
 
   void _onOpponentHiddenToggled(
     BattleStickersOpponentHiddenToggled event,
     Emitter<BattleStickersState> emit,
   ) {
-    final bool hidden = !state.opponentHidden;
+    final bool hidden = !stateValue.opponentHidden;
     if (hidden) _opponentBubbleTimer?.cancel();
-    emit(state.copyWith(opponentHidden: hidden, resetOpponentBubble: hidden));
+    emit(stateValue.copyWith(opponentHidden: hidden, resetOpponentBubble: hidden));
   }
 
   void _onBubbleExpired(
@@ -485,12 +484,12 @@ final class BattleStickersBloc
   ) {
     switch (event.side) {
       case StickerSide.own:
-        if (state.ownBubble?.submissionId == event.key) {
-          emit(state.copyWith(resetOwnBubble: true));
+        if (stateValue.ownBubble?.submissionId == event.key) {
+          emit(stateValue.copyWith(resetOwnBubble: true));
         }
       case StickerSide.opponent:
-        if (state.opponentBubble?.eventId == event.key) {
-          emit(state.copyWith(resetOpponentBubble: true));
+        if (stateValue.opponentBubble?.eventId == event.key) {
+          emit(stateValue.copyWith(resetOpponentBubble: true));
         }
     }
   }

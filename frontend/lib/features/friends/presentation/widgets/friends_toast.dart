@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/widgets/app_notification_toast.dart';
 
@@ -24,9 +24,7 @@ enum FriendsToastVariant {
   /// The copy; [nickname] is only used by [friendRequestAccepted].
   String message({String? nickname}) => switch (this) {
     friendRequestAccepted =>
-      nickname == null
-          ? 'Your friend request was accepted.'
-          : '$nickname accepted your friend request.',
+      nickname == null ? 'Your friend request was accepted.' : '$nickname accepted your friend request.',
     invitationAccepted => 'Invitation accepted. Opening the ready check…',
     invitationExpired => 'The match invitation expired.',
     invitationCancelled => 'The match invitation was cancelled.',
@@ -34,14 +32,14 @@ enum FriendsToastVariant {
 }
 
 /// A toast of one [FriendsToastVariant].
-final class FriendsToast extends StatelessWidget {
+final class FriendsToast extends StatelessComponent {
   const FriendsToast({required this.variant, this.nickname, super.key});
 
   final FriendsToastVariant variant;
   final String? nickname;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AppNotificationToast(
       kind: variant.kind,
       message: variant.message(nickname: nickname),

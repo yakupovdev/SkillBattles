@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
@@ -34,7 +35,7 @@ enum AppCalloutTone {
 
 /// A tinted result box with a round status icon, a bold title, a body and
 /// an optional inline link after the body.
-final class AppCallout extends StatelessWidget {
+final class AppCallout extends StatelessComponent {
   const AppCallout({
     required this.title,
     required this.message,
@@ -50,53 +51,61 @@ final class AppCallout extends StatelessWidget {
   final String? actionLabel;
   final VoidCallback? onAction;
 
+  static const Styles _body = Styles(lineHeight: Unit.pixels(19));
+
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String? label = actionLabel;
-    final TextStyle bodyStyle = AppTextStyles.bodySm.copyWith(
-      color: tone.body,
-      height: 19 / 13,
-    );
-    return Semantics(
-      liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: tone.background,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 12,
-            children: <Widget>[
-              AppSvgIcon(tone.icon, width: 20, height: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 4,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: AppTextStyles.buttonMd.copyWith(color: tone.title),
-                    ),
-                    Text(message, style: bodyStyle),
-                    if (label != null)
-                      AppTextLink(
-                        label: label,
-                        style: bodyStyle.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        onPressed: onAction,
-                      ),
-                  ],
-                ),
-              ),
-            ],
+    return div(
+      classes: 'app-callout',
+      styles: Styles(backgroundColor: tone.background),
+      attributes: const <String, String>{'role': 'status', 'aria-live': 'polite'},
+      <Component>[
+        AppSvgIcon(tone.icon, width: 20, height: 20),
+        div(classes: 'app-callout__text', <Component>[
+          p(
+            classes: 'app-callout__title',
+            styles: Styles(color: tone.title),
+            <Component>[Component.text(title)],
           ),
-        ),
-      ),
+          p(
+            classes: 'app-callout__body',
+            styles: Styles(color: tone.body),
+            <Component>[Component.text(message)],
+          ),
+          if (label != null)
+            AppTextLink(
+              label: label,
+              style: AppTextStyles.bodySm
+                  .combine(_body)
+                  .combine(
+                    const Styles(color: AppColors.primary, fontWeight: FontWeight.w500),
+                  ),
+              onPressed: onAction,
+            ),
+        ]),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appCalloutStyles => <StyleRule>[
+  css('.app-callout').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(16)),
+    radius: const BorderRadius.circular(Unit.pixels(12)),
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.app-callout__text').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-callout__title').combine(AppTextStyles.buttonMd),
+  css('.app-callout__body').combine(AppTextStyles.bodySm).combine(AppCallout._body),
+];

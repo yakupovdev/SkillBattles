@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 
@@ -10,7 +11,7 @@ import 'package:skill_battles/app/theme/app_colors.dart';
 /// - Question: the time left of the round, blue (amber in overtime), red in
 ///   the last fifth.
 /// - Reveal: grey, draining until the next round (Paper: "Next in 4").
-final class BattleTimeBar extends StatefulWidget {
+final class BattleTimeBar extends StatefulComponent {
   const BattleTimeBar({
     required this.endsAt,
     required this.clockOffset,
@@ -43,27 +44,25 @@ final class _BattleTimeBarState extends State<BattleTimeBar> {
   @override
   void initState() {
     super.initState();
-    final int? seconds = widget.totalSeconds;
+    final int? seconds = component.totalSeconds;
     _totalMs = seconds != null ? seconds * 1000 : _leftMs();
     _fraction = _compute();
-    if (widget.endsAt != null) {
+    if (component.endsAt != null) {
       _timer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         final double next = _compute();
-        if ((next - _fraction).abs() > 0.002) setState(() => _fraction = next);
+        if ((next - _fraction).abs() > 0.002 && mounted) setState(() => _fraction = next);
       });
     }
   }
 
   int _leftMs() {
-    final DateTime? endsAt = widget.endsAt;
+    final DateTime? endsAt = component.endsAt;
     if (endsAt == null) return 0;
-    return endsAt
-        .difference(DateTime.now().add(widget.clockOffset))
-        .inMilliseconds;
+    return endsAt.difference(DateTime.now().add(component.clockOffset)).inMilliseconds;
   }
 
   double _compute() {
-    if (widget.endsAt == null) return 1;
+    if (component.endsAt == null) return 1;
     if (_totalMs <= 0) return 0;
     return (_leftMs() / _totalMs).clamp(0, 1).toDouble();
   }
@@ -75,23 +74,30 @@ final class _BattleTimeBarState extends State<BattleTimeBar> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final Color? low = widget.lowColor;
-    final Color color = low != null && _fraction < 0.2 ? low : widget.color;
-    return ColoredBox(
-      color: AppColors.surface,
-      child: SizedBox(
-        height: 6,
-        width: double.infinity,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: _fraction,
-            heightFactor: 1,
-            child: ColoredBox(color: color),
-          ),
+  Component build(BuildContext context) {
+    final Color? low = component.lowColor;
+    final Color color = low != null && _fraction < 0.2 ? low : component.color;
+    return div(
+      classes: 'battle-time-bar',
+      attributes: const <String, String>{'aria-hidden': 'true'},
+      <Component>[
+        div(
+          classes: 'battle-time-bar__fill',
+          styles: Styles(width: Unit.percent(_fraction * 100), backgroundColor: color),
+          const <Component>[],
         ),
-      ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get battleTimeBarStyles => <StyleRule>[
+  css('.battle-time-bar').styles(
+    width: const Unit.percent(100),
+    height: const Unit.pixels(6),
+    flex: const Flex(shrink: 0),
+    backgroundColor: AppColors.surface,
+  ),
+  css('.battle-time-bar__fill').styles(height: const Unit.percent(100)),
+];

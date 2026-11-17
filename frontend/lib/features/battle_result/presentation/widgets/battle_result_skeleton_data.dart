@@ -1,5 +1,3 @@
-import 'package:skeletonizer/skeletonizer.dart';
-
 import 'package:skill_battles/core/domain/entity/answer_access_entity.dart';
 import 'package:skill_battles/core/domain/entity/battle_mode.dart';
 import 'package:skill_battles/core/domain/entity/battle_outcome.dart';
@@ -11,6 +9,7 @@ import 'package:skill_battles/core/domain/entity/question_entity.dart';
 import 'package:skill_battles/core/domain/entity/question_option_entity.dart';
 import 'package:skill_battles/core/domain/entity/result_player_entity.dart';
 import 'package:skill_battles/core/domain/entity/round_answer_entity.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_question_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_round_entity.dart';

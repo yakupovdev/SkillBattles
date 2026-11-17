@@ -1,18 +1,19 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/domain/entity/season_entity.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_segmented_control.dart';
 import 'package:skill_battles/core/presentation/widgets/app_status_view.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
-import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/core/utils/extensions/route_extension.dart';
 import 'package:skill_battles/features/account/domain/entity/season_peak_entity.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_season_history_usecase.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
@@ -22,22 +23,20 @@ import 'package:skill_battles/features/catalog/domain/usecases/get_ranks_usecase
 import 'package:skill_battles/features/leaderboard/domain/entity/leaderboard_entity.dart';
 import 'package:skill_battles/features/leaderboard/domain/usecases/get_leaderboard_usecase.dart';
 import 'package:skill_battles/features/leaderboard/presentation/bloc/leaderboard_bloc/leaderboard_bloc.dart';
-// import 'package:skill_battles/features/leaderboard/presentation/widgets/leaderboard_climb_board.dart';
 import 'package:skill_battles/features/leaderboard/presentation/widgets/leaderboard_side_panel.dart';
 import 'package:skill_battles/features/leaderboard/presentation/widgets/leaderboard_skeleton_data.dart';
 import 'package:skill_battles/features/leaderboard/presentation/widgets/leaderboard_table.dart';
 
 /// The current-season league ladder above the top 50 and your own row.
-final class LeaderboardScreen extends StatelessWidget
-    implements GoRouterWrapper {
+final class LeaderboardScreen extends StatelessComponent implements RouteWrapper {
   const LeaderboardScreen({this.disciplineCode, super.key});
 
   final String? disciplineCode;
 
   @override
-  Widget wrappedRoute(BuildContext context) {
+  Component wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<LeaderboardBloc>(
+    return BlocSignalProvider<LeaderboardBloc>(
       create: (_) => LeaderboardBloc(
         getDisciplines: dependencies.getDep<GetDisciplinesUsecase>(),
         getRanks: dependencies.getDep<GetRanksUsecase>(),
@@ -50,43 +49,23 @@ final class LeaderboardScreen extends StatelessWidget
   }
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AppDesktopViewport(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(64, 48, 64, 64),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 40,
-          children: <Widget>[
-            const _Header(),
-            // const _ClimbBoard(),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 64,
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      spacing: 28,
-                      children: <Widget>[
-                        const Text('Leaderboard', style: AppTextStyles.titleXl),
-                        _Table(disciplineCode: disciplineCode),
-                      ],
-                    ),
-                  ),
-                  const _Side(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: div(classes: 'leaderboard-screen', <Component>[
+        const _Header(),
+        div(classes: 'leaderboard-screen__body', <Component>[
+          div(classes: 'leaderboard-screen__main', <Component>[
+            const h2(classes: 'leaderboard-screen__title', <Component>[Component.text('Leaderboard')]),
+            _Table(disciplineCode: disciplineCode),
+          ]),
+          const _Side(),
+        ]),
+      ]),
     );
   }
 }
 
-final class _Header extends StatelessWidget {
+final class _Header extends StatelessComponent {
   const _Header();
 
   /// `Fall 2026 · 16 days left`.
@@ -97,8 +76,8 @@ final class _Header extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<LeaderboardBloc, LeaderboardState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<LeaderboardBloc, LeaderboardState>(
       buildWhen: (LeaderboardState previous, LeaderboardState current) =>
           previous.board != current.board ||
           previous.boardStatus != current.boardStatus ||
@@ -115,84 +94,46 @@ final class _Header extends StatelessWidget {
           }
         }
         final bool failed = board == null && state.boardStatus.isFailure;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8,
-                children: <Widget>[
-                  Skeletonizer(
-                    enabled: board == null && !failed,
-                    child: AppEyebrow(
-                      failed
-                          ? disciplineName ?? 'Season rankings'
-                          : '${disciplineName == null ? '' : '$disciplineName · '}${_seasonLine((board ?? LeaderboardSkeletonData.board).season, DateTime.now())}',
-                    ),
-                  ),
-                  const Text('Your climb', style: AppTextStyles.displayMd),
-                ],
-              ),
+        return div(classes: 'leaderboard-header', <Component>[
+          div(classes: 'leaderboard-header__titles', <Component>[
+            // The wrapper is the skeleton root, so the eyebrow is one of its
+            // leaves.
+            Skeletonizer(
+              enabled: board == null && !failed,
+              child: div(<Component>[
+                AppEyebrow(
+                  failed
+                      ? disciplineName ?? 'Season rankings'
+                      : '${disciplineName == null ? '' : '$disciplineName · '}'
+                            '${_seasonLine((board ?? LeaderboardSkeletonData.board).season, DateTime.now())}',
+                ),
+              ]),
             ),
-            if (disciplines.length > 1)
-              AppSegmentedControl<String>(
-                size: AppSegmentedControlSize.medium,
-                selected: state.selectedCode ?? '',
-                onSelected: (String code) => context
-                    .read<LeaderboardBloc>()
-                    .add(LeaderboardDisciplineSelected(code)),
-                segments: <AppSegment<String>>[
-                  for (final DisciplineEntity d in disciplines)
-                    AppSegment<String>(value: d.code, label: d.displayName),
-                ],
-              ),
-          ],
-        );
+            const h1(classes: 'leaderboard-header__title', <Component>[Component.text('Your climb')]),
+          ]),
+          if (disciplines.length > 1)
+            AppSegmentedControl<String>(
+              size: AppSegmentedControlSize.medium,
+              selected: state.selectedCode ?? '',
+              onSelected: (String code) => context.read<LeaderboardBloc>().add(LeaderboardDisciplineSelected(code)),
+              segments: <AppSegment<String>>[
+                for (final DisciplineEntity d in disciplines) AppSegment<String>(value: d.code, label: d.displayName),
+              ],
+            ),
+        ]);
       },
     );
   }
 }
 
-// final class _ClimbBoard extends StatelessWidget {
-//   const _ClimbBoard();
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return BlocBuilder<LeaderboardBloc, LeaderboardState>(
-//       buildWhen: (LeaderboardState previous, LeaderboardState current) =>
-//           previous.board != current.board ||
-//           previous.boardStatus != current.boardStatus ||
-//           previous.statistics != current.statistics ||
-//           previous.ranks != current.ranks,
-//       builder: (BuildContext context, LeaderboardState state) {
-//         final LeaderboardEntity? board = state.board;
-//         if (board == null && state.boardStatus.isFailure) {
-//           return const SizedBox.shrink();
-//         }
-//         return Skeletonizer(
-//           enabled: board == null,
-//           child: LeaderboardClimbBoard(
-//             board: board ?? LeaderboardSkeletonData.climbBoard,
-//             stats: board == null
-//                 ? LeaderboardSkeletonData.stats
-//                 : state.statistics?.forDiscipline(board.disciplineCode),
-//             ranks: state.ranks,
-//           ),
-//         );
-//       },
-//     );
-//   }
-// }
-
-final class _Table extends StatelessWidget {
+final class _Table extends StatelessComponent {
   const _Table({required this.disciplineCode});
 
   final String? disciplineCode;
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<LeaderboardBloc, LeaderboardState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<LeaderboardBloc, LeaderboardState>(
       buildWhen: (LeaderboardState previous, LeaderboardState current) =>
           previous.board != current.board ||
           previous.boardStatus != current.boardStatus ||
@@ -212,9 +153,7 @@ final class _Table extends StatelessWidget {
         }
         return Skeletonizer(
           enabled: board == null,
-          child: LeaderboardTable(
-            board: board ?? LeaderboardSkeletonData.board,
-          ),
+          child: LeaderboardTable(board: board ?? LeaderboardSkeletonData.board),
         );
       },
     );
@@ -222,12 +161,12 @@ final class _Table extends StatelessWidget {
 }
 
 /// The right column with a rule on its left edge.
-final class _Side extends StatelessWidget {
+final class _Side extends StatelessComponent {
   const _Side();
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<LeaderboardBloc, LeaderboardState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<LeaderboardBloc, LeaderboardState>(
       buildWhen: (LeaderboardState previous, LeaderboardState current) =>
           previous.board != current.board ||
           previous.boardStatus != current.boardStatus ||
@@ -237,19 +176,12 @@ final class _Side extends StatelessWidget {
       builder: (BuildContext context, LeaderboardState state) {
         final LeaderboardEntity? board = state.board;
         if (board == null && state.boardStatus.isFailure) {
-          return const SizedBox.shrink();
+          return const Component.empty();
         }
         final LeaderboardEntity shown = board ?? LeaderboardSkeletonData.board;
-        final List<SeasonPeakEntity> seasons =
-            state.seasons?.items ?? const <SeasonPeakEntity>[];
-        return Container(
-          width: LeaderboardSidePanel.width,
-          padding: const EdgeInsets.only(left: 40),
-          decoration: const BoxDecoration(
-            border: Border(left: BorderSide(color: AppColors.border)),
-          ),
-          alignment: Alignment.topLeft,
-          child: Skeletonizer(
+        final List<SeasonPeakEntity> seasons = state.seasons?.items ?? const <SeasonPeakEntity>[];
+        return div(classes: 'leaderboard-side', <Component>[
+          Skeletonizer(
             enabled: board == null,
             child: LeaderboardSidePanel(
               board: shown,
@@ -260,8 +192,54 @@ final class _Side extends StatelessWidget {
               seasons: seasons,
             ),
           ),
-        );
+        ]);
       },
     );
   }
 }
+
+@css
+List<StyleRule> get leaderboardScreenStyles => <StyleRule>[
+  css('.leaderboard-screen').styles(
+    display: Display.flex,
+    padding: const Padding.only(
+      left: Unit.pixels(64),
+      top: Unit.pixels(48),
+      right: Unit.pixels(64),
+      bottom: Unit.pixels(64),
+    ),
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(40)),
+  ),
+  css('.leaderboard-screen__body').styles(
+    display: Display.flex,
+    alignItems: AlignItems.stretch,
+    gap: const Gap.column(Unit.pixels(64)),
+  ),
+  css('.leaderboard-screen__main').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(28)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.leaderboard-screen__title').combine(AppTextStyles.titleXl),
+  css('.leaderboard-header').styles(display: Display.flex, alignItems: AlignItems.end),
+  css('.leaderboard-header__titles').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(8)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.leaderboard-header__title').combine(AppTextStyles.displayMd),
+  css('.leaderboard-side').styles(
+    width: const Unit.pixels(LeaderboardSidePanel.width),
+    padding: const Padding.only(left: Unit.pixels(40)),
+    border: const Border.only(
+      left: BorderSide(color: AppColors.border, width: Unit.pixels(1)),
+    ),
+    flex: const Flex(shrink: 0),
+  ),
+];

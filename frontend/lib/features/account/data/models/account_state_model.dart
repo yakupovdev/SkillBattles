@@ -18,8 +18,7 @@ final class AccountStateModel {
     required this.streaks,
   });
 
-  factory AccountStateModel.fromJson(Map<String, dynamic> json) =>
-      _$AccountStateModelFromJson(json);
+  factory AccountStateModel.fromJson(Map<String, dynamic> json) => _$AccountStateModelFromJson(json);
 
   @JsonKey(required: true)
   final UserModel user;

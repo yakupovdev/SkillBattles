@@ -1,12 +1,14 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/js_interop.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_card.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
@@ -21,7 +23,7 @@ import 'package:skill_battles/features/friends/presentation/controllers/friend_c
 /// Put it under a `Skeletonizer` with mock data while the code loads; the
 /// eyebrow and the explanation stay visible. When [hasFailed] the code and
 /// the button are replaced by an error line and [onRetry].
-final class FriendCodeCard extends StatelessWidget {
+final class FriendCodeCard extends StatelessComponent {
   const FriendCodeCard({
     required this.code,
     this.hasFailed = false,
@@ -34,99 +36,68 @@ final class FriendCodeCard extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AppCard(
       color: AppColors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 16,
-        children: <Widget>[
-          const Skeleton.keep(child: AppEyebrow('Your friend code')),
-          if (hasFailed)
-            _LoadError(onRetry: onRetry)
-          else
-            _CodeAndCopy(code: code.code),
-          Skeleton.keep(
-            child: Text(
+      classes: 'friend-code-card',
+      child: Component.fragment(<Component>[
+        Skeleton.keep(child: const AppEyebrow('Your friend code')),
+        if (hasFailed) _LoadError(onRetry: onRetry) else _CodeAndCopy(code: code.code),
+        Skeleton.keep(
+          child: p(classes: 'friend-code-card__note', <Component>[
+            Component.text(
               'Friends enter this code to send you a request. '
               'It is not a room code, and only you can see it.',
-              style: AppTextStyles.bodySm.copyWith(
-                height: 18 / 13,
-                color: AppColors.muted,
-              ),
             ),
-          ),
-        ],
-      ),
+          ]),
+        ),
+      ]),
     );
   }
 }
 
-final class _LoadError extends StatelessWidget {
+/// Writes [text] to the system clipboard.
+Future<void> writeClipboardText(String text) => web.window.navigator.clipboard.writeText(text).toDart;
+
+final class _LoadError extends StatelessComponent {
   const _LoadError({required this.onRetry});
 
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      spacing: 12,
-      children: <Widget>[
-        const Expanded(
-          child: AppInlineError("Couldn't load your friend code."),
-        ),
-        AppButton(
-          label: 'Try again',
-          onPressed: onRetry,
-          variant: AppButtonVariant.outline,
-          size: AppButtonSize.field,
-        ),
-      ],
-    );
+  Component build(BuildContext context) {
+    return div(classes: 'friend-code-card__error', <Component>[
+      const AppInlineError("Couldn't load your friend code."),
+      AppButton(
+        label: 'Try again',
+        onPressed: onRetry,
+        variant: AppButtonVariant.outline,
+        size: AppButtonSize.field,
+      ),
+    ]);
   }
 }
 
-final class _CodeAndCopy extends StatelessWidget {
+final class _CodeAndCopy extends StatelessComponent {
   const _CodeAndCopy({required this.code});
 
   final String code;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 16,
-      children: <Widget>[
-        Semantics(
-          label: 'Friend code ${code.split('').join(' ')}',
-          excludeSemantics: true,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              FriendCodeInput.grouped(code),
-              style: AppTextStyles.monoLg.copyWith(
-                fontSize: 30,
-                height: 36 / 30,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.02 * 30,
-                color: AppColors.ink,
-              ),
-              maxLines: 1,
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: _CopyButton(code: code),
-        ),
-      ],
-    );
+  Component build(BuildContext context) {
+    return div(classes: 'friend-code-card__code-block', <Component>[
+      p(
+        classes: 'friend-code-card__code',
+        attributes: <String, String>{'role': 'img', 'aria-label': 'Friend code ${code.split('').join(' ')}'},
+        <Component>[Component.text(FriendCodeInput.grouped(code))],
+      ),
+      _CopyButton(code: code),
+    ]);
   }
 }
 
 /// "Copy code", which reads "Copied" with a check for two seconds.
-final class _CopyButton extends StatefulWidget {
+final class _CopyButton extends StatefulComponent {
   const _CopyButton({required this.code});
 
   final String code;
@@ -155,7 +126,7 @@ final class _CopyButtonState extends State<_CopyButton> {
 
   Future<void> _copy() async {
     // The canonical 12 characters, not the grouped display text.
-    await Clipboard.setData(ClipboardData(text: widget.code));
+    await writeClipboardText(component.code);
     if (!mounted) return;
     _timer?.cancel();
     setState(() => _isCopied = true);
@@ -165,19 +136,63 @@ final class _CopyButtonState extends State<_CopyButton> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final bool isSkeleton = Skeletonizer.maybeOf(context)?.enabled ?? false;
-    return Semantics(
-      liveRegion: true,
-      child: AppButton(
-        label: _isCopied ? 'Copied' : 'Copy code',
-        variant: AppButtonVariant.dark,
-        size: AppButtonSize.medium,
-        icon: _isCopied
-            ? const AppSvgIcon(AppIcons.check, width: 16, height: 16)
-            : const AppSvgIcon(AppIcons.copy, width: 16, height: 16),
-        onPressed: isSkeleton ? null : _copy,
-      ),
+  Component build(BuildContext context) {
+    final bool isSkeleton = Skeletonizer.isEnabled(context);
+    return div(
+      classes: 'friend-code-card__copy',
+      attributes: const <String, String>{'aria-live': 'polite'},
+      <Component>[
+        AppButton(
+          label: _isCopied ? 'Copied' : 'Copy code',
+          variant: AppButtonVariant.dark,
+          size: AppButtonSize.medium,
+          icon: _isCopied
+              ? const AppSvgIcon(AppIcons.check, width: 16, height: 16)
+              : const AppSvgIcon(AppIcons.copy, width: 16, height: 16),
+          onPressed: isSkeleton ? null : _copy,
+        ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get friendCodeCardStyles => <StyleRule>[
+  css('.friend-code-card').styles(gap: const Gap.row(Unit.pixels(16))),
+  css('.friend-code-card__note')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted, lineHeight: Unit.pixels(18))),
+  css('.friend-code-card__error').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.friend-code-card__error > .app-inline-error').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friend-code-card__code-block').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(16)),
+  ),
+  css('.friend-code-card__code')
+      .styles(
+        maxWidth: const Unit.percent(100),
+        overflow: Overflow.hidden,
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.monoLg)
+      .combine(
+        const Styles(
+          color: AppColors.ink,
+          fontSize: Unit.pixels(30),
+          fontWeight: FontWeight.w600,
+          letterSpacing: Unit.em(0.02),
+          lineHeight: Unit.pixels(36),
+        ),
+      ),
+  css('.friend-code-card__copy').styles(display: Display.flex),
+];

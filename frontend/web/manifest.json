@@ -1,11 +1,11 @@
 {
-    "name": "skill_battles",
-    "short_name": "skill_battles",
+    "name": "SkillBattles",
+    "short_name": "SkillBattles",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "SkillBattles — live skill battles",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -1,9 +1,8 @@
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/account/domain/entity/season_history_page_entity.dart';
@@ -20,16 +19,16 @@ part 'profile_event.dart';
 part 'profile_state.dart';
 
 /// Statistics (basic for all, advanced for Pro) and season peaks.
-final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
+final class ProfileBloc extends SignalBloc<ProfileEvent, ProfileState> {
   ProfileBloc({
     required this._getStatistics,
     required this._getDisciplines,
     required this._getRanks,
     required this._getSeasonHistory,
   }) : super(const ProfileState()) {
-    on<ProfileStarted>(_onStarted, transformer: restartable());
-    on<ProfileRefreshRequested>(_onStarted, transformer: restartable());
-    on<ProfileDisciplineSelected>(_onDisciplineSelected);
+    handle<ProfileStarted>(_onStarted, transformer: restartable());
+    handle<ProfileRefreshRequested>(_onStarted, transformer: restartable());
+    handle<ProfileDisciplineSelected>(_onDisciplineSelected);
   }
 
   final GetStatisticsUsecase _getStatistics;
@@ -41,7 +40,7 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     ProfileEvent event,
     Emitter<ProfileState> emit,
   ) async {
-    emit(state.copyWith(loadStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(loadStatus: LoadStatus.loading));
     final (
       Either<Failure, StatisticsEntity> statistics,
       Either<Failure, List<DisciplineEntity>> disciplines,
@@ -56,21 +55,21 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     if (emit.isDone) return;
     statistics.match(
       (Failure failure) => emit(
-        state.copyWith(loadStatus: LoadStatus.failure, failure: failure),
+        stateValue.copyWith(loadStatus: LoadStatus.failure, failure: failure),
       ),
       (StatisticsEntity value) {
         final List<DisciplineEntity> list = disciplines.getOrElse(
           (_) => const <DisciplineEntity>[],
         );
         final String? selected =
-            state.selectedCode ??
+            stateValue.selectedCode ??
             (list.isNotEmpty
                 ? list.first.code
                 : value.disciplines.isEmpty
                 ? null
                 : value.disciplines.first.disciplineCode);
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             loadStatus: LoadStatus.success,
             statistics: value,
             disciplines: list,
@@ -88,6 +87,6 @@ final class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     ProfileDisciplineSelected event,
     Emitter<ProfileState> emit,
   ) {
-    emit(state.copyWith(selectedCode: event.code));
+    emit(stateValue.copyWith(selectedCode: event.code));
   }
 }

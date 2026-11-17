@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:skill_battles/core/domain/entity/battle_mode.dart';
@@ -196,15 +196,15 @@ void main() {
     'an older version from an event never replaces a newer snapshot',
     () async {
       await started();
-      expect(bloc.state.snapshot?.version, 2);
+      expect(bloc.stateValue.snapshot?.version, 2);
 
       repository.events.add(_snapshot(version: 1));
       await Future<void>.delayed(Duration.zero);
-      expect(bloc.state.snapshot?.version, 2);
+      expect(bloc.stateValue.snapshot?.version, 2);
 
       repository.events.add(_snapshot(version: 3));
       await Future<void>.delayed(Duration.zero);
-      expect(bloc.state.snapshot?.version, 3);
+      expect(bloc.stateValue.snapshot?.version, 3);
     },
   );
 
@@ -216,7 +216,7 @@ void main() {
     );
     await Future<void>.delayed(Duration.zero);
 
-    expect(bloc.state.snapshot?.entitlements.isPro, isTrue);
+    expect(bloc.stateValue.snapshot?.entitlements.isPro, isTrue);
   });
 
   test(
@@ -238,9 +238,9 @@ void main() {
       bloc.add(const BattleOptionSelected('o2'));
       bloc.add(const BattleAnswerSubmitted());
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(bloc.state.submission?.status, SubmissionStatus.failed);
+      expect(bloc.stateValue.submission?.status, SubmissionStatus.failed);
       // The choice is locked to what was sent.
-      expect(bloc.state.canChangeSelection, isFalse);
+      expect(bloc.stateValue.canChangeSelection, isFalse);
 
       bloc.add(const BattleAnswerSubmitted());
       await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -251,7 +251,7 @@ void main() {
         repository.submissions[1].submissionId,
       );
       expect(repository.submissions[1].optionId, 'o2');
-      expect(bloc.state.submission?.status, SubmissionStatus.accepted);
+      expect(bloc.stateValue.submission?.status, SubmissionStatus.accepted);
     },
   );
 
@@ -261,15 +261,15 @@ void main() {
       repository.snapshot = _snapshot(version: 2, mySelection: 'o3');
       await started();
 
-      expect(bloc.state.submission?.status, SubmissionStatus.accepted);
-      expect(bloc.state.selectedOptionId, 'o3');
-      expect(bloc.state.canSubmit, isFalse);
+      expect(bloc.stateValue.submission?.status, SubmissionStatus.accepted);
+      expect(bloc.stateValue.selectedOptionId, 'o3');
+      expect(bloc.stateValue.canSubmit, isFalse);
 
       repository.events.add(_snapshot(version: 3, roundId: 'r2'));
       await Future<void>.delayed(Duration.zero);
 
-      expect(bloc.state.submission, isNull);
-      expect(bloc.state.selectedOptionId, isNull);
+      expect(bloc.stateValue.submission, isNull);
+      expect(bloc.stateValue.selectedOptionId, isNull);
     },
   );
 
@@ -280,6 +280,6 @@ void main() {
     bloc.add(const BattleOptionSelected('o1'));
     await Future<void>.delayed(Duration.zero);
 
-    expect(bloc.state.selectedOptionId, isNull);
+    expect(bloc.stateValue.selectedOptionId, isNull);
   });
 }

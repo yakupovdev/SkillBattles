@@ -16,8 +16,7 @@ final class StatisticsResponseModel {
     required this.disciplines,
   });
 
-  factory StatisticsResponseModel.fromJson(Map<String, dynamic> json) =>
-      _$StatisticsResponseModelFromJson(json);
+  factory StatisticsResponseModel.fromJson(Map<String, dynamic> json) => _$StatisticsResponseModelFromJson(json);
 
   @JsonKey(required: true)
   final EntitlementsModel entitlements;
@@ -31,8 +30,6 @@ final class StatisticsResponseModel {
   StatisticsEntity toEntity() => StatisticsEntity(
     entitlements: entitlements.toEntity(),
     streaks: streaks.toEntity(),
-    disciplines: disciplines
-        .map((DisciplineStatsModel stats) => stats.toEntity())
-        .toList(growable: false),
+    disciplines: disciplines.map((DisciplineStatsModel stats) => stats.toEntity()).toList(growable: false),
   );
 }

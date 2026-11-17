@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -38,7 +39,7 @@ enum AppAvatarSize {
 enum AppAvatarTone { primary, accent, ink, neutral }
 
 /// A round avatar with the first letter of a nickname.
-final class AppAvatar extends StatelessWidget {
+final class AppAvatar extends StatelessComponent {
   const AppAvatar({
     required this.nickname,
     this.size = AppAvatarSize.sm,
@@ -51,10 +52,8 @@ final class AppAvatar extends StatelessWidget {
   final AppAvatarTone tone;
 
   @override
-  Widget build(BuildContext context) {
-    final String initial = nickname.isEmpty
-        ? '?'
-        : nickname.characters.first.toUpperCase();
+  Component build(BuildContext context) {
+    final String initial = nickname.isEmpty ? '?' : String.fromCharCode(nickname.runes.first).toUpperCase();
     final (Color background, Color foreground) = switch (tone) {
       AppAvatarTone.primary => (AppColors.primary, AppColors.white),
       AppAvatarTone.accent => (AppColors.accent, AppColors.ink),
@@ -62,25 +61,33 @@ final class AppAvatar extends StatelessWidget {
       AppAvatarTone.neutral => (AppColors.border, AppColors.ink),
     };
 
-    return Semantics(
-      label: nickname,
-      excludeSemantics: true,
-      child: Container(
-        width: size.diameter,
-        height: size.diameter,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: background, shape: BoxShape.circle),
-        child: Text(
-          initial,
-          style: TextStyle(
-            fontFamily: AppFonts.display,
-            fontSize: size.fontSize,
-            height: size.lineHeight / size.fontSize,
-            fontWeight: FontWeight.w700,
-            color: foreground,
-          ),
-        ),
+    return div(
+      classes: 'app-avatar',
+      styles: Styles(
+        width: Unit.pixels(size.diameter),
+        height: Unit.pixels(size.diameter),
+        color: foreground,
+        fontSize: Unit.pixels(size.fontSize),
+        lineHeight: Unit.pixels(size.lineHeight),
+        backgroundColor: background,
       ),
+      attributes: <String, String>{'role': 'img', 'aria-label': nickname},
+      <Component>[
+        span(attributes: const <String, String>{'aria-hidden': 'true'}, <Component>[Component.text(initial)]),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appAvatarStyles => <StyleRule>[
+  css('.app-avatar').styles(
+    display: Display.flex,
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(shrink: 0),
+    fontFamily: AppFonts.display,
+    fontWeight: FontWeight.w700,
+  ),
+];

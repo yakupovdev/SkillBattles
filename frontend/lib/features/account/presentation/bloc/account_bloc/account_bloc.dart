@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/entitlements_entity.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/account/domain/entity/account_state_entity.dart';
@@ -22,7 +22,7 @@ part 'account_state.dart';
 ///
 /// ACCOUNT_CHANGED replaces the state at once; a sign-out drops it, so no
 /// paid data outlives the session in memory.
-final class AccountBloc extends Bloc<AccountEvent, AccountState> {
+final class AccountBloc extends SignalBloc<AccountEvent, AccountState> {
   AccountBloc({
     required this._getAccountState,
     required this._watchAccountChanges,
@@ -30,11 +30,11 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     required this._logout,
     required bool isSignedIn,
   }) : super(AccountState(isSignedIn: isSignedIn)) {
-    on<AccountStarted>(_onStarted);
-    on<AccountRefreshRequested>(_onRefreshRequested);
-    on<AccountLogoutRequested>(_onLogoutRequested);
-    on<_AccountSignedInChanged>(_onSignedInChanged);
-    on<_AccountChangeReceived>(_onChangeReceived);
+    handle<AccountStarted>(_onStarted);
+    handle<AccountRefreshRequested>(_onRefreshRequested);
+    handle<AccountLogoutRequested>(_onLogoutRequested);
+    handle<_AccountSignedInChanged>(_onSignedInChanged);
+    handle<_AccountChangeReceived>(_onChangeReceived);
   }
 
   final GetAccountStateUsecase _getAccountState;
@@ -55,14 +55,14 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     _changesSubscription ??= _watchAccountChanges(const NoParams()).listen(
       (AccountStateEntity account) => add(_AccountChangeReceived(account)),
     );
-    if (state.isSignedIn) await _load(emit);
+    if (stateValue.isSignedIn) await _load(emit);
   }
 
   Future<void> _onRefreshRequested(
     AccountRefreshRequested event,
     Emitter<AccountState> emit,
   ) async {
-    if (state.isSignedIn) await _load(emit);
+    if (stateValue.isSignedIn) await _load(emit);
   }
 
   Future<void> _onSignedInChanged(
@@ -74,7 +74,7 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
       emit(AccountState(isSignedIn: false));
       return;
     }
-    emit(state.copyWith(isSignedIn: true));
+    emit(stateValue.copyWith(isSignedIn: true));
     await _load(emit);
   }
 
@@ -82,11 +82,11 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     _AccountChangeReceived event,
     Emitter<AccountState> emit,
   ) {
-    if (!state.isSignedIn) return;
+    if (!stateValue.isSignedIn) return;
     // A later full read must not overwrite this newer push.
     _loadVersion++;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         status: LoadStatus.success,
         account: event.account,
         resetFailure: true,
@@ -98,32 +98,31 @@ final class AccountBloc extends Bloc<AccountEvent, AccountState> {
     AccountLogoutRequested event,
     Emitter<AccountState> emit,
   ) async {
-    emit(state.copyWith(logoutStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(logoutStatus: LoadStatus.loading));
     await _logout(const NoParams());
     if (emit.isDone) return;
-    emit(state.copyWith(logoutStatus: LoadStatus.success));
+    emit(stateValue.copyWith(logoutStatus: LoadStatus.success));
   }
 
   Future<void> _load(Emitter<AccountState> emit) async {
     final int version = ++_loadVersion;
-    emit(state.copyWith(status: LoadStatus.loading));
+    emit(stateValue.copyWith(status: LoadStatus.loading));
     final Either<Failure, AccountStateEntity> result = await _getAccountState(
       const NoParams(),
     );
-    if (emit.isDone || version != _loadVersion || !state.isSignedIn) return;
+    if (emit.isDone || version != _loadVersion || !stateValue.isSignedIn) return;
     result.match(
-      (Failure failure) =>
-          emit(state.copyWith(status: LoadStatus.failure, failure: failure)),
+      (Failure failure) => emit(stateValue.copyWith(status: LoadStatus.failure, failure: failure)),
       (AccountStateEntity account) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           status: LoadStatus.success,
           // Keep streaks from a previous push; a full read has none.
-          account: account.streaks == null && state.account?.streaks != null
+          account: account.streaks == null && stateValue.account?.streaks != null
               ? AccountStateEntity(
                   user: account.user,
                   subscription: account.subscription,
                   limits: account.limits,
-                  streaks: state.account?.streaks,
+                  streaks: stateValue.account?.streaks,
                 )
               : account,
           resetFailure: true,

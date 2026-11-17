@@ -1,5 +1,5 @@
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
@@ -8,6 +8,7 @@ import 'package:skill_battles/app/theme/league_colors.dart';
 import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
 import 'package:skill_battles/core/presentation/league/league_rank.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_progress_bar.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
@@ -22,7 +23,7 @@ import 'package:skill_battles/features/catalog/presentation/extensions/catalog_l
 
 /// Selectable discipline cards from the catalogue: rating, rank, RP
 /// progress, calibration or season peak — all computed by the server.
-final class HomeDisciplineCards extends StatelessWidget {
+final class HomeDisciplineCards extends StatelessComponent {
   const HomeDisciplineCards({
     required this.disciplines,
     required this.statistics,
@@ -39,40 +40,27 @@ final class HomeDisciplineCards extends StatelessWidget {
   final ValueChanged<String> onSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     // Two cards per row, equally tall, as on the artboard.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 20,
-      children: <Widget>[
-        for (int i = 0; i < disciplines.length; i += 2)
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 20,
-              children: <Widget>[
-                for (final DisciplineEntity discipline
-                    in disciplines.skip(i).take(2))
-                  Expanded(
-                    child: _DisciplineCard(
-                      discipline: discipline,
-                      stats: statistics.forDiscipline(discipline.code),
-                      ranks: ranks,
-                      isSelected: discipline.code == selectedCode,
-                      onTap: () => onSelected(discipline.code),
-                    ),
-                  ),
-                if (i + 1 >= disciplines.length && disciplines.length > 1)
-                  const Expanded(child: SizedBox.shrink()),
-              ],
+    return div(classes: 'home-discipline-cards', <Component>[
+      for (int i = 0; i < disciplines.length; i += 2)
+        div(classes: 'home-discipline-cards__row', <Component>[
+          for (final DisciplineEntity discipline in disciplines.skip(i).take(2))
+            _DisciplineCard(
+              discipline: discipline,
+              stats: statistics.forDiscipline(discipline.code),
+              ranks: ranks,
+              isSelected: discipline.code == selectedCode,
+              onTap: () => onSelected(discipline.code),
             ),
-          ),
-      ],
-    );
+          if (i + 1 >= disciplines.length && disciplines.length > 1)
+            const div(classes: 'home-discipline-cards__spacer', <Component>[]),
+        ]),
+    ]);
   }
 }
 
-final class _DisciplineCard extends StatelessWidget {
+final class _DisciplineCard extends StatelessComponent {
   const _DisciplineCard({
     required this.discipline,
     required this.stats,
@@ -88,225 +76,116 @@ final class _DisciplineCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final DisciplineStatsEntity? stats = this.stats;
     return AppTappable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      radius: 16,
       isSelected: isSelected,
       semanticLabel:
           '${discipline.displayName}, rating ${stats?.rating ?? 'unknown'}, '
           '${stats?.rank.rankName ?? ''}',
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primarySurface : null,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        // The border is added to the padding, so the content sits 30 px in
-        // from the edge in both states, as on the artboard.
-        padding: EdgeInsets.all(isSelected ? 28 : 29),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 20,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 12,
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    spacing: 4,
-                    children: <Widget>[
-                      Text(
-                        discipline.displayName,
-                        style: AppTextStyles.titleXlCompact,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        discipline.roundsLabel,
-                        style: AppTextStyles.bodySm.copyWith(
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Skeleton.ignore(child: _SelectionMark(isSelected: isSelected)),
-              ],
-            ),
-            if (stats != null)
-              _LeagueSection(
-                stats: stats,
-                ranks: ranks,
-                isSelected: isSelected,
-              ),
-            _Footer(
-              discipline: discipline,
-              stats: stats,
-              ranks: ranks,
-              isSelected: isSelected,
-            ),
-          ],
-        ),
-      ),
+      classes: isSelected ? 'home-discipline-card home-discipline-card--selected' : 'home-discipline-card',
+      child: div(classes: 'home-discipline-card__body', <Component>[
+        div(classes: 'home-discipline-card__top', <Component>[
+          div(classes: 'home-discipline-card__titles', <Component>[
+            h2(classes: 'home-discipline-card__name', <Component>[Component.text(discipline.displayName)]),
+            p(classes: 'home-discipline-card__rounds', <Component>[Component.text(discipline.roundsLabel)]),
+          ]),
+          Skeleton.ignore(child: _SelectionMark(isSelected: isSelected)),
+        ]),
+        if (stats != null) _LeagueSection(stats: stats, ranks: ranks, isSelected: isSelected),
+        _Footer(discipline: discipline, stats: stats, ranks: ranks, isSelected: isSelected),
+      ]),
     );
   }
 }
 
 /// The league hero and the RP progress of one discipline.
-final class _LeagueSection extends StatelessWidget {
-  const _LeagueSection({
-    required this.stats,
-    required this.ranks,
-    required this.isSelected,
-  });
+final class _LeagueSection extends StatelessComponent {
+  const _LeagueSection({required this.stats, required this.ranks, required this.isSelected});
 
   final DisciplineStatsEntity stats;
   final RankLadderEntity? ranks;
   final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final LeagueRank? league = LeagueRank.tryParse(stats.rank.rankCode);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 20,
-      children: <Widget>[
-        _LeagueHero(stats: stats, league: league, isSelected: isSelected),
-        _LeagueProgress(
-          rank: stats.rank,
-          league: league,
-          ranks: ranks,
-          isSelected: isSelected,
-        ),
-      ],
-    );
+    return div(classes: 'home-league-section', <Component>[
+      _LeagueHero(stats: stats, league: league, isSelected: isSelected),
+      _LeagueProgress(rank: stats.rank, league: league, ranks: ranks, isSelected: isSelected),
+    ]);
   }
 }
 
-final class _LeagueHero extends StatelessWidget {
-  const _LeagueHero({
-    required this.stats,
-    required this.league,
-    required this.isSelected,
-  });
+final class _LeagueHero extends StatelessComponent {
+  const _LeagueHero({required this.stats, required this.league, required this.isSelected});
 
   final DisciplineStatsEntity stats;
   final LeagueRank? league;
   final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final LeagueRank? league = this.league;
-    final LeaguePalette? palette = league == null
-        ? null
-        : LeagueColors.of(league.league);
-    return Row(
-      spacing: 16,
-      children: <Widget>[
-        if (league != null && palette != null)
-          _EmblemCircle(league: league, palette: palette),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 6,
-            children: <Widget>[
-              Text(
-                'YOUR LEAGUE',
-                style: AppTextStyles.monoCaption.copyWith(
-                  letterSpacing: 0.1 * 11,
-                  color: AppColors.muted,
-                ),
-              ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  stats.rank.rankName,
-                  style: AppTextStyles.titleXl.copyWith(
-                    fontSize: 34,
-                    height: 38 / 34,
-                    letterSpacing: -0.02 * 34,
-                    color: palette?.nameText,
-                  ),
-                  maxLines: 1,
-                ),
-              ),
-              if (league != null && league.division != null)
-                Skeleton.leaf(
-                  child: DivisionPips(
-                    division: league.division,
-                    color: LeagueColors.of(league.league).deep,
-                    emptyColor: isSelected
-                        ? AppColors.primaryLine
-                        : AppColors.divider,
-                  ),
-                ),
-            ],
+    final LeaguePalette? palette = league == null ? null : LeagueColors.of(league.league);
+    final int? division = league?.division;
+    return div(classes: 'home-league-hero', <Component>[
+      if (league != null && palette != null) _EmblemCircle(league: league, palette: palette),
+      div(classes: 'home-league-hero__info', <Component>[
+        const p(classes: 'home-league-hero__caption', <Component>[Component.text('YOUR LEAGUE')]),
+        p(
+          classes: 'home-league-hero__rank',
+          styles: palette == null ? null : Styles(color: palette.nameText),
+          <Component>[Component.text(stats.rank.rankName)],
+        ),
+        if (league != null && division != null)
+          Skeleton.leaf(
+            child: DivisionPips(
+              division: division,
+              color: LeagueColors.of(league.league).deep,
+              emptyColor: isSelected ? AppColors.primaryLine : AppColors.divider,
+            ),
           ),
+      ]),
+      div(classes: 'home-league-hero__rating', <Component>[
+        p(
+          classes: 'home-league-hero__rating-value',
+          styles: Styles(color: isSelected ? AppColors.primary : AppColors.ink),
+          <Component>[Component.text('${stats.rating}')],
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          spacing: 2,
-          children: <Widget>[
-            Text(
-              '${stats.rating}',
-              style: AppTextStyles.monoXl.copyWith(
-                fontSize: 28,
-                height: 32 / 28,
-                letterSpacing: -0.02 * 28,
-                color: isSelected ? AppColors.primary : AppColors.ink,
-              ),
-            ),
-            Text(
-              'Elo rating',
-              style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
-            ),
-          ],
-        ),
-      ],
-    );
+        const p(classes: 'home-league-hero__rating-label', <Component>[Component.text('Elo rating')]),
+      ]),
+    ]);
   }
 }
 
-final class _EmblemCircle extends StatelessWidget {
+final class _EmblemCircle extends StatelessComponent {
   const _EmblemCircle({required this.league, required this.palette});
 
   final LeagueRank league;
   final LeaguePalette palette;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return Skeleton.leaf(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: palette.tint,
-          border: Border.all(color: palette.base),
+      child: div(
+        classes: 'home-league-hero__emblem',
+        styles: Styles(
+          border: Border.all(color: palette.base, width: const Unit.pixels(1)),
+          // Inline, so the bone keeps the circle while loading.
+          radius: const BorderRadius.circular(Unit.percent(50)),
+          backgroundColor: palette.tint,
         ),
-        child: SizedBox.square(
-          dimension: 112,
-          child: Center(child: LeagueEmblem(rank: league, size: 96)),
-        ),
+        <Component>[LeagueEmblem(rank: league, size: 96)],
       ),
     );
   }
 }
 
-final class _LeagueProgress extends StatelessWidget {
-  const _LeagueProgress({
-    required this.rank,
-    required this.league,
-    required this.ranks,
-    required this.isSelected,
-  });
+final class _LeagueProgress extends StatelessComponent {
+  const _LeagueProgress({required this.rank, required this.league, required this.ranks, required this.isSelected});
 
   final RankProgressEntity rank;
   final LeagueRank? league;
@@ -314,72 +193,45 @@ final class _LeagueProgress extends StatelessWidget {
   final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final int? target = rank.divisionRpTarget;
     final RankTierEntity? nextTier = ranks?.next(rank.rankCode);
-    final TextStyle mono = AppTextStyles.eyebrow.copyWith(
-      letterSpacing: 0,
-      color: AppColors.inkSoft,
-    );
     final LeagueRank? current = league;
     final Color fill = current == null
         ? (isSelected ? AppColors.primary : AppColors.ink)
         : LeagueColors.of(current.league).deep;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
-      children: <Widget>[
-        Row(
-          spacing: 12,
-          children: <Widget>[
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  text: target == null
-                      ? 'Open tier · no RP cap'
-                      : '${rank.divisionRpCurrent} / $target RP',
-                  children: <InlineSpan>[
-                    if (target != null && nextTier != null)
-                      TextSpan(
-                        text: ' · to ${nextTier.displayName}',
-                        style: const TextStyle(color: AppColors.muted),
-                      ),
-                  ],
-                ),
-                style: mono,
-              ),
-            ),
-            if (current != null)
-              Skeleton.ignore(
-                child: _NextLeague(
-                  nextLeague: _nextLeague(ranks, rank.rankCode, current),
-                ),
-              ),
-          ],
-        ),
-        if (target != null)
-          Skeleton.leaf(
-            child: AppProgressBar(
-              fraction: rank.fraction ?? 1,
-              color: fill,
-              trackColor: isSelected
-                  ? AppColors.primaryLine
-                  : AppColors.divider,
-              height: 8,
-            ),
+    return div(classes: 'home-league-progress', <Component>[
+      div(classes: 'home-league-progress__row', <Component>[
+        p(classes: 'home-league-progress__text', <Component>[
+          span(<Component>[
+            Component.text(target == null ? 'Open tier · no RP cap' : '${rank.divisionRpCurrent} / $target RP'),
+          ]),
+          if (target != null && nextTier != null)
+            span(classes: 'home-league-progress__next-tier', <Component>[
+              Component.text(' · to ${nextTier.displayName}'),
+            ]),
+        ]),
+        if (current != null)
+          Skeleton.ignore(
+            child: _NextLeague(nextLeague: _nextLeague(ranks, rank.rankCode, current)),
           ),
-      ],
-    );
+      ]),
+      if (target != null)
+        Skeleton.leaf(
+          child: AppProgressBar(
+            fraction: rank.fraction ?? 1,
+            color: fill,
+            trackColor: isSelected ? AppColors.primaryLine : AppColors.divider,
+            height: 8,
+          ),
+        ),
+    ]);
   }
 }
 
 /// The first tier of the next league, from the server ladder; `null` while
 /// the ladder is missing or in the top league.
-RankTierEntity? _nextLeague(
-  RankLadderEntity? ranks,
-  String rankCode,
-  LeagueRank current,
-) {
+RankTierEntity? _nextLeague(RankLadderEntity? ranks, String rankCode, LeagueRank current) {
   if (ranks == null) return null;
   final List<RankTierEntity> tiers = ranks.tiers;
   final int index = tiers.indexWhere((RankTierEntity t) => t.code == rankCode);
@@ -392,50 +244,27 @@ RankTierEntity? _nextLeague(
   return null;
 }
 
-final class _NextLeague extends StatelessWidget {
+final class _NextLeague extends StatelessComponent {
   const _NextLeague({required this.nextLeague});
 
   final RankTierEntity? nextLeague;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final RankTierEntity? tier = nextLeague;
-    final LeagueRank? rank = tier == null
-        ? null
-        : LeagueRank.tryParse(tier.code);
-    if (tier == null || rank == null) return const SizedBox.shrink();
-    return Opacity(
-      opacity: 0.55,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 6,
-        children: <Widget>[
-          Text(
-            'Next',
-            style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
-          ),
-          LeagueEmblem(rank: rank, size: 22, dimmed: true),
-          Text(
-            rank.league.displayName,
-            style: AppTextStyles.bodyXs.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppColors.inkSoft,
-            ),
-          ),
-        ],
-      ),
-    );
+    final LeagueRank? rank = tier == null ? null : LeagueRank.tryParse(tier.code);
+    if (tier == null || rank == null) return const span(<Component>[]);
+    return div(classes: 'home-next-league', <Component>[
+      const span(classes: 'home-next-league__label', <Component>[Component.text('Next')]),
+      LeagueEmblem(rank: rank, size: 22, dimmed: true),
+      span(classes: 'home-next-league__name', <Component>[Component.text(rank.league.displayName)]),
+    ]);
   }
 }
 
 /// Calibration or season peak below a line, then rare notices.
-final class _Footer extends StatelessWidget {
-  const _Footer({
-    required this.discipline,
-    required this.stats,
-    required this.ranks,
-    required this.isSelected,
-  });
+final class _Footer extends StatelessComponent {
+  const _Footer({required this.discipline, required this.stats, required this.ranks, required this.isSelected});
 
   final DisciplineEntity discipline;
   final DisciplineStatsEntity? stats;
@@ -443,124 +272,257 @@ final class _Footer extends StatelessWidget {
   final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final DisciplineStatsEntity? stats = this.stats;
     final CalibrationEntity? calibration = stats?.calibration;
-    final TextStyle textStyle = AppTextStyles.bodySm.copyWith(
-      color: AppColors.muted,
-    );
-    final List<Widget> children = <Widget>[
-      if (stats != null && calibration != null)
-        if (calibration.isCalibrating)
-          Row(
-            spacing: 8,
-            children: <Widget>[
+    return div(
+      classes: isSelected ? 'home-card-footer home-card-footer--selected' : 'home-card-footer',
+      <Component>[
+        if (stats != null && calibration != null)
+          if (calibration.isCalibrating)
+            div(classes: 'home-card-footer__calibration', <Component>[
               const _CalibrationChip(),
-              Flexible(
-                child: Text(
-                  'Calibration · ${calibration.matchesRemaining} of '
-                  '${calibration.completedMatches + calibration.matchesRemaining} '
-                  'matches left',
-                  style: textStyle.copyWith(
-                    color: isSelected ? AppColors.primaryInk : null,
+              p(
+                classes: 'home-card-footer__text',
+                styles: isSelected ? const Styles(color: AppColors.primaryInk) : null,
+                <Component>[
+                  Component.text(
+                    'Calibration · ${calibration.matchesRemaining} of '
+                    '${calibration.completedMatches + calibration.matchesRemaining} '
+                    'matches left',
                   ),
-                ),
+                ],
               ),
-            ],
-          )
-        else
-          Text(
-            'Calibrated · Season peak ${stats.seasonPeakRating} '
-            '${ranks.nameOf(stats.seasonPeakRankCode)}',
-            style: textStyle,
-          ),
-      if (stats != null && stats.seasonRolloverPending)
-        Text(
-          'Season reset pending — finishing your last match of the '
-          'previous season.',
-          style: AppTextStyles.bodyXs.copyWith(color: AppColors.accentText),
-        ),
-      if (!discipline.contentAvailable)
-        Text(
-          'Questions are being restocked — not available right now.',
-          style: AppTextStyles.bodyXs.copyWith(color: AppColors.danger),
-        ),
-    ];
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: isSelected ? AppColors.primaryLine : AppColors.divider,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(top: 16),
-        // An empty Column reports a negative intrinsic height (its spacing is
-        // subtracted once), which breaks the equal-height card row.
-        child: children.isEmpty
-            ? const SizedBox.shrink()
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8,
-                children: children,
+            ])
+          else
+            p(classes: 'home-card-footer__text', <Component>[
+              Component.text(
+                'Calibrated · Season peak ${stats.seasonPeakRating} '
+                '${ranks.nameOf(stats.seasonPeakRankCode)}',
               ),
-      ),
+            ]),
+        if (stats != null && stats.seasonRolloverPending)
+          const p(classes: 'home-card-footer__rollover', <Component>[
+            Component.text('Season reset pending — finishing your last match of the previous season.'),
+          ]),
+        if (!discipline.contentAvailable)
+          const p(classes: 'home-card-footer__unavailable', <Component>[
+            Component.text('Questions are being restocked — not available right now.'),
+          ]),
+      ],
     );
   }
 }
 
 /// "×2 ELO": calibration matches move the rating twice as fast (K 64
 /// instead of 32).
-final class _CalibrationChip extends StatelessWidget {
+final class _CalibrationChip extends StatelessComponent {
   const _CalibrationChip();
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        child: Text(
-          '×2 ELO',
-          style: AppTextStyles.monoCaption.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.04 * 11,
-            color: AppColors.white,
-          ),
-        ),
-      ),
-    );
+  Component build(BuildContext context) {
+    return const span(classes: 'home-calibration-chip', <Component>[Component.text('×2 ELO')]);
   }
 }
 
-final class _SelectionMark extends StatelessWidget {
+final class _SelectionMark extends StatelessComponent {
   const _SelectionMark({required this.isSelected});
 
   final bool isSelected;
 
   @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: 24,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: isSelected ? AppColors.primary : null,
-          border: isSelected
-              ? null
-              : Border.all(color: AppColors.borderStrong, width: 1.5),
-        ),
-        child: isSelected
-            ? const Center(
-                child: AppSvgIcon(AppIcons.check, width: 12, height: 12),
-              )
-            : null,
-      ),
+  Component build(BuildContext context) {
+    return span(
+      classes: isSelected ? 'home-selection-mark home-selection-mark--selected' : 'home-selection-mark',
+      attributes: const <String, String>{'aria-hidden': 'true'},
+      <Component>[
+        if (isSelected) const AppSvgIcon(AppIcons.check, width: 12, height: 12),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get homeDisciplineCardsStyles => <StyleRule>[
+  css('.home-discipline-cards').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(20)),
+  ),
+  css('.home-discipline-cards__row').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.row,
+    alignItems: AlignItems.stretch,
+    gap: const Gap.column(Unit.pixels(20)),
+  ),
+  css('.home-discipline-cards__row > *').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  // The border is added to the padding, so the content sits 30 px in from
+  // the edge in both states, as on the artboard.
+  css('.home-discipline-card').styles(
+    padding: const Padding.all(Unit.pixels(29)),
+    border: Border.all(color: AppColors.border, width: const Unit.pixels(1)),
+    radius: const BorderRadius.circular(Unit.pixels(16)),
+    transition: const Transition('all', duration: Duration(milliseconds: 150)),
+  ),
+  css('.home-discipline-card--selected').styles(
+    padding: const Padding.all(Unit.pixels(28)),
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(2)),
+    backgroundColor: AppColors.primarySurface,
+  ),
+  css('.home-discipline-card__body').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(20)),
+  ),
+  css('.home-discipline-card__top').styles(
+    display: Display.flex,
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.home-discipline-card__titles').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.home-discipline-card__name')
+      .styles(overflow: Overflow.hidden, textOverflow: TextOverflow.ellipsis, whiteSpace: WhiteSpace.noWrap)
+      .combine(AppTextStyles.titleXlCompact),
+  css('.home-discipline-card__rounds').combine(AppTextStyles.bodySm).combine(const Styles(color: AppColors.muted)),
+  css('.home-selection-mark').styles(
+    display: Display.flex,
+    width: const Unit.pixels(24),
+    height: const Unit.pixels(24),
+    border: Border.all(color: AppColors.borderStrong, width: const Unit.pixels(1.5)),
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(shrink: 0),
+  ),
+  css('.home-selection-mark--selected').styles(
+    border: Border.none,
+    backgroundColor: AppColors.primary,
+  ),
+  css('.home-league-section').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(20)),
+  ),
+  css('.home-league-hero').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(16)),
+  ),
+  css('.home-league-hero__emblem').styles(
+    display: Display.flex,
+    width: const Unit.pixels(112),
+    height: const Unit.pixels(112),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(shrink: 0),
+  ),
+  css('.home-league-hero__info').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(6)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.home-league-hero__caption')
+      .combine(AppTextStyles.monoCaption)
+      .combine(const Styles(color: AppColors.muted, letterSpacing: Unit.em(0.1))),
+  css('.home-league-hero__rank')
+      .styles(
+        maxWidth: const Unit.percent(100),
+        overflow: Overflow.hidden,
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.titleXl)
+      .combine(
+        const Styles(fontSize: Unit.pixels(34), letterSpacing: Unit.em(-0.02), lineHeight: Unit.pixels(38)),
+      ),
+  css('.home-league-hero__rating').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.end,
+    gap: const Gap.row(Unit.pixels(2)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.home-league-hero__rating-value')
+      .combine(AppTextStyles.monoXl)
+      .combine(
+        const Styles(fontSize: Unit.pixels(28), letterSpacing: Unit.em(-0.02), lineHeight: Unit.pixels(32)),
+      ),
+  css('.home-league-hero__rating-label').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.muted)),
+  css('.home-league-progress').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(10)),
+  ),
+  css('.home-league-progress__row').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.home-league-progress__text')
+      .styles(
+        minWidth: Unit.zero,
+        flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+      )
+      .combine(AppTextStyles.eyebrow)
+      .combine(const Styles(color: AppColors.inkSoft, letterSpacing: Unit.zero)),
+  css('.home-league-progress__next-tier').styles(color: AppColors.muted),
+  css('.home-next-league').styles(
+    display: Display.flex,
+    opacity: 0.55,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(6)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.home-next-league__label').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.muted)),
+  css('.home-next-league__name')
+      .combine(AppTextStyles.bodyXs)
+      .combine(const Styles(color: AppColors.inkSoft, fontWeight: FontWeight.w600)),
+  css('.home-card-footer').styles(
+    display: Display.flex,
+    padding: const Padding.only(top: Unit.pixels(16)),
+    border: const Border.only(
+      top: BorderSide(color: AppColors.divider, width: Unit.pixels(1)),
+    ),
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(8)),
+  ),
+  css('.home-card-footer--selected').styles(
+    border: const Border.only(
+      top: BorderSide(color: AppColors.primaryLine, width: Unit.pixels(1)),
+    ),
+  ),
+  css('.home-card-footer__calibration').styles(
+    display: Display.flex,
+    maxWidth: const Unit.percent(100),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+  ),
+  css('.home-card-footer__text')
+      .styles(minWidth: Unit.zero)
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted)),
+  css('.home-card-footer__rollover').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.accentText)),
+  css('.home-card-footer__unavailable').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.danger)),
+  css('.home-calibration-chip')
+      .styles(
+        padding: const Padding.symmetric(horizontal: Unit.pixels(8), vertical: Unit.pixels(3)),
+        radius: const BorderRadius.circular(Unit.pixels(6)),
+        flex: const Flex(shrink: 0),
+        backgroundColor: AppColors.primary,
+      )
+      .combine(AppTextStyles.monoCaption)
+      .combine(const Styles(color: AppColors.white, fontWeight: FontWeight.w600, letterSpacing: Unit.em(0.04))),
+];

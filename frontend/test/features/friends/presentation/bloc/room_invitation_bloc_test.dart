@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
@@ -70,7 +70,7 @@ void main() {
         repo.onSendDuelInvitation = (_) async => failed(const TimeoutFailure());
 
         await send(RoomInvitationSendRequested(friendAnna.id));
-        expect(bloc.state.canRetrySend, isTrue);
+        expect(bloc.stateValue.canRetrySend, isTrue);
         await send(RoomInvitationSendRequested(friendAnna.id));
         await send(RoomInvitationSendRequested(friendBoris.id));
 
@@ -94,7 +94,7 @@ void main() {
             failed(apiFailure(ApiErrorCodes.friendNotFound, status: 404));
 
         await send(RoomInvitationSendRequested(friendAnna.id));
-        expect(bloc.state.canRetrySend, isFalse);
+        expect(bloc.stateValue.canRetrySend, isFalse);
         await send(RoomInvitationSendRequested(friendAnna.id));
 
         expect(repo.sendInvitationCalls.map((p) => p.requestId), <String>[
@@ -136,9 +136,9 @@ void main() {
       );
       await _settle();
 
-      expect(bloc.state.canRetrySend, isFalse);
-      expect(bloc.state.sendStatus, LoadStatus.success);
-      expect(bloc.state.sendFailure, isNull);
+      expect(bloc.stateValue.canRetrySend, isFalse);
+      expect(bloc.stateValue.sendStatus, LoadStatus.success);
+      expect(bloc.stateValue.sendFailure, isNull);
       await send(RoomInvitationSendRequested(friendAnna.id));
       expect(repo.sendInvitationCalls.last.requestId, 'id-2');
     });
@@ -162,10 +162,10 @@ void main() {
         answer.complete(failed(const TimeoutFailure()));
         await _settle();
 
-        expect(bloc.state.invitation, terminal);
-        expect(bloc.state.canRetrySend, isFalse);
-        expect(bloc.state.sendStatus, LoadStatus.success);
-        expect(bloc.state.sendFailure, isNull);
+        expect(bloc.stateValue.invitation, terminal);
+        expect(bloc.stateValue.canRetrySend, isFalse);
+        expect(bloc.stateValue.sendStatus, LoadStatus.success);
+        expect(bloc.stateValue.sendFailure, isNull);
         repo.onSendDuelInvitation = (_) async => failed(const TimeoutFailure());
         await send(RoomInvitationSendRequested(friendAnna.id));
         expect(repo.sendInvitationCalls.last.requestId, 'id-2');
@@ -203,7 +203,7 @@ void main() {
               : ok(invitation('i1', incoming: false)),
         );
         await _settle();
-        final LoadStatus statusAfterOldAnswer = bloc.state.sendStatus;
+        final LoadStatus statusAfterOldAnswer = bloc.stateValue.sendStatus;
         second.complete(
           ok(
             invitation(
@@ -217,9 +217,9 @@ void main() {
 
         expect(requestIds, <String>['id-1', 'id-2']);
         expect(statusAfterOldAnswer, LoadStatus.loading);
-        expect(bloc.state.invitation!.id, 'i2');
-        expect(bloc.state.sendStatus, LoadStatus.success);
-        expect(bloc.state.canRetrySend, isFalse);
+        expect(bloc.stateValue.invitation!.id, 'i2');
+        expect(bloc.stateValue.sendStatus, LoadStatus.success);
+        expect(bloc.stateValue.canRetrySend, isFalse);
       });
     }
 
@@ -250,8 +250,8 @@ void main() {
         repo.invitations.add(invitation('i1', incoming: false));
         first.complete(ok(oldResult));
         await _settle();
-        final LoadStatus statusAfterReplay = bloc.state.sendStatus;
-        final DuelInvitationEntity? resultAfterReplay = bloc.state.invitation;
+        final LoadStatus statusAfterReplay = bloc.stateValue.sendStatus;
+        final DuelInvitationEntity? resultAfterReplay = bloc.stateValue.invitation;
         second.complete(
           ok(
             invitation(
@@ -269,7 +269,7 @@ void main() {
           'id-1',
           'id-2',
         ]);
-        expect(bloc.state.invitation!.id, 'i2');
+        expect(bloc.stateValue.invitation!.id, 'i2');
       },
     );
 
@@ -287,7 +287,7 @@ void main() {
       );
       repo.invitations.add(newest);
       await _settle();
-      expect(bloc.state.invitation, newest);
+      expect(bloc.stateValue.invitation, newest);
 
       repo.invitations.add(invitation('old', incoming: false));
       repo.invitations.add(
@@ -299,8 +299,8 @@ void main() {
         ),
       );
       await _settle();
-      expect(bloc.state.invitation, newest);
-      expect(bloc.state.pendingInvitation, isNull);
+      expect(bloc.stateValue.invitation, newest);
+      expect(bloc.stateValue.pendingInvitation, isNull);
     });
 
     test('an unresolved send blocks duplicate sends', () async {
@@ -315,7 +315,7 @@ void main() {
       await _settle();
 
       expect(calls, 1);
-      expect(bloc.state.pendingInvitation!.id, 'i1');
+      expect(bloc.stateValue.pendingInvitation!.id, 'i1');
     });
 
     test('pending invitation blocks duplicate send', () async {
@@ -326,7 +326,7 @@ void main() {
       await send(RoomInvitationSendRequested(friendBoris.id));
 
       expect(repo.sendInvitationCalls, hasLength(1));
-      expect(bloc.state.canInvite, isFalse);
+      expect(bloc.stateValue.canInvite, isFalse);
     });
   });
 
@@ -352,9 +352,9 @@ void main() {
 
       expect(repo.withdrawCalls, <String>['i1']);
       expect(repo.getInvitationCalls, <String>['i1']);
-      expect(bloc.state.withdrawStatus, LoadStatus.success);
-      expect(bloc.state.pendingInvitation, isNull);
-      expect(bloc.state.canInvite, isTrue);
+      expect(bloc.stateValue.withdrawStatus, LoadStatus.success);
+      expect(bloc.stateValue.pendingInvitation, isNull);
+      expect(bloc.stateValue.canInvite, isTrue);
     });
 
     test('MATCH_ALREADY_FOUND rereads accepted result', () async {
@@ -372,9 +372,9 @@ void main() {
       );
       await send(const RoomInvitationWithdrawRequested());
 
-      expect(bloc.state.invitation!.battleId, 'battle-1');
-      expect(bloc.state.withdrawFailure, isNull);
-      expect(bloc.state.pendingInvitation, isNull);
+      expect(bloc.stateValue.invitation!.battleId, 'battle-1');
+      expect(bloc.stateValue.withdrawFailure, isNull);
+      expect(bloc.stateValue.pendingInvitation, isNull);
     });
   });
 
@@ -401,8 +401,8 @@ void main() {
         repo.onGetFriends = (_) => answer.future;
         await send(const RoomInvitationFriendsPageRequested(1));
 
-        expect(bloc.state.friendsPageStatus, LoadStatus.loading);
-        expect(bloc.state.friends.single.friend, friendAnna);
+        expect(bloc.stateValue.friendsPageStatus, LoadStatus.loading);
+        expect(bloc.stateValue.friends.single.friend, friendAnna);
         answer.complete(
           ok(
             friendsPage(
@@ -415,9 +415,9 @@ void main() {
         );
         await _settle();
 
-        expect(bloc.state.friendsPageStatus, LoadStatus.success);
-        expect(bloc.state.friends.single.friend, friendBoris);
-        expect(bloc.state.friendsPage!.page, 1);
+        expect(bloc.stateValue.friendsPageStatus, LoadStatus.success);
+        expect(bloc.stateValue.friends.single.friend, friendBoris);
+        expect(bloc.stateValue.friendsPage!.page, 1);
         expect(repo.friendsCalls.last.size, 2);
       },
     );
@@ -442,9 +442,9 @@ void main() {
       );
       await _settle();
 
-      expect(bloc.state.friends.single.relationshipId, 'fresh');
-      expect(bloc.state.friendsPage!.page, 0);
-      expect(bloc.state.friendsPageStatus, LoadStatus.initial);
+      expect(bloc.stateValue.friends.single.relationshipId, 'fresh');
+      expect(bloc.stateValue.friendsPage!.page, 0);
+      expect(bloc.stateValue.friendsPageStatus, LoadStatus.initial);
     });
 
     test('page failure keeps current data and can be retried', () async {
@@ -452,16 +452,16 @@ void main() {
       repo.onGetFriends = (_) async => failed(const TimeoutFailure());
       await send(const RoomInvitationFriendsPageRequested(1));
 
-      expect(bloc.state.friends.single.friend, friendAnna);
-      expect(bloc.state.friendsPageStatus, LoadStatus.failure);
-      expect(bloc.state.friendsPageFailure, const TimeoutFailure());
+      expect(bloc.stateValue.friends.single.friend, friendAnna);
+      expect(bloc.stateValue.friendsPageStatus, LoadStatus.failure);
+      expect(bloc.stateValue.friendsPageFailure, const TimeoutFailure());
       repo.onGetFriends = (_) async => ok(
         friendsPage([friendItem('rel-1', friendBoris)], page: 1, totalPages: 2),
       );
       await send(const RoomInvitationFriendsPageRequested(1));
 
-      expect(bloc.state.friendsPageFailure, isNull);
-      expect(bloc.state.friends.single.friend, friendBoris);
+      expect(bloc.stateValue.friendsPageFailure, isNull);
+      expect(bloc.stateValue.friends.single.friend, friendBoris);
     });
   });
 }

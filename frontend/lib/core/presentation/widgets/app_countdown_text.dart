@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
 
@@ -21,7 +22,7 @@ enum AppCountdownFormat {
 
 /// Remaining time until a server instant, corrected by the server clock
 /// offset. Display only: reaching zero never changes any state.
-final class AppCountdownText extends StatefulWidget {
+final class AppCountdownText extends StatefulComponent {
   const AppCountdownText({
     required this.target,
     this.clockOffset = Duration.zero,
@@ -36,7 +37,7 @@ final class AppCountdownText extends StatefulWidget {
 
   /// Server time minus local time.
   final Duration clockOffset;
-  final TextStyle? style;
+  final Styles? style;
   final String prefix;
   final String suffix;
   final AppCountdownFormat format;
@@ -57,28 +58,24 @@ final class _AppCountdownTextState extends State<AppCountdownText> {
   }
 
   Duration _compute() {
-    final Duration left = widget.target.difference(
-      DateTime.now().add(widget.clockOffset),
-    );
+    final Duration left = component.target.difference(DateTime.now().add(component.clockOffset));
     return left.isNegative ? Duration.zero : left;
   }
 
   @override
-  void didUpdateWidget(AppCountdownText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.target != widget.target ||
-        oldWidget.clockOffset != widget.clockOffset) {
+  void didUpdateComponent(AppCountdownText oldComponent) {
+    super.didUpdateComponent(oldComponent);
+    if (oldComponent.target != component.target || oldComponent.clockOffset != component.clockOffset) {
       _remaining = _compute();
     }
   }
 
   void _tick() {
     final Duration next = _compute();
-    if (next.inSeconds == _remaining.inSeconds &&
-        (next == Duration.zero) == (_remaining == Duration.zero)) {
+    if (next.inSeconds == _remaining.inSeconds && (next == Duration.zero) == (_remaining == Duration.zero)) {
       return;
     }
-    setState(() => _remaining = next);
+    if (mounted) setState(() => _remaining = next);
   }
 
   @override
@@ -88,16 +85,22 @@ final class _AppCountdownTextState extends State<AppCountdownText> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final String value = switch (widget.format) {
+  Component build(BuildContext context) {
+    final String value = switch (component.format) {
       AppCountdownFormat.clock => DisplayFormatters.clock(_remaining),
-      AppCountdownFormat.compact => DisplayFormatters.compactDuration(
-        _remaining,
-      ),
+      AppCountdownFormat.compact => DisplayFormatters.compactDuration(_remaining),
       AppCountdownFormat.hms => DisplayFormatters.hms(_remaining),
-      AppCountdownFormat.seconds =>
-        '${(_remaining.inMilliseconds / 1000).ceil()}',
+      AppCountdownFormat.seconds => '${(_remaining.inMilliseconds / 1000).ceil()}',
     };
-    return Text('${widget.prefix}$value${widget.suffix}', style: widget.style);
+    return span(
+      classes: 'app-countdown-text',
+      styles: component.style,
+      <Component>[Component.text('${component.prefix}$value${component.suffix}')],
+    );
   }
 }
+
+@css
+List<StyleRule> get appCountdownTextStyles => <StyleRule>[
+  css('.app-countdown-text').styles(raw: const <String, String>{'font-variant-numeric': 'tabular-nums'}),
+];

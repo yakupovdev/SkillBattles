@@ -13,8 +13,7 @@ final class UpdateProfileParamsEntity extends Equatable {
   final String? currentPassword;
   final String? newPassword;
 
-  bool get isEmpty =>
-      nickname == null && currentPassword == null && newPassword == null;
+  bool get isEmpty => nickname == null && currentPassword == null && newPassword == null;
 
   @override
   String toString() => 'UpdateProfileParamsEntity(nickname: $nickname)';

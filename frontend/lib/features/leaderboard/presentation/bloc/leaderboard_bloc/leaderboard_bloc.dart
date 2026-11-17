@@ -1,9 +1,8 @@
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/account/domain/entity/season_history_page_entity.dart';
@@ -26,7 +25,7 @@ part 'leaderboard_state.dart';
 /// peaks and past seasons of the side panel load once, next to the
 /// catalogue. The rank ladder enriches climb progress; optional data failures
 /// leave the corresponding details out without blocking the leaderboard.
-final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
+final class LeaderboardBloc extends SignalBloc<LeaderboardEvent, LeaderboardState> {
   LeaderboardBloc({
     required this._getDisciplines,
     required this._getRanks,
@@ -34,8 +33,8 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     required this._getStatistics,
     required this._getSeasonHistory,
   }) : super(const LeaderboardState()) {
-    on<LeaderboardStarted>(_onStarted, transformer: droppable());
-    on<LeaderboardDisciplineSelected>(_onSelected, transformer: restartable());
+    handle<LeaderboardStarted>(_onStarted, transformer: droppable());
+    handle<LeaderboardDisciplineSelected>(_onSelected, transformer: restartable());
   }
 
   final GetDisciplinesUsecase _getDisciplines;
@@ -48,7 +47,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     LeaderboardStarted event,
     Emitter<LeaderboardState> emit,
   ) async {
-    emit(state.copyWith(boardStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(boardStatus: LoadStatus.loading));
     final (
       Either<Failure, List<DisciplineEntity>> result,
       Either<Failure, RankLadderEntity> ranks,
@@ -62,7 +61,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     ).wait;
     if (emit.isDone) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         ranks: ranks.toNullable(),
         resetRanks: ranks.isLeft(),
         statistics: statistics.toNullable(),
@@ -72,7 +71,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     final List<DisciplineEntity>? disciplines = result.toNullable();
     if (disciplines == null || disciplines.isEmpty) {
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           boardStatus: LoadStatus.failure,
           failure: result.getLeft(),
         ),
@@ -86,7 +85,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
             )
         ? event.disciplineCode!
         : disciplines.first.code;
-    emit(state.copyWith(disciplines: disciplines, selectedCode: code));
+    emit(stateValue.copyWith(disciplines: disciplines, selectedCode: code));
     await _load(code, emit);
   }
 
@@ -95,7 +94,7 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     Emitter<LeaderboardState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         selectedCode: event.code,
         boardStatus: LoadStatus.loading,
         resetBoard: true,
@@ -108,13 +107,13 @@ final class LeaderboardBloc extends Bloc<LeaderboardEvent, LeaderboardState> {
     final Either<Failure, LeaderboardEntity> result = await _getLeaderboard(
       LeaderboardParamsEntity(disciplineCode: code),
     );
-    if (emit.isDone || state.selectedCode != code) return;
+    if (emit.isDone || stateValue.selectedCode != code) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(boardStatus: LoadStatus.failure, failure: failure),
+        stateValue.copyWith(boardStatus: LoadStatus.failure, failure: failure),
       ),
       (LeaderboardEntity board) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           boardStatus: LoadStatus.success,
           board: board,
           resetFailure: true,
