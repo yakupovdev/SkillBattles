@@ -1,10 +1,9 @@
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/season_entity.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/account/domain/entity/activity_entity.dart';
@@ -25,7 +24,7 @@ part 'home_state.dart';
 
 /// Catalogue, current season, ratings, streaks and the live activity to
 /// resume; joining a private duel by code.
-final class HomeBloc extends Bloc<HomeEvent, HomeState> {
+final class HomeBloc extends SignalBloc<HomeEvent, HomeState> {
   HomeBloc({
     required this._getDisciplines,
     required this._getRanks,
@@ -34,11 +33,11 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
     required this._getCurrentSeason,
     required this._joinDuel,
   }) : super(const HomeState()) {
-    on<HomeStarted>(_onStarted, transformer: restartable());
-    on<HomeRefreshRequested>(_onStarted, transformer: restartable());
-    on<HomeDisciplineSelected>(_onDisciplineSelected);
-    on<HomeJoinDuelSubmitted>(_onJoinDuelSubmitted, transformer: droppable());
-    on<HomeJoinCodeEdited>(_onJoinCodeEdited);
+    handle<HomeStarted>(_onStarted, transformer: restartable());
+    handle<HomeRefreshRequested>(_onStarted, transformer: restartable());
+    handle<HomeDisciplineSelected>(_onDisciplineSelected);
+    handle<HomeJoinDuelSubmitted>(_onJoinDuelSubmitted, transformer: droppable());
+    handle<HomeJoinCodeEdited>(_onJoinCodeEdited);
   }
 
   final GetDisciplinesUsecase _getDisciplines;
@@ -49,7 +48,7 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final JoinDuelUsecase _joinDuel;
 
   Future<void> _onStarted(HomeEvent event, Emitter<HomeState> emit) async {
-    emit(state.copyWith(loadStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(loadStatus: LoadStatus.loading));
     final (
       Either<Failure, List<DisciplineEntity>> disciplines,
       Either<Failure, RankLadderEntity> ranks,
@@ -67,18 +66,18 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
     // The catalogue and statistics are the page; the rest degrades quietly.
     final Failure? required = disciplines.getLeft() ?? statistics.getLeft();
     if (required != null) {
-      emit(state.copyWith(loadStatus: LoadStatus.failure, failure: required));
+      emit(stateValue.copyWith(loadStatus: LoadStatus.failure, failure: required));
       return;
     }
     final List<DisciplineEntity> list = disciplines.getOrElse(
       (_) => const <DisciplineEntity>[],
     );
     final String? selected =
-        list.any((DisciplineEntity d) => d.code == state.selectedCode)
-        ? state.selectedCode
+        list.any((DisciplineEntity d) => d.code == stateValue.selectedCode)
+        ? stateValue.selectedCode
         : (list.isEmpty ? null : list.first.code);
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         loadStatus: LoadStatus.success,
         disciplines: list,
         ranks: ranks.toNullable(),
@@ -95,7 +94,7 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
     HomeDisciplineSelected event,
     Emitter<HomeState> emit,
   ) {
-    emit(state.copyWith(selectedCode: event.code));
+    emit(stateValue.copyWith(selectedCode: event.code));
   }
 
   Future<void> _onJoinDuelSubmitted(
@@ -103,16 +102,16 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     emit(
-      state.copyWith(joinStatus: LoadStatus.loading, resetJoinFailure: true),
+      stateValue.copyWith(joinStatus: LoadStatus.loading, resetJoinFailure: true),
     );
     final Either<Failure, DuelEntity> result = await _joinDuel(event.params);
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(joinStatus: LoadStatus.failure, joinFailure: failure),
+        stateValue.copyWith(joinStatus: LoadStatus.failure, joinFailure: failure),
       ),
       (DuelEntity duel) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           joinStatus: LoadStatus.success,
           joinedBattleId: duel.battleId,
         ),
@@ -121,9 +120,9 @@ final class HomeBloc extends Bloc<HomeEvent, HomeState> {
   }
 
   void _onJoinCodeEdited(HomeJoinCodeEdited event, Emitter<HomeState> emit) {
-    if (state.joinFailure == null) return;
+    if (stateValue.joinFailure == null) return;
     emit(
-      state.copyWith(resetJoinFailure: true, joinStatus: LoadStatus.initial),
+      stateValue.copyWith(resetJoinFailure: true, joinStatus: LoadStatus.initial),
     );
   }
 }

@@ -1,13 +1,13 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:jaspr_router/jaspr_router.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
-import 'package:skill_battles/app/theme/app_skeleton_theme.dart';
-import 'package:skill_battles/app/theme/app_theme.dart';
+import 'package:skill_battles/app/router/app_router.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
+import 'package:skill_battles/core/utils/session/auth_session.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_account_state_usecase.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_activity_usecase.dart';
 import 'package:skill_battles/features/account/domain/usecases/watch_account_changes_usecase.dart';
@@ -35,19 +35,50 @@ import 'package:skill_battles/features/friends/domain/usecases/watch_friendship_
 import 'package:skill_battles/features/friends/domain/usecases/watch_signed_in_user_usecase.dart';
 import 'package:skill_battles/features/notifications/presentation/bloc/notification_bloc/notification_bloc.dart';
 
-/// Root widget: the app-level account and notification BLoCs, theme,
-/// skeleton look and the router (owned by `AppDependencies`).
-final class SkillBattlesApp extends StatelessWidget {
-  const SkillBattlesApp({required this.router, super.key});
-
-  final GoRouter router;
+/// Root component: the app-level account and notification blocs, the
+/// sticker compositions and the router.
+final class SkillBattlesApp extends StatefulComponent {
+  const SkillBattlesApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<SkillBattlesApp> createState() => _SkillBattlesAppState();
+}
+
+final class _SkillBattlesAppState extends State<SkillBattlesApp> {
+  late GlobalStateKey<RouterState> _routerKey;
+  late AuthSession _session;
+  late Router _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _routerKey = GlobalStateKey<RouterState>();
+    _session = AppDependenciesProvider.of(context).getDep<AuthSession>();
+    _router = createAppRouter(session: _session, key: _routerKey);
+    _session.addListener(_onSessionChanged);
+  }
+
+  /// Re-runs the redirect for the current address, like go_router's
+  /// `refreshListenable`: sign-out leaves for the log-in page, sign-in
+  /// leaves the auth pages.
+  void _onSessionChanged() {
+    final RouterState? router = _routerKey.currentState;
+    if (router == null) return;
+    router.replace(router.matchList.uri.toString());
+  }
+
+  @override
+  void dispose() {
+    _session.removeListener(_onSessionChanged);
+    super.dispose();
+  }
+
+  @override
+  Component build(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return MultiBlocProvider(
-      providers: <BlocProvider<dynamic>>[
-        BlocProvider<AccountBloc>(
+    return MultiBlocSignalProvider(
+      providers: <BlocSignalProviderSingleChildComponent>[
+        BlocSignalProvider<AccountBloc>(
           create: (_) => AccountBloc(
             getAccountState: dependencies.getDep<GetAccountStateUsecase>(),
             watchAccountChanges: dependencies
@@ -62,7 +93,7 @@ final class SkillBattlesApp extends StatelessWidget {
         // In-app notifications (rematches, friend requests, room
         // invitations) for the global overlay; above the router, so they
         // survive navigation.
-        BlocProvider<NotificationBloc>(
+        BlocSignalProvider<NotificationBloc>(
           lazy: false,
           create: (_) => NotificationBloc(
             watchRematches: dependencies.getDep<WatchRematchesUsecase>(),
@@ -99,16 +130,7 @@ final class SkillBattlesApp extends StatelessWidget {
           )..add(const NotificationStarted()),
         ),
       ],
-      child: MaterialApp.router(
-        title: 'SkillBattles',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        routerConfig: router,
-        builder: (BuildContext context, Widget? child) =>
-            StickerCompositionsScope(
-              child: AppSkeletonTheme(child: child ?? const SizedBox.shrink()),
-            ),
-      ),
+      child: StickerCompositionsScope(child: _router),
     );
   }
 }

@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -28,13 +29,14 @@ enum AppTagTone {
 }
 
 /// A small tinted label. Rounded rectangle by default, a pill with
-/// [isPill].
-final class AppTag extends StatelessWidget {
+/// [isPill]. It hugs its content and wraps a long label inside the width of
+/// its parent.
+final class AppTag extends StatelessComponent {
   const AppTag({
     required this.label,
     this.tone = AppTagTone.primary,
     this.isPill = false,
-    this.padding = const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    this.padding = const Padding.symmetric(horizontal: Unit.pixels(10), vertical: Unit.pixels(5)),
     this.style,
     this.leading,
     this.foregroundColor,
@@ -45,14 +47,14 @@ final class AppTag extends StatelessWidget {
   final String label;
   final AppTagTone tone;
   final bool isPill;
-  final EdgeInsetsGeometry padding;
+  final Padding padding;
 
   /// Text style; defaults to 13/16 semibold. The tone color is applied on
   /// top of it.
-  final TextStyle? style;
+  final Styles? style;
 
   /// Optional icon before the label (6 px gap).
-  final Widget? leading;
+  final Component? leading;
 
   /// Replaces the tone's text color ("You: B · $60.00 · incorrect").
   final Color? foregroundColor;
@@ -60,34 +62,46 @@ final class AppTag extends StatelessWidget {
   /// Renders [label] as inline Markdown with LaTeX (a quoted answer option).
   final bool isMarkdown;
 
-  @override
-  Widget build(BuildContext context) {
-    final TextStyle textStyle =
-        (style ?? AppTextStyles.bodySm.copyWith(fontWeight: FontWeight.w600))
-            .copyWith(color: foregroundColor ?? tone.foreground);
-    final Widget? icon = leading;
-    // Without an icon the label is a bare Text, so a long label (an answer
-    // quote in the round review) wraps inside the parent's width instead of
-    // overflowing a min-size Row.
-    final Widget text = isMarkdown
-        ? AppMarkdownLine(label, style: textStyle)
-        : Text(label, style: textStyle);
+  static const Styles _defaultStyle = Styles(
+    fontFamily: AppFonts.body,
+    fontSize: Unit.pixels(13),
+    fontWeight: FontWeight.w600,
+    lineHeight: Unit.pixels(16),
+  );
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: tone.background,
-        borderRadius: BorderRadius.circular(isPill ? 99 : 6),
-      ),
-      child: Padding(
-        padding: padding,
-        child: icon == null
-            ? text
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 6,
-                children: <Widget>[icon, text],
-              ),
-      ),
+  static const Styles _box = Styles(display: Display.block, width: Unit.fitContent, maxWidth: Unit.percent(100));
+
+  static const Styles _iconBox = Styles(
+    display: Display.flex,
+    width: Unit.fitContent,
+    maxWidth: Unit.percent(100),
+    alignItems: AlignItems.center,
+    gap: Gap.column(Unit.pixels(6)),
+  );
+
+  static const Styles _label = Styles(display: Display.block, minWidth: Unit.zero);
+
+  @override
+  Component build(BuildContext context) {
+    final Styles textStyle = (style ?? _defaultStyle).combine(Styles(color: foregroundColor ?? tone.foreground));
+    final Component? icon = leading;
+    final Component text = isMarkdown
+        ? AppMarkdownLine(label, style: textStyle)
+        : span(styles: textStyle.combine(_label), <Component>[Component.text(label)]);
+
+    // Inline styles only: this file imports the Markdown renderer, which
+    // the `@css` collector cannot compile (see `MarkdownStyles`).
+    return div(
+      classes: 'app-tag',
+      styles: Styles.combine(<Styles>[
+        icon == null ? _box : _iconBox,
+        Styles(
+          padding: padding,
+          radius: BorderRadius.circular(Unit.pixels(isPill ? 99 : 6)),
+          backgroundColor: tone.background,
+        ),
+      ]),
+      <Component>[?icon, text],
     );
   }
 }

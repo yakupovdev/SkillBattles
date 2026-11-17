@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/subscription_entity.dart';
 import 'package:skill_battles/core/domain/entity/subscription_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/subscription/domain/usecases/get_subscription_usecase.dart';
@@ -18,14 +17,14 @@ part 'billing_return_state.dart';
 /// Pro is shown only when the server reports a verified ACTIVE status, so
 /// this polls `GET /subscriptions/me` for a while.
 final class BillingReturnBloc
-    extends Bloc<BillingReturnEvent, BillingReturnState> {
+    extends SignalBloc<BillingReturnEvent, BillingReturnState> {
   BillingReturnBloc({
     required this._getSubscription,
     this.pollInterval = const Duration(seconds: 2),
     this.maxAttempts = 15,
   }) : super(const BillingReturnState()) {
-    on<BillingReturnStarted>(_onStarted, transformer: droppable());
-    on<_BillingPollTick>(_onTick, transformer: droppable());
+    handle<BillingReturnStarted>(_onStarted, transformer: droppable());
+    handle<_BillingPollTick>(_onTick, transformer: droppable());
   }
 
   final GetSubscriptionUsecase _getSubscription;
@@ -58,21 +57,21 @@ final class BillingReturnBloc
       const NoParams(),
     );
     if (emit.isDone) return;
-    final int attempts = state.attempts + 1;
+    final int attempts = stateValue.attempts + 1;
     result.match(
       (Failure failure) =>
-          emit(state.copyWith(attempts: attempts, failure: failure)),
+          emit(stateValue.copyWith(attempts: attempts, failure: failure)),
       (SubscriptionEntity subscription) {
         final bool active =
             subscription.status == SubscriptionStatus.active &&
             subscription.entitlements.isPro;
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             attempts: attempts,
             subscription: subscription,
             status: active
                 ? BillingReturnStatus.active
-                : state.status == BillingReturnStatus.cancelled
+                : stateValue.status == BillingReturnStatus.cancelled
                 ? BillingReturnStatus.cancelled
                 : attempts >= maxAttempts
                 ? BillingReturnStatus.pending
@@ -83,13 +82,13 @@ final class BillingReturnBloc
       },
     );
     _timer?.cancel();
-    if (state.status == BillingReturnStatus.checking &&
+    if (stateValue.status == BillingReturnStatus.checking &&
         attempts < maxAttempts) {
       _timer = Timer(pollInterval, () {
         if (!isClosed) add(const _BillingPollTick());
       });
-    } else if (state.status == BillingReturnStatus.checking) {
-      emit(state.copyWith(status: BillingReturnStatus.pending));
+    } else if (stateValue.status == BillingReturnStatus.checking) {
+      emit(stateValue.copyWith(status: BillingReturnStatus.pending));
     }
   }
 

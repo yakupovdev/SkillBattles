@@ -6,11 +6,7 @@ import 'package:skill_battles/features/account/domain/entity/season_history_para
 import 'package:skill_battles/features/account/domain/repository/account_repository.dart';
 
 final class GetSeasonHistoryUsecase
-    implements
-        Usecase<
-          Future<Either<Failure, SeasonHistoryPageEntity>>,
-          SeasonHistoryParamsEntity
-        > {
+    implements Usecase<Future<Either<Failure, SeasonHistoryPageEntity>>, SeasonHistoryParamsEntity> {
   const GetSeasonHistoryUsecase(this._repository);
 
   final AccountRepository _repository;

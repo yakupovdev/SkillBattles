@@ -1,5 +1,6 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
@@ -15,7 +16,7 @@ import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dar
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_test_mode_badge.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
-import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/core/utils/extensions/route_extension.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
 import 'package:skill_battles/features/subscription/domain/usecases/get_subscription_usecase.dart';
 import 'package:skill_battles/features/subscription/presentation/bloc/billing_return_bloc/billing_return_bloc.dart';
@@ -24,16 +25,15 @@ import 'package:skill_battles/features/subscription/presentation/widgets/subscri
 /// Where Stripe returns (Paper: "25 Checkout return — verifying"). Shows the
 /// server-verified status; the query string (`success=true`) is never taken
 /// as proof of payment.
-final class BillingReturnScreen extends StatelessWidget
-    implements GoRouterWrapper {
+final class BillingReturnScreen extends StatelessComponent implements RouteWrapper {
   const BillingReturnScreen({required this.checkoutCancelled, super.key});
 
   final bool checkoutCancelled;
 
   @override
-  Widget wrappedRoute(BuildContext context) {
+  Component wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<BillingReturnBloc>(
+    return BlocSignalProvider<BillingReturnBloc>(
       create: (_) => BillingReturnBloc(
         getSubscription: dependencies.getDep<GetSubscriptionUsecase>(),
       )..add(BillingReturnStarted(checkoutCancelled: checkoutCancelled)),
@@ -42,202 +42,144 @@ final class BillingReturnScreen extends StatelessWidget
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocListener<BillingReturnBloc, BillingReturnState>(
-      listenWhen: (BillingReturnState previous, BillingReturnState current) =>
-          previous.status != current.status,
+  Component build(BuildContext context) {
+    return BlocSignalListener<BillingReturnBloc, BillingReturnState>(
+      listenWhen: (BillingReturnState previous, BillingReturnState current) => previous.status != current.status,
       listener: (BuildContext context, BillingReturnState state) =>
           context.read<AccountBloc>().add(const AccountRefreshRequested()),
       child: AppDesktopViewport(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 40),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: BlocBuilder<BillingReturnBloc, BillingReturnState>(
-                builder: (BuildContext context, BillingReturnState state) {
-                  final _ReturnCallout? callout = _ReturnCallout.forState(
-                    state,
-                  );
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 56,
-                    children: <Widget>[
-                      _Hero(state: state),
-                      ?callout,
-                    ],
-                  );
-                },
-              ),
+        child: div(classes: 'billing-return', <Component>[
+          div(classes: 'billing-return__column', <Component>[
+            BlocSignalBuilder<BillingReturnBloc, BillingReturnState>(
+              builder: (BuildContext context, BillingReturnState state) {
+                final _ReturnCallout? callout = _ReturnCallout.forState(state);
+                return div(classes: 'billing-return__content', <Component>[
+                  _Hero(state: state),
+                  ?callout,
+                ]);
+              },
             ),
-          ),
-        ),
+          ]),
+        ]),
       ),
     );
   }
 }
 
-final class _Hero extends StatelessWidget {
+final class _Hero extends StatelessComponent {
   const _Hero({required this.state});
 
   final BillingReturnState state;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final PlanCode? code = state.subscription?.planCode;
     // While Stripe has not confirmed, the account may still report Free.
-    final String plan = code == null || code == PlanCode.free
-        ? 'Pro'
-        : code.label;
-    final String? nickname = context.select(
-      (AccountBloc bloc) => bloc.state.account?.user.nickname,
-    );
-    final TextStyle bodyStyle = AppTextStyles.bodyXl.copyWith(
-      fontSize: 16,
-      height: 24 / 16,
-      color: AppColors.muted,
-    );
-    final bool waiting =
-        state.status == BillingReturnStatus.checking ||
-        state.status == BillingReturnStatus.pending;
+    final String plan = code == null || code == PlanCode.free ? 'Pro' : code.label;
+    final bool waiting = state.status == BillingReturnStatus.checking || state.status == BillingReturnStatus.pending;
+    final bool isActive = state.status == BillingReturnStatus.active;
     final String title = switch (state.status) {
-      BillingReturnStatus.checking ||
-      BillingReturnStatus.pending => 'Confirming your payment…',
+      BillingReturnStatus.checking || BillingReturnStatus.pending => 'Confirming your payment…',
       BillingReturnStatus.active => 'Payment confirmed',
       BillingReturnStatus.cancelled => 'Checkout was cancelled',
     };
-    final InlineSpan body = switch (state.status) {
-      BillingReturnStatus.checking || BillingReturnStatus.pending => TextSpan(
-        children: <InlineSpan>[
-          TextSpan(text: "We're waiting for Stripe to confirm $plan"),
-          if (nickname != null) ...<InlineSpan>[
-            const TextSpan(text: ' for '),
-            TextSpan(
-              text: nickname,
-              style: bodyStyle.copyWith(
-                color: AppColors.ink,
-                fontWeight: FontWeight.w600,
+    return div(classes: 'billing-hero', <Component>[
+      switch (state.status) {
+        BillingReturnStatus.checking || BillingReturnStatus.pending => const span(
+          classes: 'billing-hero__spinner',
+          attributes: <String, String>{'role': 'progressbar', 'aria-label': 'Confirming the payment'},
+          <Component>[],
+        ),
+        BillingReturnStatus.active => const AppSvgIcon(AppIcons.statusSuccess, width: 64, height: 64),
+        BillingReturnStatus.cancelled => const AppSvgIcon(AppIcons.statusError, width: 64, height: 64),
+      },
+      h1(classes: 'billing-hero__title', <Component>[Component.text(title)]),
+      div(
+        classes: 'billing-hero__body',
+        attributes: const <String, String>{'aria-live': 'polite'},
+        <Component>[
+          switch (state.status) {
+            BillingReturnStatus.checking || BillingReturnStatus.pending => _WaitingBody(plan: plan),
+            BillingReturnStatus.active => p(<Component>[
+              Component.text(
+                '$plan is active. Your full history, correct answers and '
+                'analytics are unlocked.',
               ),
-            ),
-          ],
-          const TextSpan(
-            text:
-                '. This usually takes a few seconds — you can keep this page '
-                'open or go play.',
-          ),
+            ]),
+            BillingReturnStatus.cancelled => const p(<Component>[
+              Component.text('Nothing was charged. You can choose a plan again anytime.'),
+            ]),
+          },
         ],
       ),
-      BillingReturnStatus.active => TextSpan(
-        text:
-            '$plan is active. Your full history, correct answers and '
-            'analytics are unlocked.',
-      ),
-      BillingReturnStatus.cancelled => const TextSpan(
-        text: 'Nothing was charged. You can choose a plan again anytime.',
-      ),
-    };
-    return Column(
-      spacing: 20,
-      children: <Widget>[
-        switch (state.status) {
-          BillingReturnStatus.checking ||
-          BillingReturnStatus.pending => const SizedBox.square(
-            dimension: 64,
-            child: Padding(
-              padding: EdgeInsets.all(2.5),
-              child: CircularProgressIndicator(
-                strokeWidth: 5,
-                strokeCap: StrokeCap.round,
-                color: AppColors.primary,
-                backgroundColor: AppColors.divider,
-              ),
-            ),
+      div(classes: 'billing-hero__actions', <Component>[
+        if (waiting)
+          AppButton(
+            label: 'Check again',
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.small,
+            onPressed: () =>
+                context.read<BillingReturnBloc>().add(const BillingReturnStarted(checkoutCancelled: false)),
+          )
+        else if (isActive)
+          AppButton(
+            label: 'Go play',
+            variant: AppButtonVariant.dark,
+            size: AppButtonSize.small,
+            onPressed: context.goHome,
+          )
+        else
+          AppButton(
+            label: 'See plans',
+            variant: AppButtonVariant.outline,
+            size: AppButtonSize.small,
+            onPressed: context.goPro,
           ),
-          BillingReturnStatus.active => const AppSvgIcon(
-            AppIcons.statusSuccess,
-            width: 64,
-            height: 64,
+        div(classes: 'billing-hero__link', <Component>[
+          AppTextLink(
+            label: isActive ? 'Subscription details' : 'Back to home',
+            style: AppTextStyles.bodyMd.combine(const Styles(color: AppColors.muted, fontWeight: FontWeight.w500)),
+            onPressed: isActive ? context.goPro : context.goHome,
           ),
-          BillingReturnStatus.cancelled => const AppSvgIcon(
-            AppIcons.statusError,
-            width: 64,
-            height: 64,
-          ),
-        },
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: AppTextStyles.headlineLg,
+        ]),
+      ]),
+      if (state.subscription?.isTestMode ?? true)
+        const div(classes: 'billing-hero__test', <Component>[
+          AppTestModeBadge(),
+          span(classes: 'billing-hero__test-text', <Component>[Component.text('No real money was charged.')]),
+        ]),
+    ]);
+  }
+}
+
+/// "We're waiting for Stripe to confirm Pro for `nickname`. …"
+final class _WaitingBody extends StatelessComponent {
+  const _WaitingBody({required this.plan});
+
+  final String plan;
+
+  @override
+  Component build(BuildContext context) {
+    return BlocSignalSelector<AccountBloc, AccountState, String?>(
+      selector: (AccountState state) => state.account?.user.nickname,
+      builder: (BuildContext context, String? nickname) => p(<Component>[
+        Component.text("We're waiting for Stripe to confirm $plan"),
+        if (nickname != null) ...<Component>[
+          const Component.text(' for '),
+          strong(classes: 'billing-hero__nickname', <Component>[Component.text(nickname)]),
+        ],
+        const Component.text(
+          '. This usually takes a few seconds — you can keep this page '
+          'open or go play.',
         ),
-        Semantics(
-          liveRegion: true,
-          child: Text.rich(body, textAlign: TextAlign.center, style: bodyStyle),
-        ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 12,
-          children: <Widget>[
-            if (waiting)
-              AppButton(
-                label: 'Check again',
-                variant: AppButtonVariant.outline,
-                size: AppButtonSize.small,
-                onPressed: () => context.read<BillingReturnBloc>().add(
-                  const BillingReturnStarted(checkoutCancelled: false),
-                ),
-              )
-            else if (state.status == BillingReturnStatus.active)
-              AppButton(
-                label: 'Go play',
-                variant: AppButtonVariant.dark,
-                size: AppButtonSize.small,
-                onPressed: context.goHome,
-              )
-            else
-              AppButton(
-                label: 'See plans',
-                variant: AppButtonVariant.outline,
-                size: AppButtonSize.small,
-                onPressed: context.goPro,
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: AppTextLink(
-                label: state.status == BillingReturnStatus.active
-                    ? 'Subscription details'
-                    : 'Back to home',
-                style: AppTextStyles.bodyMd.copyWith(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w500,
-                ),
-                onPressed: state.status == BillingReturnStatus.active
-                    ? context.goPro
-                    : context.goHome,
-              ),
-            ),
-          ],
-        ),
-        if (state.subscription?.isTestMode ?? true)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 8,
-            children: <Widget>[
-              const AppTestModeBadge(),
-              Text(
-                'No real money was charged.',
-                style: AppTextStyles.bodyXs.copyWith(color: AppColors.muted),
-              ),
-            ],
-          ),
-      ],
+      ]),
     );
   }
 }
 
 /// Outcome box under the hero: Pro is on, the payment did not go through,
 /// or Stripe is slow.
-final class _ReturnCallout extends StatelessWidget {
+final class _ReturnCallout extends StatelessComponent {
   const _ReturnCallout({
     required this.icon,
     required this.background,
@@ -259,9 +201,7 @@ final class _ReturnCallout extends StatelessWidget {
         background: AppColors.successCallout,
         titleColor: AppColors.successTitle,
         bodyColor: AppColors.successBody,
-        title: end == null
-            ? "You're Pro"
-            : "You're Pro until ${DisplayFormatters.date(end)}",
+        title: end == null ? "You're Pro" : "You're Pro until ${DisplayFormatters.date(end)}",
         message:
             'Old reviews, answers and analytics are unlocked now. Ratings '
             'stay exactly the same.',
@@ -303,55 +243,104 @@ final class _ReturnCallout extends StatelessWidget {
   final void Function(BuildContext context)? onAction;
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle bodyStyle = AppTextStyles.bodySm.copyWith(
-      height: 19 / 13,
-      color: bodyColor,
-    );
+  Component build(BuildContext context) {
     final String? label = actionLabel;
     final void Function(BuildContext context)? action = onAction;
-    return Semantics(
-      liveRegion: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 14,
-            children: <Widget>[
-              AppSvgIcon(icon, width: 22, height: 22),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 4,
-                  children: <Widget>[
-                    Text(
-                      title,
-                      style: AppTextStyles.buttonMd.copyWith(color: titleColor),
-                    ),
-                    Text(message, style: bodyStyle),
-                    if (label != null)
-                      AppTextLink(
-                        label: label,
-                        style: bodyStyle.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        onPressed: action == null
-                            ? null
-                            : () => action(context),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final Styles bodyStyle = AppTextStyles.bodySm.combine(Styles(color: bodyColor, lineHeight: const Unit.pixels(19)));
+    return div(
+      classes: 'billing-callout',
+      styles: Styles(backgroundColor: background),
+      attributes: const <String, String>{'aria-live': 'polite'},
+      <Component>[
+        AppSvgIcon(icon, width: 22, height: 22),
+        div(classes: 'billing-callout__text', <Component>[
+          span(classes: 'billing-callout__title', styles: Styles(color: titleColor), <Component>[
+            Component.text(title),
+          ]),
+          p(styles: bodyStyle, <Component>[Component.text(message)]),
+          if (label != null)
+            AppTextLink(
+              label: label,
+              style: bodyStyle.combine(const Styles(color: AppColors.primary, fontWeight: FontWeight.w500)),
+              onPressed: action == null ? null : () => action(context),
+            ),
+        ]),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get billingReturnScreenStyles => <StyleRule>[
+  css.keyframes('billing-spin', <String, Styles>{'to': const Styles(transform: Transform.rotate(Angle.deg(360)))}),
+  css('.billing-return').styles(
+    display: Display.flex,
+    padding: const Padding.symmetric(horizontal: Unit.pixels(64), vertical: Unit.pixels(40)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+  ),
+  css('.billing-return__column').styles(width: const Unit.percent(100), maxWidth: const Unit.pixels(560)),
+  css('.billing-return__content').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(56)),
+  ),
+  css('.billing-hero').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.center,
+    gap: const Gap.row(Unit.pixels(20)),
+  ),
+  css('.billing-hero__spinner').styles(
+    display: Display.block,
+    width: const Unit.pixels(59),
+    height: const Unit.pixels(59),
+    margin: const Margin.all(Unit.pixels(2.5)),
+    border: Border.all(color: AppColors.divider, width: const Unit.pixels(5)),
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    raw: const <String, String>{
+      'border-top-color': '#2B4BF2',
+      'animation': 'billing-spin 1s linear infinite',
+    },
+  ),
+  css('.billing-hero__title').combine(AppTextStyles.headlineLg).combine(const Styles(textAlign: TextAlign.center)),
+  css('.billing-hero__body')
+      .combine(AppTextStyles.bodyXl)
+      .combine(
+        const Styles(
+          color: AppColors.muted,
+          textAlign: TextAlign.center,
+          fontSize: Unit.pixels(16),
+          lineHeight: Unit.pixels(24),
+        ),
+      ),
+  css('.billing-hero__nickname').styles(color: AppColors.ink, fontWeight: FontWeight.w600),
+  css('.billing-hero__actions').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.billing-hero__link').styles(padding: const Padding.symmetric(horizontal: Unit.pixels(20))),
+  css('.billing-hero__test').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+  ),
+  css('.billing-hero__test-text').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.muted)),
+  css('.billing-callout').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(20)),
+    radius: const BorderRadius.circular(Unit.pixels(14)),
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(14)),
+  ),
+  css('.billing-callout__text').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.billing-callout__title').combine(AppTextStyles.buttonMd),
+];

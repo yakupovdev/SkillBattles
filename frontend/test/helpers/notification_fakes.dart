@@ -325,7 +325,7 @@ final class NotificationFixture {
   late DateTime now;
   late final NotificationBloc bloc;
 
-  NotificationState get state => bloc.state;
+  NotificationState get state => bloc.stateValue;
 
   /// Not awaited: under `testWidgets` the fake clock only moves on `pump`,
   /// so an awaited close would never complete in a tear-down.

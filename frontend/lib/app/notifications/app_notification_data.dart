@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/jaspr.dart' show VoidCallback;
 
 import 'package:skill_battles/core/presentation/widgets/app_notification_toast.dart';
 

@@ -1,10 +1,10 @@
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
+import 'package:skill_battles/app/router/app_navigation.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
@@ -12,15 +12,17 @@ import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_dropdown_field.dart';
+import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
+import 'package:skill_battles/core/presentation/widgets/app_form.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
 import 'package:skill_battles/core/presentation/widgets/app_logo.dart';
-import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_segmented_control.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_field.dart';
+import 'package:skill_battles/core/presentation/widgets/app_text_input.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
-import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/core/utils/extensions/route_extension.dart';
 import 'package:skill_battles/core/utils/form_validators.dart';
 import 'package:skill_battles/features/auth/domain/entity/age_check_params_entity.dart';
 import 'package:skill_battles/features/auth/domain/entity/age_check_result.dart';
@@ -38,13 +40,13 @@ import 'package:skill_battles/features/auth/presentation/widgets/auth_failure_me
 /// Sign-up first asks neutrally for the month and year of birth (and the
 /// day only when the user turns 13 this ET month), then the credentials.
 /// The server re-checks the age and has the final word.
-final class AuthScreen extends StatelessWidget implements GoRouterWrapper {
+final class AuthScreen extends StatelessComponent implements RouteWrapper {
   const AuthScreen({super.key});
 
   @override
-  Widget wrappedRoute(BuildContext context) {
+  Component wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<AuthBloc>(
+    return BlocSignalProvider<AuthBloc>(
       create: (_) => AuthBloc(
         checkAge: dependencies.getDep<CheckAgeUsecase>(),
         register: dependencies.getDep<RegisterUsecase>(),
@@ -55,210 +57,117 @@ final class AuthScreen extends StatelessWidget implements GoRouterWrapper {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return const AuthLayout(child: _AuthForm());
   }
 }
 
 /// The blue hero half and a form half; shared by the auth screens.
-final class AuthLayout extends StatelessWidget {
+///
+/// Both halves span the full window width and page height: the hero's blue
+/// background stretches with the taller of the two halves.
+final class AuthLayout extends StatelessComponent {
   const AuthLayout({required this.child, super.key});
 
-  final Widget child;
+  final Component child;
 
   @override
-  Widget build(BuildContext context) {
-    final double windowHeight = MediaQuery.sizeOf(context).height;
-
-    return Scaffold(
-      backgroundColor: AppColors.white,
-      body: AppDesktopViewport(
-        fullBleed: true,
-        // The blue half is painted behind the content, so both halves span
-        // the full window width and page height.
-        child: Stack(
-          children: <Widget>[
-            const Positioned.fill(
-              child: Row(
-                children: <Widget>[
-                  Expanded(child: _HeroBackground()),
-                  Expanded(child: SizedBox.shrink()),
-                ],
-              ),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(child: _HeroContent(minHeight: windowHeight)),
-                Expanded(
-                  child: _FormSide(minHeight: windowHeight, child: child),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+  Component build(BuildContext context) {
+    return AppDesktopViewport(
+      fullBleed: true,
+      child: div(classes: 'auth-layout', <Component>[
+        const _Hero(),
+        div(classes: 'auth-layout__form-side', <Component>[
+          div(classes: 'auth-layout__form', <Component>[child]),
+        ]),
+      ]),
     );
   }
 }
 
-final class _HeroBackground extends StatelessWidget {
-  const _HeroBackground();
+final class _Hero extends StatelessComponent {
+  const _Hero();
 
   @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: AppColors.primary,
-      child: ClipRect(
-        child: Stack(
-          children: <Widget>[
-            Positioned(
-              right: -120,
-              top: 120,
-              child: _Ring(size: 420, color: AppColors.onPrimaryRingOuter),
-            ),
-            Positioned(
-              right: -40,
-              top: 200,
-              child: _Ring(size: 260, color: AppColors.onPrimaryRingInner),
-            ),
-          ],
-        ),
-      ),
-    );
+  Component build(BuildContext context) {
+    return const section(classes: 'auth-hero', <Component>[
+      _Ring(size: 420, top: 120, right: -120, color: AppColors.onPrimaryRingOuter),
+      _Ring(size: 260, top: 200, right: -40, color: AppColors.onPrimaryRingInner),
+      AppLogo(variant: AppLogoVariant.onPrimary),
+      _HeroCopy(),
+      _HeroCaptions(),
+    ]);
   }
 }
 
-final class _HeroContent extends StatelessWidget {
-  const _HeroContent({required this.minHeight});
-
-  final double minHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: minHeight),
-      child: const Padding(
-        padding: EdgeInsets.symmetric(vertical: 56, horizontal: 64),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            AppLogo(variant: AppLogoVariant.onPrimary),
-            _HeroCopy(),
-            _HeroCaptions(),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-final class _Ring extends StatelessWidget {
-  const _Ring({required this.size, required this.color});
+final class _Ring extends StatelessComponent {
+  const _Ring({
+    required this.size,
+    required this.top,
+    required this.right,
+    required this.color,
+  });
 
   final double size;
+  final double top;
+  final double right;
   final Color color;
 
   @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 2),
-        ),
+  Component build(BuildContext context) {
+    return div(
+      classes: 'auth-hero__ring',
+      styles: Styles(
+        position: Position.absolute(top: Unit.pixels(top), right: Unit.pixels(right)),
+        width: Unit.pixels(size),
+        height: Unit.pixels(size),
+        border: Border.all(color: color, width: const Unit.pixels(2)),
       ),
+      attributes: const <String, String>{'aria-hidden': 'true'},
+      const <Component>[],
     );
   }
 }
 
-final class _HeroCopy extends StatelessWidget {
+final class _HeroCopy extends StatelessComponent {
   const _HeroCopy();
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 24,
-      children: <Widget>[
-        Text.rich(
-          TextSpan(
-            style: AppTextStyles.displayLg.copyWith(color: AppColors.white),
-            children: const <InlineSpan>[
-              TextSpan(text: 'Five minutes.\nOne opponent.\n'),
-              TextSpan(
-                text: 'Sharper mind.',
-                style: TextStyle(color: AppColors.accent),
-              ),
-            ],
-          ),
+  Component build(BuildContext context) {
+    return const div(classes: 'auth-hero__copy', <Component>[
+      h1(classes: 'auth-hero__title', <Component>[
+        Component.text('Five minutes.'),
+        br(),
+        Component.text('One opponent.'),
+        br(),
+        span(classes: 'auth-hero__title-accent', <Component>[Component.text('Sharper mind.')]),
+      ]),
+      p(classes: 'auth-hero__body', <Component>[
+        Component.text(
+          'Live one-on-one battles in SAT Math and Reading & Writing. Same '
+          'questions, same clock — learn from every round.',
         ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
-          child: Text(
-            'Live one-on-one battles in SAT Math and Reading & Writing. Same '
-            'questions, same clock — learn from every round.',
-            style: AppTextStyles.bodyXl.copyWith(
-              color: AppColors.onPrimaryBody,
-            ),
-          ),
-        ),
-      ],
-    );
+      ]),
+    ]);
   }
 }
 
-final class _HeroCaptions extends StatelessWidget {
+final class _HeroCaptions extends StatelessComponent {
   const _HeroCaptions();
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle style = AppTextStyles.monoBodySm.copyWith(
-      letterSpacing: 0.04 * 13,
-      color: AppColors.onPrimaryMuted,
-    );
-
-    return Wrap(
-      spacing: 32,
-      runSpacing: 8,
-      children: <Widget>[
-        Text('SAT MATH · 5 ROUNDS', style: style),
-        Text('SAT R&W · 5 ROUNDS', style: style),
-        Text('ELO RANKED · 27 TIERS', style: style),
-      ],
-    );
-  }
-}
-
-final class _FormSide extends StatelessWidget {
-  const _FormSide({required this.minHeight, required this.child});
-
-  final double minHeight;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: minHeight),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: child,
-          ),
-        ),
-      ),
-    );
+  Component build(BuildContext context) {
+    return const div(classes: 'auth-hero__captions', <Component>[
+      span(classes: 'auth-hero__caption', <Component>[Component.text('SAT MATH · 5 ROUNDS')]),
+      span(classes: 'auth-hero__caption', <Component>[Component.text('SAT R&W · 5 ROUNDS')]),
+      span(classes: 'auth-hero__caption', <Component>[Component.text('ELO RANKED · 27 TIERS')]),
+    ]);
   }
 }
 
 enum _AuthTab { signUp, logIn }
 
-final class _AuthForm extends StatefulWidget {
+final class _AuthForm extends StatefulComponent {
   const _AuthForm();
 
   @override
@@ -266,8 +175,8 @@ final class _AuthForm extends StatefulWidget {
 }
 
 final class _AuthFormState extends State<_AuthForm> {
-  late final GlobalKey<FormState> _ageFormKey;
-  late final GlobalKey<FormState> _formKey;
+  late final GlobalStateKey<AppFormState> _ageFormKey;
+  late final GlobalStateKey<AppFormState> _formKey;
   late final TextEditingController _dayController;
   late final TextEditingController _nicknameController;
   late final TextEditingController _emailController;
@@ -285,8 +194,8 @@ final class _AuthFormState extends State<_AuthForm> {
   @override
   void initState() {
     super.initState();
-    _ageFormKey = GlobalKey<FormState>();
-    _formKey = GlobalKey<FormState>();
+    _ageFormKey = GlobalStateKey<AppFormState>();
+    _formKey = GlobalStateKey<AppFormState>();
     _dayController = TextEditingController();
     _nicknameController = TextEditingController();
     _emailController = TextEditingController();
@@ -298,10 +207,13 @@ final class _AuthFormState extends State<_AuthForm> {
     _tab = _AuthTab.logIn;
     _month = null;
     _year = null;
+    // Typing the day is a birth edit (Flutter: the day field's onChanged).
+    _dayController.addListener(_onBirthEdited);
   }
 
   @override
   void dispose() {
+    _dayController.removeListener(_onBirthEdited);
     _dayController.dispose();
     _nicknameController.dispose();
     _emailController.dispose();
@@ -330,11 +242,9 @@ final class _AuthFormState extends State<_AuthForm> {
     );
   }
 
-  bool get _needsDay =>
-      context.read<AuthBloc>().state.ageResult == AgeCheckResult.needsDay;
+  bool get _needsDay => context.read<AuthBloc>().stateValue.ageResult == AgeCheckResult.needsDay;
 
   void _submitAge() {
-    FocusScope.of(context).unfocus();
     if (!(_ageFormKey.currentState?.validate() ?? false)) return;
     final AgeCheckParamsEntity? birth = _birth(withDay: _needsDay);
     if (birth == null) return;
@@ -354,23 +264,17 @@ final class _AuthFormState extends State<_AuthForm> {
   }
 
   void _submit() {
-    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final AuthBloc bloc = context.read<AuthBloc>();
     if (!_isSignUp) {
       bloc.add(
         AuthLoginSubmitted(
-          LoginParamsEntity(
-            email: _emailController.text,
-            password: _passwordController.text,
-          ),
+          LoginParamsEntity(email: _emailController.text, password: _passwordController.text),
         ),
       );
       return;
     }
-    final AgeCheckParamsEntity? birth = _birth(
-      withDay: _dayController.text.trim().isNotEmpty,
-    );
+    final AgeCheckParamsEntity? birth = _birth(withDay: _dayController.text.trim().isNotEmpty);
     if (birth == null) return;
     bloc.add(
       AuthRegisterSubmitted(
@@ -387,8 +291,8 @@ final class _AuthFormState extends State<_AuthForm> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<AuthBloc, AuthState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<AuthBloc, AuthState>(
       buildWhen: (AuthState previous, AuthState current) =>
           previous.ageResult != current.ageResult ||
           previous.submitStatus != current.submitStatus ||
@@ -412,53 +316,46 @@ final class _AuthFormState extends State<_AuthForm> {
               setState(() => _year = year);
               _onBirthEdited();
             },
-            onDayEdited: _onBirthEdited,
             result: state.ageResult,
             isSubmitting: state.submitStatus.isLoading,
             onSubmit: _submitAge,
             onLogIn: () => _onTabSelected(_AuthTab.logIn),
           );
         }
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 32,
-          children: <Widget>[
-            AppSegmentedControl<_AuthTab>(
-              segments: const <AppSegment<_AuthTab>>[
-                AppSegment<_AuthTab>(
-                  value: _AuthTab.signUp,
-                  label: 'Create account',
-                ),
-                AppSegment<_AuthTab>(value: _AuthTab.logIn, label: 'Log in'),
-              ],
-              selected: _tab,
-              onSelected: _onTabSelected,
-            ),
-            _CredentialsStep(
-              formKey: _formKey,
-              isSignUp: _isSignUp,
-              nicknameController: _nicknameController,
-              emailController: _emailController,
-              passwordController: _passwordController,
-              nicknameFocus: _nicknameFocus,
-              emailFocus: _emailFocus,
-              passwordFocus: _passwordFocus,
-              state: state,
-              onSubmit: _submit,
-              onEdited: () =>
-                  context.read<AuthBloc>().add(const AuthFieldEdited()),
-              onChangeBirth: _onBirthEdited,
-            ),
-          ],
-        );
+        return div(classes: 'auth-form', <Component>[
+          AppSegmentedControl<_AuthTab>(
+            segments: const <AppSegment<_AuthTab>>[
+              AppSegment<_AuthTab>(value: _AuthTab.signUp, label: 'Create account'),
+              AppSegment<_AuthTab>(value: _AuthTab.logIn, label: 'Log in'),
+            ],
+            selected: _tab,
+            onSelected: _onTabSelected,
+          ),
+          _CredentialsStep(
+            formKey: _formKey,
+            isSignUp: _isSignUp,
+            nicknameController: _nicknameController,
+            emailController: _emailController,
+            passwordController: _passwordController,
+            nicknameFocus: _nicknameFocus,
+            emailFocus: _emailFocus,
+            passwordFocus: _passwordFocus,
+            state: state,
+            onSubmit: _submit,
+            onChangeBirth: _onBirthEdited,
+          ),
+        ]);
       },
     );
   }
 }
 
+/// `onPressed` of a submit button: the click submits the enclosing
+/// [AppForm], whose `onSubmit` does the work (also for Enter in a field).
+void _submitsEnclosingForm() {}
+
 /// Eyebrow, title and muted subtitle at the top of every auth form.
-final class AuthHeading extends StatelessWidget {
+final class AuthHeading extends StatelessComponent {
   const AuthHeading({
     required this.title,
     required this.subtitle,
@@ -475,62 +372,42 @@ final class AuthHeading extends StatelessWidget {
   final double gap;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String? eyebrow = this.eyebrow;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: gap,
-      children: <Widget>[
+    return div(
+      classes: 'auth-heading',
+      styles: Styles(gap: Gap.row(Unit.pixels(gap))),
+      <Component>[
         if (eyebrow != null) AppEyebrow(eyebrow),
-        Text(title, style: AppTextStyles.headlineLg),
-        Text(
-          subtitle,
-          style: AppTextStyles.bodyLg.copyWith(
-            height: 22 / 15,
-            color: AppColors.muted,
-          ),
-        ),
+        h2(classes: 'auth-heading__title', <Component>[Component.text(title)]),
+        p(classes: 'auth-heading__subtitle', <Component>[Component.text(subtitle)]),
       ],
     );
   }
 }
 
 /// "Already have an account? Log in" — muted text with a blue link.
-final class _FooterLink extends StatelessWidget {
-  const _FooterLink({
-    required this.text,
-    required this.label,
-    required this.onPressed,
-  });
+final class _FooterLink extends StatelessComponent {
+  const _FooterLink({required this.text, required this.label, required this.onPressed});
 
   final String text;
   final String label;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        if (text.isNotEmpty)
-          Text(
-            '$text ',
-            style: AppTextStyles.bodySm.copyWith(color: AppColors.muted),
-          ),
-        AppTextLink(
-          label: label,
-          style: AppTextStyles.bodySm.copyWith(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w500,
-          ),
-          onPressed: onPressed,
-        ),
-      ],
-    );
+  Component build(BuildContext context) {
+    return div(classes: 'auth-footer-link', <Component>[
+      if (text.isNotEmpty) span(classes: 'auth-footer-link__text', <Component>[Component.text('$text ')]),
+      AppTextLink(
+        label: label,
+        style: AppTextStyles.bodySm.combine(const Styles(color: AppColors.primary, fontWeight: FontWeight.w500)),
+        onPressed: onPressed,
+      ),
+    ]);
   }
 }
 
-final class _AgeStep extends StatelessWidget {
+final class _AgeStep extends StatelessComponent {
   const _AgeStep({
     required this.formKey,
     required this.dayController,
@@ -539,21 +416,19 @@ final class _AgeStep extends StatelessWidget {
     required this.year,
     required this.onMonthChanged,
     required this.onYearChanged,
-    required this.onDayEdited,
     required this.result,
     required this.isSubmitting,
     required this.onSubmit,
     required this.onLogIn,
   });
 
-  final GlobalKey<FormState> formKey;
+  final GlobalStateKey<AppFormState> formKey;
   final TextEditingController dayController;
   final FocusNode dayFocus;
   final int? month;
   final int? year;
   final ValueChanged<int?> onMonthChanged;
   final ValueChanged<int?> onYearChanged;
-  final VoidCallback onDayEdited;
   final AgeCheckResult? result;
   final bool isSubmitting;
   final VoidCallback onSubmit;
@@ -581,258 +456,148 @@ final class _AgeStep extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Form(
+  Component build(BuildContext context) {
+    return AppForm(
       key: formKey,
       autovalidateMode: AutovalidateMode.onUserInteractionIfError,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 32,
-        children: <Widget>[
-          const AuthHeading(
-            eyebrow: 'Step 1 of 2 — About you',
-            gap: 12,
-            title: 'When were you born?',
-            subtitle:
-                "We only use this to confirm eligibility. It's never shown "
-                'to opponents or on leaderboards.',
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 20,
-            children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12,
-                children: <Widget>[
-                  Expanded(
-                    flex: 14,
-                    child: AppDropdownField<int>(
-                      label: 'Month',
-                      hintText: 'Month',
-                      items: List<int>.generate(12, (int i) => i + 1),
-                      labelOf: (int value) => _months[value - 1],
-                      value: month,
-                      validator: FormValidators.birthMonth,
-                      onChanged: onMonthChanged,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 10,
-                    child: AppDropdownField<int>(
-                      label: 'Year',
-                      hintText: 'YYYY',
-                      items: _years(),
-                      labelOf: (int value) => '$value',
-                      value: year,
-                      style: AppTextStyles.bodyLg.copyWith(
-                        fontFamily: AppFonts.mono,
-                      ),
-                      validator: (int? value) =>
-                          FormValidators.birthYear(value?.toString()),
-                      onChanged: onYearChanged,
-                    ),
-                  ),
-                ],
+      onSubmit: onSubmit,
+      child: div(classes: 'auth-form', <Component>[
+        const AuthHeading(
+          eyebrow: 'Step 1 of 2 — About you',
+          gap: 12,
+          title: 'When were you born?',
+          subtitle:
+              "We only use this to confirm eligibility. It's never shown "
+              'to opponents or on leaderboards.',
+        ),
+        div(classes: 'auth-form__fields auth-form__fields--age', <Component>[
+          div(classes: 'auth-birth', <Component>[
+            div(classes: 'auth-birth__month', <Component>[
+              AppDropdownField<int>(
+                label: 'Month',
+                hintText: 'Month',
+                items: List<int>.generate(12, (int i) => i + 1),
+                labelOf: (int value) => _months[value - 1],
+                value: month,
+                validator: FormValidators.birthMonth,
+                onChanged: onMonthChanged,
               ),
-              if (result == AgeCheckResult.needsDay)
-                _DayPanel(
-                  controller: dayController,
-                  focusNode: dayFocus,
-                  onEdited: onDayEdited,
-                  onSubmit: onSubmit,
-                ),
-              if (result == AgeCheckResult.invalidDate)
-                const AppInlineError('Enter a real date in the past.'),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 16,
-            children: <Widget>[
-              AppButton(
-                label: 'Continue',
-                variant: AppButtonVariant.dark,
-                expand: true,
-                trailingIcon: const AppSvgIcon(
-                  AppIcons.arrowSmall,
-                  width: 16,
-                  height: 16,
-                ),
-                onPressed: isSubmitting ? null : onSubmit,
+            ]),
+            div(classes: 'auth-birth__year', <Component>[
+              AppDropdownField<int>(
+                label: 'Year',
+                hintText: 'YYYY',
+                items: _years(),
+                labelOf: (int value) => '$value',
+                value: year,
+                style: AppTextStyles.bodyLg.combine(const Styles(fontFamily: AppFonts.mono)),
+                validator: (int? value) => FormValidators.birthYear(value?.toString()),
+                onChanged: onYearChanged,
               ),
-              _FooterLink(
-                text: 'Already have an account?',
-                label: 'Log in',
-                onPressed: onLogIn,
-              ),
-            ],
+            ]),
+          ]),
+          if (result == AgeCheckResult.needsDay) _DayPanel(controller: dayController, focusNode: dayFocus),
+          if (result == AgeCheckResult.invalidDate) const AppInlineError('Enter a real date in the past.'),
+        ]),
+        div(classes: 'auth-form__actions', <Component>[
+          AppButton(
+            label: 'Continue',
+            variant: AppButtonVariant.dark,
+            expand: true,
+            type: ButtonType.submit,
+            trailingIcon: const AppSvgIcon(AppIcons.arrowSmall, width: 16, height: 16),
+            onPressed: isSubmitting ? null : _submitsEnclosingForm,
           ),
-        ],
-      ),
+          _FooterLink(text: 'Already have an account?', label: 'Log in', onPressed: onLogIn),
+        ]),
+      ]),
     );
   }
 }
 
 /// The blue note that asks for the day when the user turns 13 this month.
-final class _DayPanel extends StatelessWidget {
-  const _DayPanel({
-    required this.controller,
-    required this.focusNode,
-    required this.onEdited,
-    required this.onSubmit,
-  });
+///
+/// Enter in the day field submits the age form.
+final class _DayPanel extends StatelessComponent {
+  const _DayPanel({required this.controller, required this.focusNode});
 
   final TextEditingController controller;
   final FocusNode focusNode;
-  final VoidCallback onEdited;
-  final VoidCallback onSubmit;
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle labelStyle = AppTextStyles.bodySm.copyWith(
-      fontWeight: FontWeight.w500,
-    );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.primarySurface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primaryLine),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 10,
-          children: <Widget>[
-            Text(
-              'Please add the day of your birthday, too.',
-              style: AppTextStyles.bodySm.copyWith(
-                color: AppColors.primaryInk,
-                height: 19 / 13,
-              ),
-            ),
-            MergeSemantics(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 12,
-                children: <Widget>[
-                  SizedBox(
-                    width: 40,
-                    height: 44,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Day', style: labelStyle),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 96,
-                    child: TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      validator: FormValidators.birthDay,
-                      keyboardType: TextInputType.number,
-                      textInputAction: TextInputAction.done,
-                      inputFormatters: <TextInputFormatter>[
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(2),
-                      ],
-                      onChanged: (_) => onEdited(),
-                      onFieldSubmitted: (_) => onSubmit(),
-                      style: AppTextStyles.bodyLg.copyWith(
-                        fontFamily: AppFonts.mono,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'DD',
-                        filled: true,
-                        fillColor: AppColors.white,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 13,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 44,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Required',
-                        style: AppTextStyles.bodySm.copyWith(
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+  Component build(BuildContext context) {
+    return div(classes: 'auth-day', <Component>[
+      const p(classes: 'auth-day__note', <Component>[
+        Component.text('Please add the day of your birthday, too.'),
+      ]),
+      div(classes: 'auth-day__row', <Component>[
+        // The field keeps its own (visually hidden) "Day" label for
+        // assistive technology; this one is the visible caption.
+        const span(
+          classes: 'auth-day__label',
+          attributes: <String, String>{'aria-hidden': 'true'},
+          <Component>[Component.text('Day')],
         ),
-      ),
-    );
+        div(classes: 'auth-day__field', <Component>[
+          AppTextField(
+            label: 'Day',
+            controller: controller,
+            focusNode: focusNode,
+            validator: FormValidators.birthDay,
+            hintText: 'DD',
+            textInputAction: TextInputAction.done,
+            autofillHints: const <String>['bday-day'],
+            inputFormatters: <TextInputFormatter>[
+              FilteringTextInputFormatter.digitsOnly,
+              const LengthLimitingTextInputFormatter(2),
+            ],
+          ),
+        ]),
+        const span(classes: 'auth-day__required', <Component>[Component.text('Required')]),
+      ]),
+    ]);
   }
 }
 
 /// Shown when the birth date is under 13 (client check or the server's
 /// AGE_RESTRICTED). Nothing typed is kept.
-final class _RestrictedStep extends StatelessWidget {
+final class _RestrictedStep extends StatelessComponent {
   const _RestrictedStep({required this.onRestart});
 
   final VoidCallback onRestart;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 32,
-      children: <Widget>[
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            width: 56,
-            height: 56,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const AppSvgIcon(AppIcons.alert, width: 26, height: 26),
+  Component build(BuildContext context) {
+    return div(classes: 'auth-form', <Component>[
+      const div(classes: 'auth-restricted__icon', <Component>[
+        AppSvgIcon(AppIcons.alert, width: 26, height: 26),
+      ]),
+      const div(classes: 'auth-restricted__copy', <Component>[
+        h2(classes: 'auth-heading__title', <Component>[Component.text('We can’t create your account yet')]),
+        p(classes: 'auth-heading__subtitle', <Component>[
+          Component.text(
+            'SkillBattles is available to players aged 13 and up. Nothing '
+            'you entered has been saved.',
           ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 12,
-          children: <Widget>[
-            const Text(
-              'We can’t create your account yet',
-              style: AppTextStyles.headlineLg,
-            ),
-            Text(
-              'SkillBattles is available to players aged 13 and up. Nothing '
-              'you entered has been saved.',
-              style: AppTextStyles.bodyLg.copyWith(
-                height: 22 / 15,
-                color: AppColors.muted,
-              ),
-            ),
-          ],
-        ),
-        AppButton(
-          label: 'Back to start',
-          variant: AppButtonVariant.outline,
-          expand: true,
-          onPressed: onRestart,
-        ),
-      ],
-    );
+        ]),
+      ]),
+      AppButton(
+        label: 'Back to start',
+        variant: AppButtonVariant.outline,
+        expand: true,
+        onPressed: onRestart,
+      ),
+    ]);
   }
 }
 
-final class _CredentialsStep extends StatelessWidget {
+/// Nickname (sign-up only), email and password in one `<form>`.
+///
+/// Password managers: the email is the account's login, so it is the
+/// `username` on log-in and `email` on sign-up (where the nickname is only
+/// a `nickname`, never the saved username); the password is
+/// `current-password` / `new-password`.
+final class _CredentialsStep extends StatelessComponent {
   const _CredentialsStep({
     required this.formKey,
     required this.isSignUp,
@@ -844,11 +609,10 @@ final class _CredentialsStep extends StatelessWidget {
     required this.passwordFocus,
     required this.state,
     required this.onSubmit,
-    required this.onEdited,
     required this.onChangeBirth,
   });
 
-  final GlobalKey<FormState> formKey;
+  final GlobalStateKey<AppFormState> formKey;
   final bool isSignUp;
   final TextEditingController nicknameController;
   final TextEditingController emailController;
@@ -858,109 +622,244 @@ final class _CredentialsStep extends StatelessWidget {
   final FocusNode passwordFocus;
   final AuthState state;
   final VoidCallback onSubmit;
-  final VoidCallback onEdited;
   final VoidCallback onChangeBirth;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final Failure? failure = state.failure;
     final bool isLoading = state.submitStatus.isLoading;
 
-    return Form(
+    return AppForm(
       key: formKey,
       autovalidateMode: AutovalidateMode.onUserInteractionIfError,
+      onSubmit: onSubmit,
       // A new subtree per tab clears validation errors; the controllers keep
       // what was typed.
-      child: KeyedSubtree(
-        key: ValueKey<bool>(isSignUp),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 32,
-          children: <Widget>[
-            AuthHeading(
-              title: isSignUp ? 'Join the arena' : 'Welcome back',
-              subtitle: isSignUp
-                  ? 'Both ratings start at 1000. You can play right away.'
-                  : 'Log in to keep your ratings and streaks.',
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
-              children: <Widget>[
-                if (isSignUp)
-                  AppTextField(
-                    label: 'Nickname',
-                    controller: nicknameController,
-                    focusNode: nicknameFocus,
-                    validator: FormValidators.nickname,
-                    errorText: state.fieldError('nickname'),
-                    textInputAction: TextInputAction.next,
-                    autofillHints: const <String>[AutofillHints.newUsername],
-                    onFieldSubmitted: (_) => emailFocus.requestFocus(),
-                  ),
-                AppTextField(
-                  label: 'Email',
-                  controller: emailController,
-                  focusNode: emailFocus,
-                  validator: FormValidators.email,
-                  errorText: state.fieldError('email'),
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  autofillHints: const <String>[AutofillHints.email],
-                  onFieldSubmitted: (_) => passwordFocus.requestFocus(),
-                ),
-                AppTextField(
-                  label: 'Password',
-                  controller: passwordController,
-                  focusNode: passwordFocus,
-                  validator: FormValidators.password,
-                  errorText: state.fieldError('password'),
-                  helperText: isSignUp ? 'At least 8 characters' : null,
-                  obscureText: true,
-                  textInputAction: TextInputAction.done,
-                  autofillHints: <String>[
-                    if (isSignUp)
-                      AutofillHints.newPassword
-                    else
-                      AutofillHints.password,
-                  ],
-                  onFieldSubmitted: (_) => onSubmit(),
-                ),
-                if (failure != null) AppInlineError(failure.authMessage),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
-              children: <Widget>[
-                AppButton(
-                  label: isLoading
-                      ? 'Please wait…'
-                      : isSignUp
-                      ? 'Create account & play'
-                      : 'Log in & play',
-                  variant: AppButtonVariant.dark,
-                  expand: true,
-                  onPressed: isLoading ? null : onSubmit,
-                ),
-                if (isSignUp)
-                  _FooterLink(
-                    text: 'Wrong birth date?',
-                    label: 'Change it',
-                    onPressed: onChangeBirth,
-                  )
-                else
-                  _FooterLink(
-                    text: '',
-                    label: 'Forgot password?',
-                    onPressed: () =>
-                        context.goNamed(AppRoutes.forgotPassword.name),
-                  ),
-              ],
-            ),
-          ],
+      child: div(key: ValueKey<bool>(isSignUp), classes: 'auth-form', <Component>[
+        AuthHeading(
+          title: isSignUp ? 'Join the arena' : 'Welcome back',
+          subtitle: isSignUp
+              ? 'Both ratings start at 1000. You can play right away.'
+              : 'Log in to keep your ratings and streaks.',
         ),
-      ),
+        div(classes: 'auth-form__fields', <Component>[
+          if (isSignUp)
+            AppTextField(
+              label: 'Nickname',
+              controller: nicknameController,
+              focusNode: nicknameFocus,
+              validator: FormValidators.nickname,
+              errorText: state.fieldError('nickname'),
+              textInputAction: TextInputAction.next,
+              autofillHints: const <String>[AutofillHints.nickname],
+              name: 'nickname',
+              onFieldSubmitted: (_) => emailFocus.requestFocus(),
+            ),
+          AppTextField(
+            label: 'Email',
+            controller: emailController,
+            focusNode: emailFocus,
+            validator: FormValidators.email,
+            errorText: state.fieldError('email'),
+            keyboardType: InputType.email,
+            textInputAction: TextInputAction.next,
+            autofillHints: <String>[if (isSignUp) AutofillHints.email else AutofillHints.username],
+            name: 'email',
+            onFieldSubmitted: (_) => passwordFocus.requestFocus(),
+          ),
+          // No onFieldSubmitted: Enter submits the form natively, which is
+          // what password managers watch for.
+          AppTextField(
+            label: 'Password',
+            controller: passwordController,
+            focusNode: passwordFocus,
+            validator: FormValidators.password,
+            errorText: state.fieldError('password'),
+            helperText: isSignUp ? 'At least 8 characters' : null,
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            autofillHints: <String>[if (isSignUp) AutofillHints.newPassword else AutofillHints.password],
+            name: 'password',
+          ),
+          if (failure != null) AppInlineError(failure.authMessage),
+        ]),
+        div(classes: 'auth-form__actions', <Component>[
+          AppButton(
+            label: isLoading
+                ? 'Please wait…'
+                : isSignUp
+                ? 'Create account & play'
+                : 'Log in & play',
+            variant: AppButtonVariant.dark,
+            expand: true,
+            type: ButtonType.submit,
+            onPressed: isLoading ? null : _submitsEnclosingForm,
+          ),
+          if (isSignUp)
+            _FooterLink(text: 'Wrong birth date?', label: 'Change it', onPressed: onChangeBirth)
+          else
+            _FooterLink(
+              text: '',
+              label: 'Forgot password?',
+              onPressed: () => context.goNamed(AppRoutes.forgotPassword.name),
+            ),
+        ]),
+      ]),
     );
   }
 }
+
+@css
+List<StyleRule> get authScreenStyles => <StyleRule>[
+  css('.auth-layout').styles(
+    display: Display.flex,
+    alignItems: AlignItems.stretch,
+    backgroundColor: AppColors.white,
+  ),
+  css('.auth-hero').styles(
+    display: Display.flex,
+    position: const Position.relative(),
+    minWidth: Unit.zero,
+    padding: const Padding.symmetric(horizontal: Unit.pixels(64), vertical: Unit.pixels(56)),
+    overflow: Overflow.hidden,
+    flexDirection: FlexDirection.column,
+    justifyContent: JustifyContent.spaceBetween,
+    alignItems: AlignItems.start,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+    backgroundColor: AppColors.primary,
+  ),
+  css('.auth-hero > :not(.auth-hero__ring)').styles(position: const Position.relative()),
+  css('.auth-hero__ring').styles(
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    pointerEvents: PointerEvents.none,
+  ),
+  css('.auth-hero__copy').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(24)),
+  ),
+  css('.auth-hero__title').combine(AppTextStyles.displayLg).combine(const Styles(color: AppColors.white)),
+  css('.auth-hero__title-accent').styles(color: AppColors.accent),
+  css('.auth-hero__body')
+      .styles(maxWidth: const Unit.pixels(460))
+      .combine(AppTextStyles.bodyXl)
+      .combine(const Styles(color: AppColors.onPrimaryBody)),
+  css('.auth-hero__captions').styles(
+    display: Display.flex,
+    flexWrap: FlexWrap.wrap,
+    gap: const Gap(row: Unit.pixels(8), column: Unit.pixels(32)),
+  ),
+  css('.auth-hero__caption')
+      .combine(AppTextStyles.monoBodySm)
+      .combine(const Styles(color: AppColors.onPrimaryMuted, letterSpacing: Unit.em(0.04))),
+  css('.auth-layout__form-side').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    padding: const Padding.all(Unit.pixels(32)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.auth-layout__form').styles(width: const Unit.percent(100), maxWidth: const Unit.pixels(400)),
+  css('.auth-form').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(32)),
+  ),
+  css('.auth-form__fields').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(16)),
+  ),
+  css('.auth-form__fields--age').styles(gap: const Gap.row(Unit.pixels(20))),
+  css('.auth-form__actions').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(16)),
+  ),
+  css('.auth-heading').styles(display: Display.flex, flexDirection: FlexDirection.column),
+  css('.auth-heading__title').combine(AppTextStyles.headlineLg),
+  css('.auth-heading__subtitle')
+      .combine(AppTextStyles.bodyLg)
+      .combine(const Styles(color: AppColors.muted, lineHeight: Unit.pixels(22))),
+  css('.auth-footer-link').styles(
+    display: Display.flex,
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+  ),
+  css('.auth-footer-link__text')
+      .styles(whiteSpace: WhiteSpace.preWrap)
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted)),
+  css('.auth-birth').styles(
+    display: Display.flex,
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.auth-birth__month').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 14, shrink: 1, basis: Unit.zero),
+  ),
+  css('.auth-birth__year').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 10, shrink: 1, basis: Unit.zero),
+  ),
+  css('.auth-day').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(16)),
+    border: Border.all(color: AppColors.primaryLine, width: const Unit.pixels(1)),
+    radius: const BorderRadius.circular(Unit.pixels(12)),
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(10)),
+    backgroundColor: AppColors.primarySurface,
+  ),
+  css('.auth-day__note')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.primaryInk, lineHeight: Unit.pixels(19))),
+  css('.auth-day__row').styles(
+    display: Display.flex,
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.auth-day__label')
+      .styles(
+        display: Display.flex,
+        width: const Unit.pixels(40),
+        height: const Unit.pixels(44),
+        alignItems: AlignItems.center,
+        flex: const Flex(shrink: 0),
+      )
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(fontWeight: FontWeight.w500)),
+  css('.auth-day__required')
+      .styles(display: Display.flex, height: const Unit.pixels(44), alignItems: AlignItems.center)
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted)),
+  css('.auth-day__field').styles(width: const Unit.pixels(96), flex: const Flex(shrink: 0)),
+  // The field's own label stays readable by assistive technology only.
+  css('.auth-day__field .app-text-field__label').styles(
+    position: const Position.absolute(),
+    width: const Unit.pixels(1),
+    height: const Unit.pixels(1),
+    overflow: Overflow.hidden,
+    whiteSpace: WhiteSpace.noWrap,
+    raw: const <String, String>{'clip-path': 'inset(50%)'},
+  ),
+  css('.auth-day__field .app-text-field').styles(gap: const Gap.row(Unit.pixels(4))),
+  css('.auth-day__field .app-text-field__box').styles(height: const Unit.pixels(44)),
+  css('.auth-day__field .app-text-field__input').styles(fontFamily: AppFonts.mono),
+  css('.auth-restricted__icon').styles(
+    display: Display.flex,
+    width: const Unit.pixels(56),
+    height: const Unit.pixels(56),
+    radius: const BorderRadius.circular(Unit.pixels(16)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    backgroundColor: AppColors.surface,
+  ),
+  css('.auth-restricted__copy').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(12)),
+  ),
+];

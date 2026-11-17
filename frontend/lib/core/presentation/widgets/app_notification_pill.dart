@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_shadows.dart';
@@ -6,7 +7,7 @@ import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 
 /// A small outlined pill with a dot that reopens something the player hid.
-final class AppNotificationPill extends StatelessWidget {
+final class AppNotificationPill extends StatelessComponent {
   const AppNotificationPill({
     required this.label,
     required this.onPressed,
@@ -17,50 +18,36 @@ final class AppNotificationPill extends StatelessWidget {
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
-    const StadiumBorder shape = StadiumBorder(
-      side: BorderSide(color: AppColors.primary, width: 1.5),
-    );
-    return Semantics(
-      button: true,
-      label: label,
-      excludeSemantics: true,
-      child: DecoratedBox(
-        decoration: const ShapeDecoration(
-          shape: StadiumBorder(),
-          shadows: AppShadows.overlay,
-        ),
-        child: Material(
-          color: AppColors.white,
-          shape: shape,
-          child: InkWell(
-            onTap: onPressed,
-            customBorder: shape,
-            hoverColor: AppColors.primarySurface,
-            focusColor: AppColors.primarySurface,
-            child: SizedBox(
-              height: 34,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  spacing: 8,
-                  children: <Widget>[
-                    const AppDot(color: AppColors.primary),
-                    Text(
-                      label,
-                      style: AppTextStyles.bodySm.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+  Component build(BuildContext context) {
+    return button(
+      type: ButtonType.button,
+      classes: 'app-notification-pill',
+      onClick: onPressed,
+      <Component>[
+        const AppDot(color: AppColors.primary),
+        span(classes: 'app-notification-pill__label', <Component>[Component.text(label)]),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appNotificationPillStyles => <StyleRule>[
+  css('.app-notification-pill').styles(
+    display: Display.inlineFlex,
+    height: const Unit.pixels(34),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(14)),
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(1.5)),
+    radius: const BorderRadius.circular(Unit.pixels(999)),
+    shadow: AppShadows.overlay,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+    backgroundColor: AppColors.white,
+  ),
+  css('.app-notification-pill:hover, .app-notification-pill:focus-visible').styles(
+    backgroundColor: AppColors.primarySurface,
+  ),
+  css('.app-notification-pill__label')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.primary, fontWeight: FontWeight.w600, whiteSpace: WhiteSpace.noWrap)),
+];

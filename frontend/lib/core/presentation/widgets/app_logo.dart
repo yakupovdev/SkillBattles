@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
@@ -15,37 +16,39 @@ enum AppLogoVariant {
 }
 
 /// The SkillBattles mark (two chevrons facing each other) with the wordmark.
-final class AppLogo extends StatelessWidget {
+final class AppLogo extends StatelessComponent {
   const AppLogo({this.variant = AppLogoVariant.onLight, super.key});
 
   final AppLogoVariant variant;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final bool onPrimary = variant == AppLogoVariant.onPrimary;
     final double markSize = onPrimary ? 32 : 28;
-    final TextStyle wordmarkStyle = onPrimary
-        ? AppTextStyles.titleMd.copyWith(
-            color: AppColors.white,
-            letterSpacing: -0.01 * 20,
-          )
-        : AppTextStyles.titleSm;
-
-    return Semantics(
-      label: 'SkillBattles',
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 10,
-        children: <Widget>[
-          AppSvgIcon(
-            onPrimary ? AppIcons.logoMarkInverse : AppIcons.logoMark,
-            width: markSize,
-            height: markSize,
-          ),
-          Text('SkillBattles', style: wordmarkStyle),
-        ],
-      ),
+    return div(
+      classes: 'app-logo',
+      attributes: const <String, String>{'role': 'img', 'aria-label': 'SkillBattles'},
+      <Component>[
+        AppSvgIcon(onPrimary ? AppIcons.logoMarkInverse : AppIcons.logoMark, width: markSize, height: markSize),
+        span(
+          classes: onPrimary ? 'app-logo__wordmark app-logo__wordmark--on-primary' : 'app-logo__wordmark',
+          attributes: const <String, String>{'aria-hidden': 'true'},
+          const <Component>[Component.text('SkillBattles')],
+        ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appLogoStyles => <StyleRule>[
+  css('.app-logo').styles(
+    display: Display.inlineFlex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(10)),
+  ),
+  css('.app-logo__wordmark').combine(AppTextStyles.titleSm).styles(whiteSpace: WhiteSpace.noWrap),
+  css('.app-logo__wordmark--on-primary')
+      .combine(AppTextStyles.titleMd)
+      .combine(const Styles(color: AppColors.white, letterSpacing: Unit.em(-0.01))),
+];

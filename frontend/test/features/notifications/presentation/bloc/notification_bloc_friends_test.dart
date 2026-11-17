@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
@@ -13,6 +13,7 @@ import 'package:skill_battles/features/friends/domain/entity/relationship_entity
 import 'package:skill_battles/features/friends/domain/entity/relationship_status.dart';
 import 'package:skill_battles/features/notifications/presentation/bloc/notification_bloc/notification_bloc.dart';
 
+import '../../../../helpers/fake_timers.dart';
 import '../../../../helpers/friends_fakes.dart';
 import '../../../../helpers/notification_fakes.dart';
 
@@ -30,14 +31,14 @@ const ActivityEntity _roomActivity = ActivityEntity(
   resourceKind: ActivityResourceKind.duel,
 );
 
-Future<void> _flush(WidgetTester tester) async {
+Future<void> _flush(FakeTimers tester) async {
   for (int i = 0; i < 10; i++) {
     await tester.pump();
   }
 }
 
 Future<void> _advance(
-  WidgetTester tester,
+  FakeTimers tester,
   FriendsNotificationFixture f,
   Duration by,
 ) async {
@@ -47,7 +48,7 @@ Future<void> _advance(
 }
 
 Future<FriendsNotificationFixture> _started(
-  WidgetTester tester, {
+  FakeTimers tester, {
   void Function(FriendsNotificationFixture f)? setUp,
 }) async {
   final FriendsNotificationFixture f = FriendsNotificationFixture();
@@ -73,7 +74,7 @@ void _incomingInvitations(
 }
 
 Future<void> _pushRequest(
-  WidgetTester tester,
+  FakeTimers tester,
   FriendsNotificationFixture f,
   RelationshipEntity r,
 ) async {
@@ -82,7 +83,7 @@ Future<void> _pushRequest(
 }
 
 Future<void> _pushInvitation(
-  WidgetTester tester,
+  FakeTimers tester,
   FriendsNotificationFixture f,
   DuelInvitationEntity i,
 ) async {
@@ -109,8 +110,8 @@ int _noticeCount(FriendsNotificationFixture f, NotificationNoticeType type) =>
 
 void main() {
   group('NotificationBloc friend requests', () {
-    testWidgets('recovered incoming PENDING request becomes a prompt', (
-      WidgetTester tester,
+    fakeTimersTest('recovered incoming PENDING request becomes a prompt', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -125,8 +126,8 @@ void main() {
       expect(f.repo.requestsCalls.single.size, 20);
     });
 
-    testWidgets('stale and equal versions are ignored, newer is applied', (
-      WidgetTester tester,
+    fakeTimersTest('stale and equal versions are ignored, newer is applied', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -158,8 +159,8 @@ void main() {
       expect(_requestOf(f, 'r1').requester, friendBoris);
     });
 
-    testWidgets('a terminal push removes the card and leaves a tombstone', (
-      WidgetTester tester,
+    fakeTimersTest('a terminal push removes the card and leaves a tombstone', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -190,8 +191,8 @@ void main() {
       expect(f.state.item(_requestId('r2')), isNotNull);
     });
 
-    testWidgets('a push that arrives during recovery and is newer than the '
-        'snapshot wins', (WidgetTester tester) async {
+    fakeTimersTest('a push that arrives during recovery and is newer than the '
+        'snapshot wins', (FakeTimers tester) async {
       final Completer<Either<Failure, dynamic>> snapshotAnswer =
           Completer<Either<Failure, dynamic>>();
       final FriendsNotificationFixture f = await _started(
@@ -215,8 +216,8 @@ void main() {
       expect(f.state.item(_requestId('r1')), isNull);
     });
 
-    testWidgets('a push that arrives during recovery and is older than the '
-        'snapshot is dropped', (WidgetTester tester) async {
+    fakeTimersTest('a push that arrives during recovery and is older than the '
+        'snapshot is dropped', (FakeTimers tester) async {
       final Completer<void> snapshotAnswer = Completer<void>();
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -244,8 +245,8 @@ void main() {
       expect(_requestOf(f, 'r1').version, 3);
     });
 
-    testWidgets('a superseded recovery answer is dropped', (
-      WidgetTester tester,
+    fakeTimersTest('a superseded recovery answer is dropped', (
+      FakeTimers tester,
     ) async {
       final Completer<void> first = Completer<void>();
       int calls = 0;
@@ -275,8 +276,8 @@ void main() {
       ]);
     });
 
-    testWidgets('an account switch in the middle of a request drops its '
-        'answer', (WidgetTester tester) async {
+    fakeTimersTest('an account switch in the middle of a request drops its '
+        'answer', (FakeTimers tester) async {
       final Completer<Either<Failure, RelationshipEntity>> accept =
           Completer<Either<Failure, RelationshipEntity>>();
       final FriendsNotificationFixture f = await _started(
@@ -309,8 +310,8 @@ void main() {
       expect(f.repo.requestsCalls, hasLength(2));
     });
 
-    testWidgets('a token refresh with the same user id keeps the state', (
-      WidgetTester tester,
+    fakeTimersTest('a token refresh with the same user id keeps the state', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -327,8 +328,8 @@ void main() {
       expect(f.repo.requestsCalls, hasLength(1));
     });
 
-    testWidgets('own Accept success shows Done and removes the card later', (
-      WidgetTester tester,
+    fakeTimersTest('own Accept success shows Done and removes the card later', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -352,8 +353,8 @@ void main() {
       expect(f.state.item(_requestId('r1')), isNull);
     });
 
-    testWidgets('Decline removes the card without a notice', (
-      WidgetTester tester,
+    fakeTimersTest('Decline removes the card without a notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -372,8 +373,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('uncertain Accept re-reads: still pending becomes failed', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept re-reads: still pending becomes failed', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -394,8 +395,8 @@ void main() {
       expect(f.repo.getRequestCalls, <String>['r1']);
     });
 
-    testWidgets('uncertain Accept re-read finds ACCEPTED: Done', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept re-read finds ACCEPTED: Done', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -416,7 +417,7 @@ void main() {
       expect((item.payload as FriendRequestNotificationPayload).isDone, isTrue);
     });
 
-    testWidgets('Accept 404 removes the card', (WidgetTester tester) async {
+    fakeTimersTest('Accept 404 removes the card', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await _started(
         tester,
         setUp: (FriendsNotificationFixture f) {
@@ -433,8 +434,8 @@ void main() {
       expect(f.state.items, isEmpty);
     });
 
-    testWidgets('own outgoing request accepted raises one notice', (
-      WidgetTester tester,
+    fakeTimersTest('own outgoing request accepted raises one notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(tester);
 
@@ -481,7 +482,7 @@ void main() {
 
   group('NotificationBloc incoming room invitations', () {
     Future<FriendsNotificationFixture> withInvitation(
-      WidgetTester tester, {
+      FakeTimers tester, {
       void Function(FriendsNotificationFixture f)? setUp,
     }) => _started(
       tester,
@@ -491,8 +492,8 @@ void main() {
       },
     );
 
-    testWidgets('recovered invitation is a prompt with a local deadline', (
-      WidgetTester tester,
+    fakeTimersTest('recovered invitation is a prompt with a local deadline', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
 
@@ -502,8 +503,8 @@ void main() {
       expect(item.expiresAt, friendsNow.add(const Duration(seconds: 60)));
     });
 
-    testWidgets('a server clock offset moves the local deadline', (
-      WidgetTester tester,
+    fakeTimersTest('a server clock offset moves the local deadline', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -522,8 +523,8 @@ void main() {
       );
     });
 
-    testWidgets('busy follows own activity other than NONE', (
-      WidgetTester tester,
+    fakeTimersTest('busy follows own activity other than NONE', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
       expect(f.state.isBusy, isFalse);
@@ -539,8 +540,8 @@ void main() {
       expect(f.state.isBusy, isFalse);
     });
 
-    testWidgets('Accept with a battle id opens it and raises a notice', (
-      WidgetTester tester,
+    fakeTimersTest('Accept with a battle id opens it and raises a notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -565,8 +566,8 @@ void main() {
       expect(f.state.notices.single.playerNickname, 'Anna');
     });
 
-    testWidgets('uncertain Accept: re-read ACCEPTED opens the battle', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept: re-read ACCEPTED opens the battle', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -592,8 +593,8 @@ void main() {
       expect(f.repo.getInvitationCalls, <String>['i1']);
     });
 
-    testWidgets('uncertain Accept: still PENDING becomes failed', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept: still PENDING becomes failed', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -615,8 +616,8 @@ void main() {
       expect(f.state.battleToOpen, isNull);
     });
 
-    testWidgets('uncertain Accept: 404 with own BATTLE opens that battle', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept: 404 with own BATTLE opens that battle', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -637,8 +638,8 @@ void main() {
       expect(f.state.item(_invitationId('i1')), isNull);
     });
 
-    testWidgets('uncertain Accept: 404 otherwise shows room unavailable', (
-      WidgetTester tester,
+    fakeTimersTest('uncertain Accept: 404 otherwise shows room unavailable', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -660,8 +661,8 @@ void main() {
       expect(f.state.battleToOpen, isNull);
     });
 
-    testWidgets('the push before the HTTP answer opens the battle once', (
-      WidgetTester tester,
+    fakeTimersTest('the push before the HTTP answer opens the battle once', (
+      FakeTimers tester,
     ) async {
       final Completer<Either<Failure, DuelInvitationEntity>> http =
           Completer<Either<Failure, DuelInvitationEntity>>();
@@ -698,8 +699,8 @@ void main() {
       expect(f.state.item(_invitationId('i1')), isNull);
     });
 
-    testWidgets('the HTTP answer before the push opens the battle once', (
-      WidgetTester tester,
+    fakeTimersTest('the HTTP answer before the push opens the battle once', (
+      FakeTimers tester,
     ) async {
       final DuelInvitationEntity accepted = invitation(
         'i1',
@@ -735,8 +736,8 @@ void main() {
       expect(_noticeCount(f, NotificationNoticeType.accepted), 1);
     });
 
-    testWidgets('the room screen opening the battle first suppresses the '
-        'overlay navigation', (WidgetTester tester) async {
+    fakeTimersTest('the room screen opening the battle first suppresses the '
+        'overlay navigation', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
 
       f.bloc.add(const NotificationBattleOpened('b1'));
@@ -755,7 +756,7 @@ void main() {
       expect(f.state.battleToOpen, isNull);
     });
 
-    testWidgets('410 on Accept expires the card', (WidgetTester tester) async {
+    fakeTimersTest('410 on Accept expires the card', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
         setUp: (FriendsNotificationFixture f) =>
@@ -777,8 +778,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('ACTIVITY_CONFLICT fails the card and marks busy', (
-      WidgetTester tester,
+    fakeTimersTest('ACTIVITY_CONFLICT fails the card and marks busy', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -800,8 +801,8 @@ void main() {
       expect(f.state.isBusy, isTrue);
     });
 
-    testWidgets('Decline removes the card without a toast', (
-      WidgetTester tester,
+    fakeTimersTest('Decline removes the card without a toast', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -819,8 +820,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('Decline with MATCH_ALREADY_FOUND re-reads the invitation', (
-      WidgetTester tester,
+    fakeTimersTest('Decline with MATCH_ALREADY_FOUND re-reads the invitation', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(
         tester,
@@ -845,8 +846,8 @@ void main() {
       expect(f.state.item(_invitationId('i1'))!.action, isNull);
     });
 
-    testWidgets('CANCELLED by the sender removes the card with a notice', (
-      WidgetTester tester,
+    fakeTimersTest('CANCELLED by the sender removes the card with a notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
 
@@ -865,8 +866,8 @@ void main() {
       expect(_noticeCount(f, NotificationNoticeType.cancelled), 1);
     });
 
-    testWidgets('DUEL_CANCELLED on a visible card shows room unavailable', (
-      WidgetTester tester,
+    fakeTimersTest('DUEL_CANCELLED on a visible card shows room unavailable', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
 
@@ -886,8 +887,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('DUEL_FILLED on a hidden card is removed with a notice', (
-      WidgetTester tester,
+    fakeTimersTest('DUEL_FILLED on a hidden card is removed with a notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
       f.bloc.add(NotificationHidden(_invitationId('i1')));
@@ -908,8 +909,8 @@ void main() {
       expect(_noticeCount(f, NotificationNoticeType.cancelled), 1);
     });
 
-    testWidgets('gone from a later snapshot shows room unavailable', (
-      WidgetTester tester,
+    fakeTimersTest('gone from a later snapshot shows room unavailable', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
       _incomingInvitations(f, <DuelInvitationEntity>[]);
@@ -921,8 +922,8 @@ void main() {
       expect(_invitationPayload(f, 'i1').isGone, isTrue);
     });
 
-    testWidgets('a local deadline expires a visible card, then removes it', (
-      WidgetTester tester,
+    fakeTimersTest('a local deadline expires a visible card, then removes it', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
 
@@ -934,8 +935,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('a local deadline removes a hidden card with an expired '
-        'notice', (WidgetTester tester) async {
+    fakeTimersTest('a local deadline removes a hidden card with an expired '
+        'notice', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await withInvitation(tester);
       f.bloc.add(NotificationHidden(_invitationId('i1')));
       await _flush(tester);
@@ -947,8 +948,8 @@ void main() {
       expect(f.state.notices.single.isOutgoing, isFalse);
     });
 
-    testWidgets('hide and show-hidden; a reconnect re-shows hidden prompts', (
-      WidgetTester tester,
+    fakeTimersTest('hide and show-hidden; a reconnect re-shows hidden prompts', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -981,8 +982,8 @@ void main() {
   });
 
   group('NotificationBloc host invitation', () {
-    testWidgets('ACCEPTED opens the battle with an outgoing notice', (
-      WidgetTester tester,
+    fakeTimersTest('ACCEPTED opens the battle with an outgoing notice', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(
@@ -1030,8 +1031,8 @@ void main() {
     for (final MapEntry<String, (DuelInvitationStatus, DuelInvitationReason?)>
         entry
         in noticed.entries) {
-      testWidgets('${entry.key} raises exactly one outgoing notice', (
-        WidgetTester tester,
+      fakeTimersTest('${entry.key} raises exactly one outgoing notice', (
+        FakeTimers tester,
       ) async {
         final FriendsNotificationFixture f = await _started(tester);
         final (DuelInvitationStatus status, DuelInvitationReason? reason) =
@@ -1063,8 +1064,8 @@ void main() {
       DuelInvitationReason.senderCancelled,
       DuelInvitationReason.duelCancelled,
     ]) {
-      testWidgets('own ${reason.name} raises no notice', (
-        WidgetTester tester,
+      fakeTimersTest('own ${reason.name} raises no notice', (
+        FakeTimers tester,
       ) async {
         final FriendsNotificationFixture f = await _started(tester);
         await _pushInvitation(tester, f, invitation('o1', incoming: false));
@@ -1086,8 +1087,8 @@ void main() {
       });
     }
 
-    testWidgets('the local deadline of an own invitation raises expired', (
-      WidgetTester tester,
+    fakeTimersTest('the local deadline of an own invitation raises expired', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(tester, f, invitation('o1', incoming: false));
@@ -1113,8 +1114,8 @@ void main() {
       expect(f.state.notices, hasLength(1));
     });
 
-    testWidgets('a lost ACCEPTED push is found when the room leaves the '
-        'activity', (WidgetTester tester) async {
+    fakeTimersTest('a lost ACCEPTED push is found when the room leaves the '
+        'activity', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(tester, f, invitation('o1', incoming: false));
       f.repo.onGetDuelInvitation = (_) async => ok(
@@ -1135,8 +1136,8 @@ void main() {
       expect(f.repo.getInvitationCalls, <String>['o1']);
     });
 
-    testWidgets('route change with invitation 404 restores the activity battle '
-        'exactly once', (WidgetTester tester) async {
+    fakeTimersTest('route change with invitation 404 restores the activity battle '
+        'exactly once', (FakeTimers tester) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(tester, f, invitation('o1', incoming: false));
       f.account.onGetActivity = () async => const Right(_battleActivity);
@@ -1161,8 +1162,8 @@ void main() {
       expect(_noticeCount(f, NotificationNoticeType.accepted), 1);
     });
 
-    testWidgets('a newer activity read supersedes a pending host check', (
-      WidgetTester tester,
+    fakeTimersTest('a newer activity read supersedes a pending host check', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(tester, f, invitation('o1', incoming: false));
@@ -1188,8 +1189,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('recovery restores the room invitation of a waiting room', (
-      WidgetTester tester,
+    fakeTimersTest('recovery restores the room invitation of a waiting room', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(
         tester,
@@ -1206,8 +1207,8 @@ void main() {
       expect(f.state.isBusy, isTrue);
     });
 
-    testWidgets('recovery with 404 and own BATTLE opens the lost battle', (
-      WidgetTester tester,
+    fakeTimersTest('recovery with 404 and own BATTLE opens the lost battle', (
+      FakeTimers tester,
     ) async {
       final FriendsNotificationFixture f = await _started(tester);
       await _pushInvitation(tester, f, invitation('o1', incoming: false));

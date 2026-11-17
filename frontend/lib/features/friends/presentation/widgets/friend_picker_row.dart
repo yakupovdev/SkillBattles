@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -10,7 +11,7 @@ import 'package:skill_battles/features/friends/domain/entity/friend_list_item_en
 
 /// One selectable friend of the invitation picker: a 56 px radio row. The
 /// whole row is the hit target; a `null` [onTap] makes it inert.
-final class FriendPickerRow extends StatelessWidget {
+final class FriendPickerRow extends StatelessComponent {
   const FriendPickerRow({
     required this.friend,
     required this.isSelected,
@@ -23,77 +24,25 @@ final class FriendPickerRow extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String nickname = friend.friend.nickname;
-    return Semantics(
-      inMutuallyExclusiveGroup: true,
-      checked: isSelected,
-      child: AppTappable(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        isSelected: isSelected,
-        semanticLabel:
-            '$nickname, friends since ${DisplayFormatters.date(friend.friendsSince)}',
-        child: Container(
-          height: 56,
-          padding: EdgeInsets.symmetric(horizontal: isSelected ? 16 : 17),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primarySurface : AppColors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.border,
-              width: isSelected ? 2 : 1,
-            ),
-          ),
-          child: Row(
-            spacing: 12,
-            children: <Widget>[
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isSelected
-                        ? AppColors.primary
-                        : AppColors.borderStrong,
-                    width: isSelected ? 5 : 1.5,
-                  ),
-                ),
-              ),
-              AppAvatar(
-                nickname: nickname,
-                size: AppAvatarSize.row,
-                tone: AppAvatarTone.accent,
-              ),
-              Expanded(
-                child: Row(
-                  spacing: 8,
-                  children: <Widget>[
-                    Flexible(
-                      child: Text(
-                        nickname,
-                        style: AppTextStyles.bodyLg.copyWith(
-                          fontWeight: isSelected
-                              ? FontWeight.w600
-                              : FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (friend.friend.isPro) const ProBadge(compact: true),
-                  ],
-                ),
-              ),
-              Text(
-                'Friends since ${_monthDay(friend.friendsSince)}',
-                style: AppTextStyles.bodySm.copyWith(color: AppColors.muted),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return AppTappable(
+      onTap: onTap,
+      radius: 10,
+      isSelected: isSelected,
+      semanticLabel: '$nickname, friends since ${DisplayFormatters.date(friend.friendsSince)}',
+      classes: isSelected ? 'friend-picker-row friend-picker-row--selected' : 'friend-picker-row',
+      child: Component.fragment(<Component>[
+        const span(classes: 'friend-picker-row__radio', <Component>[]),
+        AppAvatar(nickname: nickname, size: AppAvatarSize.row, tone: AppAvatarTone.accent),
+        div(classes: 'friend-picker-row__name', <Component>[
+          span(classes: 'friend-picker-row__nickname', <Component>[Component.text(nickname)]),
+          if (friend.friend.isPro) const ProBadge(compact: true),
+        ]),
+        span(classes: 'friend-picker-row__since', <Component>[
+          Component.text('Friends since ${_monthDay(friend.friendsSince)}'),
+        ]),
+      ]),
     );
   }
 
@@ -103,3 +52,56 @@ final class FriendPickerRow extends StatelessWidget {
     return full.substring(0, full.indexOf(','));
   }
 }
+
+@css
+List<StyleRule> get friendPickerRowStyles => <StyleRule>[
+  css('.friend-picker-row').styles(
+    display: Display.flex,
+    height: const Unit.pixels(56),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(17)),
+    boxSizing: BoxSizing.borderBox,
+    border: Border.all(color: AppColors.border, width: const Unit.pixels(1)),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+    backgroundColor: AppColors.white,
+  ),
+  // The 2 px border eats one more pixel of the padding.
+  css('.friend-picker-row--selected').styles(
+    padding: const Padding.symmetric(horizontal: Unit.pixels(16)),
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(2)),
+    backgroundColor: AppColors.primarySurface,
+  ),
+  css('.friend-picker-row__radio').styles(
+    width: const Unit.pixels(18),
+    height: const Unit.pixels(18),
+    boxSizing: BoxSizing.borderBox,
+    border: Border.all(color: AppColors.borderStrong, width: const Unit.pixels(1.5)),
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.friend-picker-row--selected .friend-picker-row__radio').styles(
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(5)),
+  ),
+  css('.friend-picker-row__name').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friend-picker-row__nickname')
+      .styles(
+        minWidth: Unit.zero,
+        overflow: Overflow.hidden,
+        flex: const Flex(grow: 0, shrink: 1, basis: Unit.auto),
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.bodyLg)
+      .combine(const Styles(fontWeight: FontWeight.w500)),
+  css('.friend-picker-row--selected .friend-picker-row__nickname').styles(fontWeight: FontWeight.w600),
+  css('.friend-picker-row__since')
+      .styles(flex: const Flex(shrink: 0), whiteSpace: WhiteSpace.noWrap)
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted)),
+];

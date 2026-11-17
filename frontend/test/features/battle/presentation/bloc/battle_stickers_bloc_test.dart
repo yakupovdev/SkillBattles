@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
@@ -219,7 +219,7 @@ void main() {
       await send();
 
       expect(repository.sends, isEmpty);
-      expect(bloc.state.ownBubble, isNull);
+      expect(bloc.stateValue.ownBubble, isNull);
     });
 
     test('nothing is sent while the connection is down', () async {
@@ -228,7 +228,7 @@ void main() {
 
       await send();
 
-      expect(bloc.state.canSend, isFalse);
+      expect(bloc.stateValue.canSend, isFalse);
       expect(repository.sends, isEmpty);
     });
 
@@ -265,9 +265,9 @@ void main() {
       final SendStickerParamsEntity params = repository.sends.single;
       expect(params.battleId, _battle);
       expect(params.stickerId, StickerId.fire);
-      expect(bloc.state.sendingSubmissionId, params.submissionId);
+      expect(bloc.stateValue.sendingSubmissionId, params.submissionId);
       expect(
-        bloc.state.ownBubble,
+        bloc.stateValue.ownBubble,
         OwnStickerBubble(
           submissionId: params.submissionId,
           stickerId: StickerId.fire,
@@ -286,11 +286,11 @@ void main() {
       repository.answer(Right(receipt(params, clockOffset: offset)));
       await _flush();
 
-      expect(bloc.state.ownBubble?.submissionId, params.submissionId);
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.sent);
-      expect(bloc.state.isSending, isFalse);
-      expect(bloc.state.cooldownUntil, now.add(const Duration(seconds: 4)));
-      expect(bloc.state.canSend, isFalse);
+      expect(bloc.stateValue.ownBubble?.submissionId, params.submissionId);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.sent);
+      expect(bloc.stateValue.isSending, isFalse);
+      expect(bloc.stateValue.cooldownUntil, now.add(const Duration(seconds: 4)));
+      expect(bloc.stateValue.canSend, isFalse);
     });
 
     test(
@@ -303,13 +303,13 @@ void main() {
           Right(receipt(first, cooldown: const Duration(milliseconds: 40))),
         );
         await _flush();
-        expect(bloc.state.isCoolingDown, isTrue);
+        expect(bloc.stateValue.isCoolingDown, isTrue);
 
         now = now.add(const Duration(milliseconds: 40));
         await _flush(60);
 
-        expect(bloc.state.cooldownUntil, isNull);
-        expect(bloc.state.canSend, isTrue);
+        expect(bloc.stateValue.cooldownUntil, isNull);
+        expect(bloc.stateValue.canSend, isTrue);
         await send();
         expect(repository.sends, hasLength(2));
         expect(repository.sends.last.submissionId, isNot(first.submissionId));
@@ -328,8 +328,8 @@ void main() {
         repository.answer(Right(late));
         await _flush();
 
-        expect(bloc.state.cooldownUntil, isNull);
-        expect(bloc.state.canSend, isTrue);
+        expect(bloc.stateValue.cooldownUntil, isNull);
+        expect(bloc.stateValue.canSend, isTrue);
       },
     );
 
@@ -339,11 +339,11 @@ void main() {
       await send();
       repository.answer(Right(receipt(repository.sends.single)));
       await _flush();
-      expect(bloc.state.ownBubble, isNotNull);
+      expect(bloc.stateValue.ownBubble, isNotNull);
 
       await _flush(60);
 
-      expect(bloc.state.ownBubble, isNull);
+      expect(bloc.stateValue.ownBubble, isNull);
     });
   });
 
@@ -366,10 +366,10 @@ void main() {
       );
       await _flush();
 
-      expect(bloc.state.ownBubble, isNull);
-      expect(bloc.state.isSending, isFalse);
+      expect(bloc.stateValue.ownBubble, isNull);
+      expect(bloc.stateValue.isSending, isFalse);
       expect(
-        bloc.state.cooldownUntil,
+        bloc.stateValue.cooldownUntil,
         now.add(const Duration(milliseconds: 2750)),
       );
     });
@@ -389,8 +389,8 @@ void main() {
       );
       await _flush();
 
-      expect(bloc.state.cooldownUntil, now.add(const Duration(seconds: 3)));
-      expect(bloc.state.ownBubble, isNull);
+      expect(bloc.stateValue.cooldownUntil, now.add(const Duration(seconds: 3)));
+      expect(bloc.stateValue.ownBubble, isNull);
     });
 
     test('STICKER_COOLDOWN without any time waits a full cooldown', () async {
@@ -400,7 +400,7 @@ void main() {
       repository.answer(Left(_api(ApiErrorCodes.stickerCooldown, status: 429)));
       await _flush();
 
-      expect(bloc.state.cooldownUntil, now.add(BattleStickersBloc.cooldown));
+      expect(bloc.stateValue.cooldownUntil, now.add(BattleStickersBloc.cooldown));
     });
 
     test('STICKERS_NOT_ALLOWED marks the bubble Not sent, closes sends and '
@@ -411,17 +411,17 @@ void main() {
       repository.answer(Left(_api(ApiErrorCodes.stickersNotAllowed)));
       await _flush();
 
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
-      expect(bloc.state.serverClosed, isTrue);
-      expect(bloc.state.battleRefreshTicket, 1);
-      expect(bloc.state.canSend, isFalse);
-      expect(bloc.state.cooldownUntil, isNull);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
+      expect(bloc.stateValue.serverClosed, isTrue);
+      expect(bloc.stateValue.battleRefreshTicket, 1);
+      expect(bloc.stateValue.canSend, isFalse);
+      expect(bloc.stateValue.cooldownUntil, isNull);
 
       update(phase: BattlePhase.reveal);
       await _flush();
 
-      expect(bloc.state.serverClosed, isFalse);
-      expect(bloc.state.canSend, isTrue);
+      expect(bloc.stateValue.serverClosed, isFalse);
+      expect(bloc.stateValue.canSend, isTrue);
     });
 
     test(
@@ -435,9 +435,9 @@ void main() {
         );
         await _flush();
 
-        expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
-        expect(bloc.state.battleRefreshTicket, 1);
-        expect(bloc.state.serverClosed, isFalse);
+        expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
+        expect(bloc.stateValue.battleRefreshTicket, 1);
+        expect(bloc.stateValue.serverClosed, isFalse);
       },
     );
 
@@ -456,9 +456,9 @@ void main() {
         await _flush(40);
 
         expect(repository.sends, hasLength(1));
-        expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
-        expect(bloc.state.battleRefreshTicket, 0);
-        expect(bloc.state.canSend, isTrue);
+        expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
+        expect(bloc.stateValue.battleRefreshTicket, 0);
+        expect(bloc.stateValue.canSend, isTrue);
       });
     }
 
@@ -471,11 +471,11 @@ void main() {
       await send();
       repository.answer(Left(_api(ApiErrorCodes.internalError, status: 500)));
       await _flush();
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
 
       await _flush(60);
 
-      expect(bloc.state.ownBubble, isNull);
+      expect(bloc.stateValue.ownBubble, isNull);
     });
   });
 
@@ -496,9 +496,9 @@ void main() {
         repository.answer(Right(receipt(repository.sends.last)));
         await _flush();
 
-        expect(bloc.state.ownBubble?.status, OwnStickerStatus.sent);
+        expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.sent);
         expect(
-          bloc.state.ownBubble?.submissionId,
+          bloc.stateValue.ownBubble?.submissionId,
           repository.sends.first.submissionId,
         );
       },
@@ -513,8 +513,8 @@ void main() {
       await _flush(40);
 
       expect(repository.sends, hasLength(2));
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
-      expect(bloc.state.isSending, isFalse);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
+      expect(bloc.stateValue.isSending, isFalse);
     });
 
     test('no retry after the connection flapped during the wait', () async {
@@ -530,7 +530,7 @@ void main() {
       await _flush(60);
 
       expect(repository.sends, hasLength(1));
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
     });
 
     test('closing during the retry wait sends nothing more', () async {
@@ -565,18 +565,18 @@ void main() {
           repository.sends.last.submissionId,
           repository.sends.first.submissionId,
         );
-        expect(bloc.state.ownBubble, isNull, reason: 'display window passed');
-        expect(bloc.state.isSending, isTrue);
+        expect(bloc.stateValue.ownBubble, isNull, reason: 'display window passed');
+        expect(bloc.stateValue.isSending, isTrue);
 
         await _flush(60);
         expect(repository.sends, hasLength(2), reason: 'no unbounded retry');
-        expect(bloc.state.isSending, isFalse);
-        expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
+        expect(bloc.stateValue.isSending, isFalse);
+        expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
         expect(
-          bloc.state.ownBubble?.submissionId,
+          bloc.stateValue.ownBubble?.submissionId,
           repository.sends.first.submissionId,
         );
-        expect(bloc.state.ownBubble?.stickerId, StickerId.gg);
+        expect(bloc.stateValue.ownBubble?.stickerId, StickerId.gg);
       },
     );
 
@@ -594,11 +594,11 @@ void main() {
 
       repository.answer(Right(receipt(repository.sends.first)));
       await _flush();
-      expect(bloc.state.isSending, isTrue, reason: 'still the retry');
+      expect(bloc.stateValue.isSending, isTrue, reason: 'still the retry');
 
       repository.answer(Right(receipt(repository.sends.last)));
       await _flush();
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.sent);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.sent);
     });
 
     test(
@@ -608,7 +608,7 @@ void main() {
         await ready();
         await send();
         await _flush(30);
-        expect(bloc.state.ownBubble, isNull);
+        expect(bloc.stateValue.ownBubble, isNull);
 
         repository.answer(const Left(ConnectionFailure()));
         await _flush(40);
@@ -628,8 +628,8 @@ void main() {
         repository.answer(Left(_api(ApiErrorCodes.stickersNotAllowed)));
         await _flush();
 
-        expect(bloc.state.ownBubble, isNull);
-        expect(bloc.state.serverClosed, isTrue);
+        expect(bloc.stateValue.ownBubble, isNull);
+        expect(bloc.stateValue.serverClosed, isTrue);
       },
     );
 
@@ -651,8 +651,8 @@ void main() {
       );
       await _flush();
 
-      expect(bloc.state.ownBubble?.status, OwnStickerStatus.notSent);
-      expect(bloc.state.cooldownUntil, isNull);
+      expect(bloc.stateValue.ownBubble?.status, OwnStickerStatus.notSent);
+      expect(bloc.stateValue.cooldownUntil, isNull);
     });
   });
 
@@ -664,14 +664,14 @@ void main() {
 
       update(phase: BattlePhase.finished);
       await _flush();
-      expect(bloc.state.ownBubble, isNull);
-      expect(bloc.state.isSending, isFalse);
+      expect(bloc.stateValue.ownBubble, isNull);
+      expect(bloc.stateValue.isSending, isFalse);
 
       repository.answer(Right(receipt(repository.sends.single)));
       await _flush();
 
-      expect(bloc.state.ownBubble, isNull);
-      expect(bloc.state.cooldownUntil, isNull);
+      expect(bloc.stateValue.ownBubble, isNull);
+      expect(bloc.stateValue.cooldownUntil, isNull);
     });
 
     test(
@@ -681,14 +681,14 @@ void main() {
         await ready();
         await send();
         await _flush(40);
-        expect(bloc.state.ownBubble, isNull);
+        expect(bloc.stateValue.ownBubble, isNull);
 
         repository.answer(Right(receipt(repository.sends.single)));
         await _flush();
 
-        expect(bloc.state.ownBubble, isNull);
-        expect(bloc.state.isSending, isFalse);
-        expect(bloc.state.cooldownUntil, isNotNull);
+        expect(bloc.stateValue.ownBubble, isNull);
+        expect(bloc.stateValue.isSending, isFalse);
+        expect(bloc.stateValue.cooldownUntil, isNotNull);
       },
     );
   });
@@ -702,11 +702,11 @@ void main() {
       await receive(incoming(eventId: 'e1'));
 
       expect(
-        bloc.state.opponentBubble,
+        bloc.stateValue.opponentBubble,
         const OpponentStickerBubble(eventId: 'e1', stickerId: StickerId.lol),
       );
       await _flush(60);
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentBubble, isNull);
     });
 
     test('a newer sticker replaces the bubble with a new key', () async {
@@ -717,7 +717,7 @@ void main() {
         incoming(eventId: 'e2', sequence: 2, stickerId: StickerId.lol),
       );
 
-      expect(bloc.state.opponentBubble?.eventId, 'e2');
+      expect(bloc.stateValue.opponentBubble?.eventId, 'e2');
     });
 
     test('an old expiry timer never clears a newer bubble', () async {
@@ -729,7 +729,7 @@ void main() {
       await receive(incoming(eventId: 'e2', sequence: 2));
       await _flush(30);
 
-      expect(bloc.state.opponentBubble?.eventId, 'e2');
+      expect(bloc.stateValue.opponentBubble?.eventId, 'e2');
     });
 
     test('nothing is shown before the first battle snapshot', () async {
@@ -738,7 +738,7 @@ void main() {
 
       await receive(incoming());
 
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentBubble, isNull);
     });
 
     final Map<String, IncomingStickerEntity Function(DateTime now)> dropped =
@@ -799,7 +799,7 @@ void main() {
 
         await receive(make(now));
 
-        expect(bloc.state.opponentBubble, isNull);
+        expect(bloc.stateValue.opponentBubble, isNull);
       });
     });
 
@@ -816,7 +816,7 @@ void main() {
           ),
         );
 
-        expect(bloc.state.opponentBubble?.eventId, 'e1');
+        expect(bloc.stateValue.opponentBubble?.eventId, 'e1');
       },
     );
 
@@ -825,14 +825,14 @@ void main() {
       () async {
         await ready();
         await receive(incoming(eventId: 'e1'));
-        expect(bloc.state.opponentBubble, isNotNull);
+        expect(bloc.stateValue.opponentBubble, isNotNull);
 
         update(phase: BattlePhase.finished);
         await _flush();
-        expect(bloc.state.opponentBubble, isNull);
+        expect(bloc.stateValue.opponentBubble, isNull);
 
         await receive(incoming(eventId: 'e2', sequence: 2));
-        expect(bloc.state.opponentBubble, isNull);
+        expect(bloc.stateValue.opponentBubble, isNull);
       },
     );
 
@@ -842,19 +842,19 @@ void main() {
       await ready();
       await receive(incoming(eventId: 'e1', sequence: 5, submissionId: 's1'));
       await _flush(40);
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentBubble, isNull);
 
       await receive(incoming(eventId: 'e1', sequence: 6, submissionId: 's9'));
-      expect(bloc.state.opponentBubble, isNull, reason: 'same eventId');
+      expect(bloc.stateValue.opponentBubble, isNull, reason: 'same eventId');
 
       await receive(incoming(eventId: 'e2', sequence: 7, submissionId: 's1'));
-      expect(bloc.state.opponentBubble, isNull, reason: 'same submissionId');
+      expect(bloc.stateValue.opponentBubble, isNull, reason: 'same submissionId');
 
       await receive(incoming(eventId: 'e3', sequence: 5, submissionId: 's3'));
-      expect(bloc.state.opponentBubble, isNull, reason: 'sequence 5 <= 5');
+      expect(bloc.stateValue.opponentBubble, isNull, reason: 'sequence 5 <= 5');
 
       await receive(incoming(eventId: 'e4', sequence: 9, submissionId: 's4'));
-      expect(bloc.state.opponentBubble?.eventId, 'e4', reason: 'gaps are fine');
+      expect(bloc.stateValue.opponentBubble?.eventId, 'e4', reason: 'gaps are fine');
     });
 
     test('a sticker received while disconnected neither displays nor consumes '
@@ -864,13 +864,13 @@ void main() {
       await _flush();
 
       await receive(incoming(eventId: 'during-disconnect', sequence: 40));
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentBubble, isNull);
 
       connection.set(RealtimeStatus.connected);
       await _flush();
       await receive(incoming(eventId: 'during-disconnect', sequence: 1));
 
-      expect(bloc.state.opponentBubble?.eventId, 'during-disconnect');
+      expect(bloc.stateValue.opponentBubble?.eventId, 'during-disconnect');
     });
 
     test(
@@ -885,7 +885,7 @@ void main() {
         await _flush();
         await receive(incoming(eventId: 'e2', sequence: 1));
 
-        expect(bloc.state.opponentBubble?.eventId, 'e2');
+        expect(bloc.stateValue.opponentBubble?.eventId, 'e2');
       },
     );
 
@@ -896,16 +896,16 @@ void main() {
 
       bloc.add(const BattleStickersOpponentHiddenToggled());
       await _flush();
-      expect(bloc.state.opponentHidden, isTrue);
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentHidden, isTrue);
+      expect(bloc.stateValue.opponentBubble, isNull);
 
       await receive(incoming(eventId: 'e2', sequence: 2));
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentBubble, isNull);
 
       bloc.add(const BattleStickersOpponentHiddenToggled());
       await _flush();
-      expect(bloc.state.opponentHidden, isFalse);
-      expect(bloc.state.opponentBubble, isNull);
+      expect(bloc.stateValue.opponentHidden, isFalse);
+      expect(bloc.stateValue.opponentBubble, isNull);
     });
 
     test('hiding the opponent keeps the own bubble and the cooldown', () async {
@@ -917,8 +917,8 @@ void main() {
       bloc.add(const BattleStickersOpponentHiddenToggled());
       await _flush();
 
-      expect(bloc.state.ownBubble, isNotNull);
-      expect(bloc.state.cooldownUntil, isNotNull);
+      expect(bloc.stateValue.ownBubble, isNotNull);
+      expect(bloc.stateValue.cooldownUntil, isNotNull);
     });
   });
 }

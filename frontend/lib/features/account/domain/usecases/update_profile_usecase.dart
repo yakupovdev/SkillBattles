@@ -7,11 +7,7 @@ import 'package:skill_battles/features/account/domain/repository/account_reposit
 
 /// Rejects an empty update and a half password pair before the request.
 final class UpdateProfileUsecase
-    implements
-        Usecase<
-          Future<Either<Failure, UpdateProfileResultEntity>>,
-          UpdateProfileParamsEntity
-        > {
+    implements Usecase<Future<Either<Failure, UpdateProfileResultEntity>>, UpdateProfileParamsEntity> {
   const UpdateProfileUsecase(this._repository);
 
   final AccountRepository _repository;

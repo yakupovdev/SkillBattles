@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "advisorModel": "fable",
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "Bash(flutter analyze)",
+      "Bash(flutter test *)",
+      "Bash(flutter test)",
+      "Bash(flutter pub get)",
+      "Bash(dart analyze *)",
+      "Bash(dart format *)",
+      "Bash(dart fix --dry-run *)",
+      "Bash(git status *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git diff)",
+      "Bash(git log *)",
+      "Bash(mcp__supabase__apply_migration)"
+    ],
+    "ask": [
+      "Bash(flutter pub add *)",
+      "Bash(dart pub add *)",
+      "Bash(flutter pub upgrade *)",
+      "Bash(dart run build_runner *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git reset *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./android/key.properties)",
+      "Read(./**/*.jks)",
+      "Read(./**/*.keystore)",
+      "Read(./**/*.p12)",
+      "Bash(git push --force *)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_FORK_SUBAGENT": "0"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/dart-check.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "dart-flutter": {
+      "source": { "source": "github", "repo": "flutter/agent-plugins" }
+    },
+    "paper": {
+      "source": { "source": "github", "repo": "paper-design/agent-plugins" }
+    }
+  },
+  "enabledPlugins": {
+    "dart-flutter@dart-flutter": true,
+    "paper-desktop@paper": true
+  }
+}

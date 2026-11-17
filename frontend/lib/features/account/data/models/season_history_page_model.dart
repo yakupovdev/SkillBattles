@@ -11,8 +11,7 @@ part 'season_history_page_model.g.dart';
 final class SeasonHistoryPageModel {
   const SeasonHistoryPageModel({required this.data, required this.pagination});
 
-  factory SeasonHistoryPageModel.fromJson(Map<String, dynamic> json) =>
-      _$SeasonHistoryPageModelFromJson(json);
+  factory SeasonHistoryPageModel.fromJson(Map<String, dynamic> json) => _$SeasonHistoryPageModelFromJson(json);
 
   @JsonKey(required: true)
   final List<SeasonPeakModel> data;
@@ -21,9 +20,7 @@ final class SeasonHistoryPageModel {
   final PaginationModel pagination;
 
   SeasonHistoryPageEntity toEntity() => SeasonHistoryPageEntity(
-    items: data
-        .map((SeasonPeakModel peak) => peak.toEntity())
-        .toList(growable: false),
+    items: data.map((SeasonPeakModel peak) => peak.toEntity()).toList(growable: false),
     page: pagination.toEntity(),
   );
 }

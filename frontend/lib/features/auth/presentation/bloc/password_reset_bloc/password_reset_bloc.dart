@@ -1,8 +1,7 @@
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/auth/domain/entity/password_reset_confirm_params_entity.dart';
@@ -16,11 +15,11 @@ part 'password_reset_state.dart';
 /// "Forgot password" (generic answer for any email) and the one-use token
 /// confirmation of the reset link.
 final class PasswordResetBloc
-    extends Bloc<PasswordResetEvent, PasswordResetState> {
+    extends SignalBloc<PasswordResetEvent, PasswordResetState> {
   PasswordResetBloc({required this._requestReset, required this._confirmReset})
     : super(const PasswordResetState()) {
-    on<PasswordResetRequested>(_onRequested, transformer: droppable());
-    on<PasswordResetConfirmed>(_onConfirmed, transformer: droppable());
+    handle<PasswordResetRequested>(_onRequested, transformer: droppable());
+    handle<PasswordResetConfirmed>(_onConfirmed, transformer: droppable());
   }
 
   final RequestPasswordResetUsecase _requestReset;
@@ -30,14 +29,14 @@ final class PasswordResetBloc
     PasswordResetRequested event,
     Emitter<PasswordResetState> emit,
   ) async {
-    emit(state.copyWith(status: LoadStatus.loading, resetFailure: true));
+    emit(stateValue.copyWith(status: LoadStatus.loading, resetFailure: true));
     final Either<Failure, String> result = await _requestReset(event.params);
     if (emit.isDone) return;
     result.match(
       (Failure failure) =>
-          emit(state.copyWith(status: LoadStatus.failure, failure: failure)),
+          emit(stateValue.copyWith(status: LoadStatus.failure, failure: failure)),
       (String message) =>
-          emit(state.copyWith(status: LoadStatus.success, message: message)),
+          emit(stateValue.copyWith(status: LoadStatus.success, message: message)),
     );
   }
 
@@ -45,13 +44,13 @@ final class PasswordResetBloc
     PasswordResetConfirmed event,
     Emitter<PasswordResetState> emit,
   ) async {
-    emit(state.copyWith(status: LoadStatus.loading, resetFailure: true));
+    emit(stateValue.copyWith(status: LoadStatus.loading, resetFailure: true));
     final Either<Failure, Unit> result = await _confirmReset(event.params);
     if (emit.isDone) return;
     result.match(
       (Failure failure) =>
-          emit(state.copyWith(status: LoadStatus.failure, failure: failure)),
-      (_) => emit(state.copyWith(status: LoadStatus.success)),
+          emit(stateValue.copyWith(status: LoadStatus.failure, failure: failure)),
+      (_) => emit(stateValue.copyWith(status: LoadStatus.success)),
     );
   }
 }

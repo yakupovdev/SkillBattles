@@ -1,8 +1,9 @@
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_avatar.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
@@ -11,7 +12,7 @@ import 'package:skill_battles/features/friends/domain/entity/friend_profile_enti
 /// Avatar, nickname, Pro badge, "Friends since" and the Remove friend
 /// button of a friend profile (Paper: "43 Friend profile — loaded"). The
 /// button is hidden while the profile is skeletonized.
-final class FriendProfileHeader extends StatelessWidget {
+final class FriendProfileHeader extends StatelessComponent {
   const FriendProfileHeader({
     required this.profile,
     required this.onRemove,
@@ -43,59 +44,69 @@ final class FriendProfileHeader extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      spacing: 20,
-      children: <Widget>[
-        Expanded(
-          child: Row(
-            spacing: 20,
-            children: <Widget>[
-              AppAvatar(
-                nickname: profile.friend.nickname,
-                size: AppAvatarSize.xl,
-                tone: AppAvatarTone.accent,
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 4,
-                  children: <Widget>[
-                    Row(
-                      spacing: 12,
-                      children: <Widget>[
-                        Flexible(
-                          child: Text(
-                            profile.friend.nickname,
-                            style: AppTextStyles.displaySm,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (profile.friend.isPro) const ProBadge(),
-                      ],
-                    ),
-                    Text(
-                      'Friends since ${longDate(profile.friendsSince)}',
-                      style: AppTextStyles.bodyMd.copyWith(
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+  Component build(BuildContext context) {
+    return div(classes: 'friend-profile-header', <Component>[
+      div(classes: 'friend-profile-header__identity', <Component>[
+        AppAvatar(nickname: profile.friend.nickname, size: AppAvatarSize.xl, tone: AppAvatarTone.accent),
+        div(classes: 'friend-profile-header__copy', <Component>[
+          div(classes: 'friend-profile-header__name-line', <Component>[
+            h1(classes: 'friend-profile-header__nickname', <Component>[Component.text(profile.friend.nickname)]),
+            if (profile.friend.isPro) const ProBadge(),
+          ]),
+          p(classes: 'friend-profile-header__since', <Component>[
+            Component.text('Friends since ${longDate(profile.friendsSince)}'),
+          ]),
+        ]),
+      ]),
+      Skeleton.ignore(
+        child: AppButton(
+          label: 'Remove friend',
+          variant: AppButtonVariant.outline,
+          size: AppButtonSize.field,
+          onPressed: onRemove,
         ),
-        Skeleton.ignore(
-          child: AppButton(
-            label: 'Remove friend',
-            variant: AppButtonVariant.outline,
-            size: AppButtonSize.field,
-            onPressed: onRemove,
-          ),
-        ),
-      ],
-    );
+      ),
+    ]);
   }
 }
+
+@css
+List<StyleRule> get friendProfileHeaderStyles => <StyleRule>[
+  css('.friend-profile-header').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(20)),
+  ),
+  css('.friend-profile-header__identity').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(20)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friend-profile-header__copy').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friend-profile-header__name-line').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    maxWidth: const Unit.percent(100),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+  ),
+  css('.friend-profile-header__nickname')
+      .styles(
+        minWidth: Unit.zero,
+        overflow: Overflow.hidden,
+        flex: const Flex(grow: 0, shrink: 1, basis: Unit.auto),
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.displaySm),
+  css('.friend-profile-header__since').combine(AppTextStyles.bodyMd).combine(const Styles(color: AppColors.muted)),
+];

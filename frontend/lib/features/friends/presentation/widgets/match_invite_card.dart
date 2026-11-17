@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/widgets/app_notification_card.dart';
 import 'package:skill_battles/features/friends/domain/entity/duel_invitation_entity.dart';
@@ -36,7 +36,7 @@ enum MatchInviteCardStatus {
 ///
 /// [disciplineName] is the catalogue display name. The expired look comes
 /// from [status], never from the countdown reaching zero.
-final class MatchInviteCard extends StatelessWidget {
+final class MatchInviteCard extends StatelessComponent {
   const MatchInviteCard({
     required this.invitation,
     required this.disciplineName,
@@ -60,14 +60,12 @@ final class MatchInviteCard extends StatelessWidget {
   static const Duration _minLifetime = Duration(seconds: 1);
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String nickname = invitation.host.nickname;
     final MatchInviteCardStatus s = status;
     final bool isAccepting = s == MatchInviteCardStatus.accepting;
     final bool isDeclining = s == MatchInviteCardStatus.declining;
-    final bool isClosed =
-        s == MatchInviteCardStatus.expired ||
-        s == MatchInviteCardStatus.roomUnavailable;
+    final bool isClosed = s == MatchInviteCardStatus.expired || s == MatchInviteCardStatus.roomUnavailable;
     final bool isInFlight = isAccepting || isDeclining;
     final Duration lifetime = invitation.expiresAt.difference(
       invitation.createdAt,
@@ -88,28 +86,22 @@ final class MatchInviteCard extends StatelessWidget {
       },
       expiredText: switch (s) {
         MatchInviteCardStatus.expired => 'This invitation expired.',
-        MatchInviteCardStatus.roomUnavailable =>
-          'This room is no longer available.',
+        MatchInviteCardStatus.roomUnavailable => 'This room is no longer available.',
         _ => null,
       },
       warningText: switch (s) {
-        MatchInviteCardStatus.busy =>
-          'Finish or leave your current activity before accepting.',
+        MatchInviteCardStatus.busy => 'Finish or leave your current activity before accepting.',
         MatchInviteCardStatus.contentUnavailable =>
           'Questions for this discipline are unavailable right now. '
               'Try again in a moment.',
         _ => null,
       },
-      errorText: s == MatchInviteCardStatus.networkError
-          ? "Couldn't update the invitation. Try again."
-          : null,
+      errorText: s == MatchInviteCardStatus.networkError ? "Couldn't update the invitation. Try again." : null,
       primaryLabel: 'Accept',
       secondaryLabel: 'Decline',
       isPrimaryLoading: isAccepting,
       isSecondaryLoading: isDeclining,
-      onPrimary: isClosed || isInFlight || s == MatchInviteCardStatus.busy
-          ? null
-          : onAccept,
+      onPrimary: isClosed || isInFlight || s == MatchInviteCardStatus.busy ? null : onAccept,
       onSecondary: isClosed || isInFlight ? null : onDecline,
       // The × is hidden (slot kept) while a request is in flight.
       onHide: isInFlight ? null : onHide,

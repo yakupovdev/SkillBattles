@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
 
 import 'package:skill_battles/core/presentation/league/league_rank.dart';
 
@@ -27,65 +27,65 @@ final class LeaguePalette {
 /// `AppColors`.
 abstract final class LeagueColors {
   static const LeaguePalette bronze = LeaguePalette(
-    base: Color(0xFFC07A45),
-    deep: Color(0xFF7A4520),
-    tint: Color(0xFFFBF1E8),
+    base: Color('#C07A45'),
+    deep: Color('#7A4520'),
+    tint: Color('#FBF1E8'),
   );
   static const LeaguePalette iron = LeaguePalette(
-    base: Color(0xFF5B6678),
-    deep: Color(0xFF2F3A4A),
-    tint: Color(0xFFEEF1F5),
+    base: Color('#5B6678'),
+    deep: Color('#2F3A4A'),
+    tint: Color('#EEF1F5'),
   );
 
   /// The name uses a darker gray than [deep] for contrast on light surfaces.
   static const LeaguePalette silver = LeaguePalette(
-    base: Color(0xFFC3CBD6),
-    deep: Color(0xFF5E6B7D),
-    tint: Color(0xFFF3F5F8),
-    nameOverride: Color(0xFF3E4A5B),
+    base: Color('#C3CBD6'),
+    deep: Color('#5E6B7D'),
+    tint: Color('#F3F5F8'),
+    nameOverride: Color('#3E4A5B'),
   );
   static const LeaguePalette gold = LeaguePalette(
-    base: Color(0xFFF2B52E),
-    deep: Color(0xFF9A6400),
-    tint: Color(0xFFFFF8E6),
+    base: Color('#F2B52E'),
+    deep: Color('#9A6400'),
+    tint: Color('#FFF8E6'),
   );
   static const LeaguePalette platinum = LeaguePalette(
-    base: Color(0xFF9BE3DC),
-    deep: Color(0xFF1F7F78),
-    tint: Color(0xFFEAFAF8),
+    base: Color('#9BE3DC'),
+    deep: Color('#1F7F78'),
+    tint: Color('#EAFAF8'),
   );
   static const LeaguePalette diamond = LeaguePalette(
-    base: Color(0xFF6CC2F7),
-    deep: Color(0xFF1565A8),
-    tint: Color(0xFFEAF6FF),
+    base: Color('#6CC2F7'),
+    deep: Color('#1565A8'),
+    tint: Color('#EAF6FF'),
   );
   static const LeaguePalette emerald = LeaguePalette(
-    base: Color(0xFF22B97D),
-    deep: Color(0xFF0B6B47),
-    tint: Color(0xFFE6F8F0),
+    base: Color('#22B97D'),
+    deep: Color('#0B6B47'),
+    tint: Color('#E6F8F0'),
   );
   static const LeaguePalette brilliant = LeaguePalette(
-    base: Color(0xFFB65CF0),
-    deep: Color(0xFF6E2AA8),
-    tint: Color(0xFFF6ECFE),
+    base: Color('#B65CF0'),
+    deep: Color('#6E2AA8'),
+    tint: Color('#F6ECFE'),
   );
   static const LeaguePalette master = LeaguePalette(
-    base: Color(0xFFE8B64A),
-    deep: Color(0xFF241F4A),
-    tint: Color(0xFFF1EFFA),
+    base: Color('#E8B64A'),
+    deep: Color('#241F4A'),
+    tint: Color('#F1EFFA'),
   );
   static const LeaguePalette grandmaster = LeaguePalette(
-    base: Color(0xFFD3264B),
-    deep: Color(0xFF8E0F2C),
-    tint: Color(0xFFFDECEF),
+    base: Color('#D3264B'),
+    deep: Color('#8E0F2C'),
+    tint: Color('#FDECEF'),
   );
 
   /// The design has a gradient name; the solid fallback is used on purpose.
   static const LeaguePalette legend = LeaguePalette(
-    base: Color(0xFFF7A21B),
-    deep: Color(0xFF7A2E0E),
-    tint: Color(0xFFFFF6E5),
-    nameOverride: Color(0xFFB5560A),
+    base: Color('#F7A21B'),
+    deep: Color('#7A2E0E'),
+    tint: Color('#FFF6E5'),
+    nameOverride: Color('#B5560A'),
   );
 
   static LeaguePalette of(League league) => switch (league) {

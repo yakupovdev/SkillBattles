@@ -16,8 +16,7 @@ final class ActivityResponseModel {
     required this.resourceKind,
   });
 
-  factory ActivityResponseModel.fromJson(Map<String, dynamic> json) =>
-      _$ActivityResponseModelFromJson(json);
+  factory ActivityResponseModel.fromJson(Map<String, dynamic> json) => _$ActivityResponseModelFromJson(json);
 
   @JsonKey(required: true)
   final ActivityTypeModel type;

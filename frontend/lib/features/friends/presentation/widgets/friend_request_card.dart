@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/widgets/app_notification_card.dart';
 import 'package:skill_battles/features/friends/domain/entity/relationship_entity.dart';
@@ -11,7 +11,7 @@ enum FriendRequestCardAction { accepting, declining }
 ///
 /// [isDone] replaces the actions with `You and {nickname} are now friends.`;
 /// the owner removes the card after four seconds.
-final class FriendRequestCard extends StatelessWidget {
+final class FriendRequestCard extends StatelessComponent {
   const FriendRequestCard({
     required this.request,
     this.action,
@@ -35,7 +35,7 @@ final class FriendRequestCard extends StatelessWidget {
   final VoidCallback? onHide;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String nickname = request.requester.nickname;
     final bool isBusy = action != null;
     return AppNotificationCard(
@@ -50,9 +50,7 @@ final class FriendRequestCard extends StatelessWidget {
       onPrimary: isBusy ? null : onAccept,
       onSecondary: isBusy ? null : onDecline,
       onHide: isBusy ? null : onHide,
-      errorText: hasFailed && !isBusy
-          ? "Couldn't update the friend request. Try again."
-          : null,
+      errorText: hasFailed && !isBusy ? "Couldn't update the friend request. Try again." : null,
       doneText: isDone ? 'You and $nickname are now friends.' : null,
     );
   }

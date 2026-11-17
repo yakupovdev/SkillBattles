@@ -22,3 +22,5 @@ CLAUDE.md
 *.log
 *.png
 !web/**
+frontend/
+.fvm/

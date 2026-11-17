@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -20,7 +21,7 @@ enum AppNoticeTone {
 }
 
 /// A tinted one-line note with a dot and an optional action link.
-final class AppNotice extends StatelessWidget {
+final class AppNotice extends StatelessComponent {
   const AppNotice({
     required this.message,
     this.tone = AppNoticeTone.info,
@@ -41,40 +42,50 @@ final class AppNotice extends StatelessWidget {
   final bool hug;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String? label = actionLabel;
-    final Widget box = DecoratedBox(
-      decoration: BoxDecoration(
-        color: tone.background,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: hug ? 14 : 12),
-        child: Row(
-          mainAxisSize: hug ? MainAxisSize.min : MainAxisSize.max,
-          spacing: 10,
-          children: <Widget>[
-            AppDot(color: tone.dot),
-            Flexible(
-              fit: hug ? FlexFit.loose : FlexFit.tight,
-              child: Text(
-                message,
-                style: AppTextStyles.bodyMd.copyWith(color: tone.text),
-              ),
-            ),
-            if (label != null)
-              AppTextLink(
-                label: label,
-                style: AppTextStyles.buttonMd.copyWith(color: AppColors.ink),
-                onPressed: onAction,
-              ),
-          ],
+    return div(
+      classes: hug ? 'app-notice app-notice--hug' : 'app-notice',
+      styles: Styles(backgroundColor: tone.background),
+      attributes: const <String, String>{'role': 'status', 'aria-live': 'polite'},
+      <Component>[
+        AppDot(color: tone.dot),
+        p(
+          classes: 'app-notice__message',
+          styles: Styles(color: tone.text),
+          <Component>[Component.text(message)],
         ),
-      ),
-    );
-    return Semantics(
-      liveRegion: true,
-      child: hug ? Align(alignment: Alignment.centerLeft, child: box) : box,
+        if (label != null)
+          AppTextLink(
+            label: label,
+            style: AppTextStyles.buttonMd.combine(const Styles(color: AppColors.ink)),
+            onPressed: onAction,
+          ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appNoticeStyles => <StyleRule>[
+  css('.app-notice').styles(
+    display: Display.flex,
+    padding: const Padding.symmetric(horizontal: Unit.pixels(16), vertical: Unit.pixels(12)),
+    radius: const BorderRadius.circular(Unit.pixels(10)),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(10)),
+  ),
+  css('.app-notice--hug').styles(
+    width: Unit.fitContent,
+    maxWidth: const Unit.percent(100),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(16), vertical: Unit.pixels(14)),
+    alignSelf: AlignSelf.start,
+  ),
+  css('.app-notice__message')
+      .styles(
+        minWidth: Unit.zero,
+        flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+      )
+      .combine(AppTextStyles.bodyMd),
+  css('.app-notice--hug .app-notice__message').styles(flex: const Flex(grow: 0, shrink: 1, basis: Unit.auto)),
+];

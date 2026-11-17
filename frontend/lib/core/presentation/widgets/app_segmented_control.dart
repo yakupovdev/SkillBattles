@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -44,7 +45,7 @@ enum AppSegmentedControlSize {
 }
 
 /// A grey track with a white, raised selected segment.
-final class AppSegmentedControl<T> extends StatelessWidget {
+final class AppSegmentedControl<T> extends StatelessComponent {
   const AppSegmentedControl({
     required this.segments,
     required this.selected,
@@ -59,42 +60,24 @@ final class AppSegmentedControl<T> extends StatelessWidget {
   final AppSegmentedControlSize size;
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(4),
-        child: Row(
-          mainAxisSize: size.expand ? MainAxisSize.max : MainAxisSize.min,
-          children: <Widget>[
-            for (final AppSegment<T> segment in segments)
-              if (size.expand)
-                Expanded(
-                  child: _SegmentButton<T>(
-                    segment: segment,
-                    isSelected: segment.value == selected,
-                    size: size,
-                    onSelected: onSelected,
-                  ),
-                )
-              else
-                _SegmentButton<T>(
-                  segment: segment,
-                  isSelected: segment.value == selected,
-                  size: size,
-                  onSelected: onSelected,
-                ),
-          ],
-        ),
-      ),
+  Component build(BuildContext context) {
+    return div(
+      classes: size.expand ? 'app-segmented' : 'app-segmented app-segmented--hug',
+      attributes: const <String, String>{'role': 'group'},
+      <Component>[
+        for (final AppSegment<T> segment in segments)
+          _SegmentButton<T>(
+            segment: segment,
+            isSelected: segment.value == selected,
+            size: size,
+            onSelected: onSelected,
+          ),
+      ],
     );
   }
 }
 
-final class _SegmentButton<T> extends StatelessWidget {
+final class _SegmentButton<T> extends StatelessComponent {
   const _SegmentButton({
     required this.segment,
     required this.isSelected,
@@ -108,40 +91,63 @@ final class _SegmentButton<T> extends StatelessWidget {
   final ValueChanged<T> onSelected;
 
   @override
-  Widget build(BuildContext context) {
-    final BorderRadius radius = BorderRadius.circular(size.segmentRadius);
+  Component build(BuildContext context) {
     return AppTappable(
       onTap: () => onSelected(segment.value),
       isSelected: isSelected,
-      borderRadius: radius,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: size.segmentHeight,
-        alignment: Alignment.center,
-        padding: EdgeInsets.symmetric(horizontal: size.horizontalPadding),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.white : Colors.transparent,
-          borderRadius: radius,
-          boxShadow: isSelected
-              ? const <BoxShadow>[
-                  BoxShadow(
-                    color: AppColors.shadow,
-                    offset: Offset(0, 1),
-                    blurRadius: 2,
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          segment.label,
-          style: AppTextStyles.bodyMd.copyWith(
-            fontSize: size.fontSize,
-            height: size.lineHeight / size.fontSize,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-            color: isSelected ? AppColors.ink : AppColors.muted,
-          ),
-        ),
+      radius: size.segmentRadius,
+      classes: <String>[
+        'app-segmented__segment',
+        if (size.expand) 'app-segmented__segment--expand',
+        if (isSelected) 'app-segmented__segment--selected',
+      ].join(' '),
+      styles: Styles(
+        height: Unit.pixels(size.segmentHeight),
+        padding: Padding.symmetric(horizontal: Unit.pixels(size.horizontalPadding)),
+        fontSize: Unit.pixels(size.fontSize),
+        lineHeight: Unit.pixels(size.lineHeight),
       ),
+      child: span(<Component>[Component.text(segment.label)]),
     );
   }
 }
+
+@css
+List<StyleRule> get appSegmentedControlStyles => <StyleRule>[
+  css('.app-segmented').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(4)),
+    radius: const BorderRadius.circular(Unit.pixels(10)),
+    backgroundColor: AppColors.surface,
+  ),
+  css('.app-segmented--hug').styles(width: Unit.fitContent, maxWidth: const Unit.percent(100)),
+  css('.app-segmented__segment')
+      .styles(
+        display: Display.flex,
+        transition: const Transition.combine(<Transition>[
+          Transition('background-color', duration: Duration(milliseconds: 150)),
+          Transition('box-shadow', duration: Duration(milliseconds: 150)),
+        ]),
+        justifyContent: JustifyContent.center,
+        alignItems: AlignItems.center,
+        whiteSpace: WhiteSpace.noWrap,
+        backgroundColor: Colors.transparent,
+      )
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(color: AppColors.muted, fontWeight: FontWeight.w500)),
+  css('.app-segmented__segment--expand').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-segmented__segment--selected').styles(
+    shadow: const BoxShadow(
+      offsetX: Unit.zero,
+      offsetY: Unit.pixels(1),
+      blur: Unit.pixels(2),
+      color: AppColors.shadow,
+    ),
+    color: AppColors.ink,
+    fontWeight: FontWeight.w600,
+    backgroundColor: AppColors.white,
+  ),
+];

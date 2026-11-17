@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/utils/time/clock.dart';
 import 'package:skill_battles/features/auth/domain/entity/age_check_params_entity.dart';
