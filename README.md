@@ -295,24 +295,27 @@ Compose-проверка создаёт отдельный уникальный 
 
 ## Первый деплой на Heroku через GitHub
 
-Цель: Cedar app `skill-battles`, один Basic web dyno (512 МБ) и Heroku Postgres
+Цель: Cedar app `skill-battles-eu`, один Basic web dyno (512 МБ) и Heroku Postgres
 Essential-0. Ветка в подключённом `yakupovdev/SkillBattles` — `develop`, Automatic
 Deploys оставьте выключенным. Команды ниже предназначены для ручного следующего
 шага: эта подготовка не создаёт ресурсы, не меняет Heroku, не делает commit/push.
 
 ### Образ и runtime
 
-Корневые `Dockerfile.heroku` и `heroku.yml` собирают Flutter 3.50.0 / Dart 3.14.0
-(архив с SHA-256, зависимости из lockfile), затем Java 21 JAR со frontend внутри
-`classpath:/static/`. Runtime содержит только JRE и приложение. Nginx, Flutter SDK,
-Maven, второй web-процесс и Docker Compose в Heroku не запускаются.
+Корневые `Dockerfile.heroku` и `heroku.yml` собирают Jaspr 0.23.5 на Dart 3.13.7
+(зависимости из lockfile) и Java 21 JAR. В одном web dyno работают nginx,
+скомпилированный Jaspr SSR и Spring Boot. Runtime основан на glibc; Dart SDK,
+Maven и Docker Compose в него не входят. Старый Flutter build для develop не подходит.
 Dockerfile не использует BuildKit cache mounts или другие расширения синтаксиса.
 `heroku.yml` использует Dockerfile CMD без отдельного `run`, как описано в
 [документации Heroku](https://devcenter.heroku.com/articles/build-docker-images-heroku-yml).
 Config Vars не нужны во время сборки, frontend получает только относительные
-публичные пути и `DEV_MOCKS=false`. Старые Dockerfile и Compose сохранены.
+публичные пути `/api/v1` и `/ws/v1/events`. Локальный Compose сохранён.
 
-Профиль `heroku` слушает `0.0.0.0:${PORT}`, учитывает forwarded headers от Heroku
+Nginx слушает `0.0.0.0:${PORT}`, проксирует страницы в Jaspr на порту 3000,
+а `/api`, `/ws`, `/media`, `/v3`, `/swagger-ui` и `/error` — в Spring на
+`127.0.0.1:8081`. Startup script переопределяет bind/port Spring через CLI;
+профиль `heroku` учитывает forwarded headers от Heroku
 HTTPS router, оставляет Flyway enabled и Hibernate `ddl-auto=validate`.
 `DATABASE_URL` обязателен: URI postgres/postgresql преобразуется в JDBC URL,
 userinfo декодируется отдельно (включая `%xx` и буквальный `+`), credentials не
@@ -323,12 +326,9 @@ userinfo декодируется отдельно (включая `%xx` и бу
 минимум 1, connection timeout 10 секунд; остаётся запас в лимите Essential-0 для
 миграций и служебных подключений.
 
-Spring отдаёт frontend с COOP `same-origin` / COEP `require-corp`, MIME
-`application/wasm` и `application/javascript` для `.mjs`. Только реальные клиентские
-маршруты получают SPA fallback, в том числе `/auth`, `/auth/reset`, `/billing/return`,
-`/play/search`, `/play/duel`, `/profile[/edit]`, `/leaderboard`, `/history`, `/pro`,
-`/friends`, `/friends/{uuid}`, `/battle/{uuid}`, `/result/{uuid}`. Неизвестные файлы возвращают 404; `/api`, `/ws`,
-`/media`, `/v3` и Swagger исключены из frontend security chain/fallback. API сохраняет
+Nginx отдаёт frontend с COOP `same-origin` / COEP `require-corp`, MIME
+`application/wasm` и `application/javascript` для `.mjs`. Страницы рендерит Jaspr,
+неизвестные файлы возвращают 404. API сохраняет
 JSON 401/404 и JWT-проверки. Native STOMP `/ws/v1/events`, JWT в CONNECT, персональные
 подписки, heartbeat и запрет клиентского SEND остаются прежними. При HTTPS клиент
 выбирает `wss`; изображения загружаются с `/media/questions/...` того же origin.
@@ -336,7 +336,9 @@ JSON 401/404 и JWT-проверки. Native STOMP `/ws/v1/events`, JWT в CONNE
 JVM CMD: heap 64–224 МБ, metaspace до 128 МБ, code cache до 48 МБ, direct buffers
 до 32 МБ, stack 512 КБ, 2 доступных процессора; Tomcat 4–40 потоков. Это оставляет
 часть 512 МБ для native расходов, дополнительных потоков и библиотек; суммы лимитов
-не являются гарантией RSS. Java получает SIGTERM напрямую; graceful shutdown —
+не являются гарантией RSS. Jaspr и nginx также занимают память: после деплоя
+нужно проверить суммарный RSS dyno. Bash supervisor передаёт SIGTERM всем трём
+процессам и останавливает контейнер при выходе любого из них; graceful shutdown Spring —
 10 секунд на фазу (почтовая очередь имеет собственные 5 секунд). Не добавляйте
 непроверенные `JAVA_TOOL_OPTIONS` поверх этих настроек.
 
@@ -423,11 +425,11 @@ Settings → Reveal Config Vars. Перенесите каждую нужную 
 
    ```sh
    heroku login
-   heroku addons --app skill-battles
-   heroku addons:create heroku-postgresql:essential-0 --app skill-battles
-   heroku pg:wait --app skill-battles
-   heroku stack:set container --app skill-battles
-   heroku features:disable preboot --app skill-battles
+   heroku addons --app skill-battles-eu
+   heroku addons:create heroku-postgresql:essential-0 --app skill-battles-eu
+   heroku pg:wait --app skill-battles-eu
+   heroku stack:set container --app skill-battles-eu
+   heroku features:disable preboot --app skill-battles-eu
    ```
 
 4. Заполните Config Vars по таблице. В Deploy выберите GitHub repository
@@ -438,11 +440,11 @@ Settings → Reveal Config Vars. Перенесите каждую нужную 
    подтвердите либо выполните:
 
    ```sh
-   heroku ps:type web=basic --app skill-battles
-   heroku ps:scale web=1 --app skill-battles
-   heroku ps --app skill-battles
-   heroku logs --tail --app skill-battles
-   heroku open --app skill-battles
+   heroku ps:type web=basic --app skill-battles-eu
+   heroku ps:scale web=1 --app skill-battles-eu
+   heroku ps --app skill-battles-eu
+   heroku logs --tail --app skill-battles-eu
+   heroku open --app skill-battles-eu
    ```
 
 6. Проверьте HTTPS сайт, прямые `/auth/reset` и `/billing/return`, Swagger
@@ -450,7 +452,7 @@ Settings → Reveal Config Vars. Перенесите каждую нужную 
    и WebSocket `wss` `/ws/v1/events` с CONNECT JWT. Проверьте изображения, REST ACK
    стикеров, друзей и приглашения в комнаты. Смотрите RAM/CPU
    в Metrics (если доступны для плана), `heroku logs` на R10/R14/R15, время старта,
-   `heroku pg:info --app skill-battles` на connections. Не публикуйте сырые логи
+   `heroku pg:info --app skill-battles-eu` на connections. Не публикуйте сырые логи
    и вывод Config Vars.
 
 Не включайте Preboot, autoscaling и второй backend: состояние очередей/комнат,
@@ -469,21 +471,31 @@ ranked quota остаётся списанной. Активный матч не
 docker build --platform linux/amd64 -f Dockerfile.heroku -t skillbattles-heroku-check .
 python backend/scripts/verify_heroku.py
 docker build -f Dockerfile.heroku --target frontend-source -t skillbattles-heroku-frontend-check .
-docker run --rm skillbattles-heroku-frontend-check flutter analyze
-docker run --rm skillbattles-heroku-frontend-check flutter test --dart-define=OUT=/tmp
+docker run --rm skillbattles-heroku-frontend-check dart analyze
+docker run --rm skillbattles-heroku-frontend-check dart test
 ```
 
 Из `backend/`: `./mvnw -B -ntp clean verify` (Windows `.\mvnw.cmd`). `clean` убирает
 старую V13 из target/classes. Контейнерная проверка использует свою tmpfs PostgreSQL
 с TLS, пароль с URL-encoded символами, случайный PORT и лимит web 512 МБ без swap;
-проверяет чистую/сохранённую БД, auth, SPA/assets, реальные REST/STOMP, изображения,
+проверяет чистую/сохранённую БД, auth, Jaspr SSR/assets, реальные REST/STOMP, изображения,
 стикеры, recovery, небольшой HTTP load и SIGTERM. Фикстуры меняются только в этой
 БД. Секреты пользовательского `.env` не читаются. Отчёт без секретов — локальный
 `backend/.cache/heroku-check-report.json`; локальная скорость CPU/диска не гарантирует
 тот же старт и RAM на Heroku. Cedar требует bind к PORT в пределах
 [60 секунд](https://devcenter.heroku.com/articles/dyno-startup-behavior).
 
-Проверено локально 2026-11-15:
+Проверено локально 2026-11-17 после перехода на Jaspr SSR:
+
+- Полный linux/amd64 образ собран с Dart 3.13.7 и Jaspr 0.23.5.
+- Изолированная TLS PostgreSQL, auth, страницы/ресурсы Jaspr, REST/STOMP,
+  друзья, изображения, стикеры и recovery после restart прошли.
+- Готовность страниц и OpenAPI: 6,28 / 5,95 / 6,09 с. Лимит 512 МиБ без swap,
+  cgroup peak 375 МиБ; 240 API-запросов при concurrency 8 без ошибок.
+- SIGTERM завершил контейнер за 0,41 с, exit 143, Spring graceful shutdown выполнен.
+  Это локальная проверка; RAM и старт в Heroku нужно проверить после деплоя.
+
+Исторические проверки 2026-11-15 (Flutter, другой runtime):
 
 Эти измерения относятся к версии до rebase на `develop` с друзьями и новым frontend;
 для объединённой версии время старта, память и Flutter-проверки нужно измерить заново.

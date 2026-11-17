@@ -1,4 +1,5 @@
 build:
   docker:
     web: Dockerfile.heroku
-# Dockerfile CMD runs the sole web process. Resources/config vars are set manually.
+# One web dyno runs nginx, Jaspr SSR and Spring Boot under a signal supervisor.
+# Resources/config vars are set manually.

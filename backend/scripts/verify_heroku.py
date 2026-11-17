@@ -87,7 +87,11 @@ def main():
             if command('inspect', '--format', '{{.State.Running}}', web) != 'true':
                 raise RuntimeError('Web exited; inspect the local check log.')
             try:
-                http('/v3/api-docs')
+                # nginx binds before Java/Jaspr are ready; retry startup 502s.
+                with urlopen(base + '/v3/api-docs', timeout=10) as response:
+                    json.load(response)
+                with urlopen(base + '/', timeout=10) as response:
+                    assert b'<html' in response.read()
                 elapsed = round(time.monotonic() - began, 2)
                 report['start_seconds'].append(elapsed)
                 print('Web ready including OpenAPI in ' + str(elapsed) + ' seconds.', flush=True)
@@ -151,11 +155,14 @@ def main():
             assert response.headers['Cross-Origin-Opener-Policy'] == 'same-origin'
             assert response.headers['Cross-Origin-Embedder-Policy'] == 'require-corp'
             assert 'no-store' in response.headers['Cache-Control']
-        for asset, mime in [('/main.dart.wasm', 'application/wasm'), ('/main.dart.mjs', 'application/javascript'),
-                            ('/flutter_bootstrap.js', 'javascript')]:
+        for asset, mime in [('/main.client.dart.js', 'javascript'), ('/styles/base.css', 'text/css'),
+                            ('/vendor/katex/katex.min.js', 'javascript')]:
             response, body = http(asset)
             assert mime in response.headers['Content-Type'] and len(body) > 100
-        for path in ['/assets/missing.js', '/missing.wasm', '/media/questions/missing.png']:
+        for path in ['/assets/missing.js', '/missing.wasm']:
+            response, body = http(path, 404)
+            assert b'<html' not in body.lower() or b'404 Not Found' in body
+        for path in ['/media/questions/missing.png']:
             response, body = http(path, 404)
             assert json.loads(body)['code'] == 'NOT_FOUND'
         response, body = http('/api/v1/users/me', 401)
@@ -218,11 +225,11 @@ def main():
         time.sleep(2)
         assert command('inspect', '--format', '{{.State.OOMKilled}}', web) == 'false'
         if peaks:
-            report['sampled_rss_peak_mib'] = round(max(p[2] for p in peaks) / 1048576, 1)
+            report['sampled_supervisor_rss_peak_mib'] = round(max(p[2] for p in peaks) / 1048576, 1)
             report['cgroup_peak_mib'] = round(max(p[1] for p in peaks) / 1048576, 1)
             report['sampled_cgroup_peak_mib'] = round(max(p[0] for p in peaks) / 1048576, 1)
         report['tls_postgres'] = True
-        report['checks'] = 'clean V1-V12,V14-V15; no demo users; SPA/assets/MIME; JSON errors; auth; REST/STOMP; friends/images/stickers; retained DB/recovery; load'
+        report['checks'] = 'clean V1-V12,V14-V15; no demo users; Jaspr SSR/assets/MIME; JSON errors; auth; REST/STOMP; friends/images/stickers; retained DB/recovery; load'
         stop_began = time.monotonic()
         command('stop', '--time', '20', web)
         report['stop_seconds'] = round(time.monotonic() - stop_began, 2)
