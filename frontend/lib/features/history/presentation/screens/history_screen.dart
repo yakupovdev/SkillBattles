@@ -13,6 +13,7 @@ import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_status_view.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_disciplines_usecase.dart';
 import 'package:skill_battles/features/history/domain/entity/history_page_entity.dart';
@@ -148,8 +149,9 @@ final class _UpgradeBanner extends StatelessComponent {
   Component build(BuildContext context) {
     return BlocSignalSelector<AccountBloc, AccountState, int?>(
       selector: (AccountState state) => state.entitlements?.historyMatchLimit,
-      builder: (BuildContext context, int? limit) =>
-          limit == null ? const Component.empty() : HistoryUpgradeBanner(limit: limit, onUpgrade: context.goPro),
+      builder: (BuildContext context, int? limit) => limit == null || !FeatureFlags.billing
+          ? const Component.empty()
+          : HistoryUpgradeBanner(limit: limit, onUpgrade: context.goPro),
     );
   }
 }

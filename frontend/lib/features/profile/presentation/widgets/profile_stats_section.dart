@@ -8,6 +8,7 @@ import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
 import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/domain/entity/discipline_stats_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/rating_history_point_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/topic_stats_entity.dart';
@@ -120,7 +121,7 @@ final class _Kpi extends StatelessComponent {
 
 /// Pro topic analytics and the Elo graph. `null` values mean the plan does
 /// not include them — not that there is no progress — so Free sees the
-/// locked panel instead.
+/// locked panel instead, or nothing while payments are off.
 final class ProfileAnalyticsSection extends StatelessComponent {
   const ProfileAnalyticsSection({required this.stats, super.key});
 
@@ -131,7 +132,7 @@ final class ProfileAnalyticsSection extends StatelessComponent {
     final List<TopicStatsEntity>? topics = stats.topicStats;
     final List<RatingHistoryPointEntity>? history = stats.ratingHistory;
     if (topics == null || history == null) {
-      return Skeleton.leaf(child: const ProfileLockedAnalytics());
+      return FeatureFlags.billing ? Skeleton.leaf(child: const ProfileLockedAnalytics()) : const Component.empty();
     }
     return div(classes: 'profile-analytics', <Component>[
       div(classes: 'profile-analytics__elo', <Component>[

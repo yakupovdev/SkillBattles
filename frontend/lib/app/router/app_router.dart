@@ -5,6 +5,7 @@ import 'package:skill_battles/app/router/app_routes.dart';
 import 'package:skill_battles/app/shell/app_shell.dart';
 import 'package:skill_battles/core/presentation/overlay/app_overlay.dart';
 import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/core/utils/session/auth_session.dart';
 import 'package:skill_battles/features/auth/presentation/screens/auth_screen.dart';
 import 'package:skill_battles/features/auth/presentation/screens/forgot_password_screen.dart';
@@ -32,16 +33,13 @@ import 'package:skill_battles/features/subscription/presentation/screens/pro_scr
 Router createAppRouter({required AuthSession session, Key? key}) {
   return Router(
     key: key,
-    redirect: (BuildContext context, RouteState state) =>
-        _redirect(session, state),
-    errorBuilder: (BuildContext context, RouteState state) =>
-        const _NotFound(),
+    redirect: (BuildContext context, RouteState state) => _redirect(session, state),
+    errorBuilder: (BuildContext context, RouteState state) => const _NotFound(),
     routes: <RouteBase>[
       // Dialogs and snack bars live inside the router so their content can
       // navigate.
       ShellRoute(
-        builder: (BuildContext context, RouteState state, Component child) =>
-            AppOverlayHost(child: child),
+        builder: (BuildContext context, RouteState state, Component child) => AppOverlayHost(child: child),
         routes: <RouteBase>[
           wrappedRoute(
             name: AppRoutes.auth.name,
@@ -68,16 +66,16 @@ Router createAppRouter({required AuthSession session, Key? key}) {
             ),
           ),
           ShellRoute(
-            builder:
-                (BuildContext context, RouteState state, Component child) {
-                  final String? routeName = _routeNameOf(state);
-                  return AppShell(
-                    activeTab: AppShell.tabFor(routeName),
-                    routeName: routeName,
-                    pathParameters: state.params,
-                    child: child,
-                  );
-                },
+            builder: (BuildContext context, RouteState state, Component child) {
+              final String? routeName = _routeNameOf(state);
+              return AppShell(
+                activeTab: AppShell.tabFor(routeName),
+                routeName: routeName,
+                location: state.location,
+                pathParameters: state.params,
+                child: child,
+              );
+            },
             routes: <RouteBase>[
               wrappedRoute(
                 name: AppRoutes.home.name,
@@ -139,9 +137,7 @@ Router createAppRouter({required AuthSession session, Key? key}) {
                 path: AppRoutes.friendProfile.path,
                 wrappedBuilder: (_, RouteState state) => FriendProfileScreen(
                   friendId: state.params[AppRoutes.friendIdParam]!,
-                  relationshipId: state.extra is String
-                      ? state.extra! as String
-                      : null,
+                  relationshipId: state.extra is String ? state.extra! as String : null,
                 ),
               ),
               wrappedRoute(
@@ -153,8 +149,7 @@ Router createAppRouter({required AuthSession session, Key? key}) {
                 name: AppRoutes.billingReturn.name,
                 path: AppRoutes.billingReturn.path,
                 wrappedBuilder: (_, RouteState state) => BillingReturnScreen(
-                  checkoutCancelled:
-                      _query(state, AppRoutes.successParam) == 'false',
+                  checkoutCancelled: _query(state, AppRoutes.successParam) == 'false',
                 ),
               ),
             ],
@@ -171,6 +166,10 @@ String? _redirect(AuthSession session, RouteState state) {
     (AppRoutes route) => route.path == path,
   );
   if (!session.isSignedIn) return isPublic ? null : AppRoutes.auth.path;
+  // Payments are off: the Pro and billing pages are not reachable.
+  if (!FeatureFlags.billing && (path == AppRoutes.pro.path || path == AppRoutes.billingReturn.path)) {
+    return AppRoutes.home.path;
+  }
   // A reset link still works while signed in (it signs the device out).
   if (path == AppRoutes.auth.path || path == AppRoutes.forgotPassword.path) {
     return AppRoutes.home.path;

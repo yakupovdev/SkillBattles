@@ -3,6 +3,7 @@ import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// Colors of a [ProBadge].
 enum ProBadgeTone {
@@ -32,6 +33,7 @@ final class ProBadge extends StatelessComponent {
 
   @override
   Component build(BuildContext context) {
+    if (!FeatureFlags.billing) return const Component.empty();
     return span(
       classes: compact ? 'pro-badge pro-badge--compact' : 'pro-badge',
       styles: Styles(

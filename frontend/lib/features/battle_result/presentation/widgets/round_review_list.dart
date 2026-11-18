@@ -17,6 +17,7 @@ import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/core/presentation/widgets/question_illustration.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/report_params_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_question_entity.dart';
@@ -256,7 +257,7 @@ final class _RoundRow extends StatelessComponent {
                   ),
                 ),
               ]),
-            if (!isPro) Skeleton.ignore(child: const _ProLockBar()),
+            if (FeatureFlags.billing && !isPro) Skeleton.ignore(child: const _ProLockBar()),
             div(classes: 'review-round__indented', <Component>[
               if (isReported)
                 const p(classes: 'review-round__reported', <Component>[Component.text('Reported — thanks.')])

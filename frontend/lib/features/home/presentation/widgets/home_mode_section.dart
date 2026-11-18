@@ -16,6 +16,7 @@ import 'package:skill_battles/core/presentation/widgets/app_text_input.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/core/utils/form_validators.dart';
 import 'package:skill_battles/features/account/domain/entity/limits_entity.dart';
 import 'package:skill_battles/features/catalog/domain/entity/discipline_entity.dart';
@@ -128,7 +129,9 @@ final class _LimitMeter extends StatelessComponent {
       ),
       p(classes: 'home-limit-meter__text', <Component>[
         span(classes: 'home-limit-meter__count', <Component>[Component.text('$remaining of $total')]),
-        const span(<Component>[Component.text(' free ranked matches left today')]),
+        const span(<Component>[
+          Component.text(FeatureFlags.billing ? ' free ranked matches left today' : ' ranked matches left today'),
+        ]),
         span(classes: 'home-limit-meter__reset', <Component>[
           Component.text(' · resets ${DisplayFormatters.time(limits.resetsAt)} your time'),
         ]),

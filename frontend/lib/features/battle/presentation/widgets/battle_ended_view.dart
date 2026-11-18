@@ -9,6 +9,7 @@ import 'package:skill_battles/core/domain/entity/battle_result_entity.dart';
 import 'package:skill_battles/core/presentation/extensions/battle_labels.dart';
 import 'package:skill_battles/core/presentation/formatters/display_formatters.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// CANCELLED: why the match did not happen, and the way out.
 final class BattleCancelledView extends StatelessComponent {
@@ -23,8 +24,11 @@ final class BattleCancelledView extends StatelessComponent {
     final bool quota = reason == BattleReason.quotaExhausted;
     final String detail = switch (reason) {
       BattleReason.quotaExhausted =>
-        'Your free ranked matches for today ran out before the first '
-            'question. Nothing was counted. Private duels stay unlimited.',
+        FeatureFlags.billing
+            ? 'Your free ranked matches for today ran out before the first '
+                  'question. Nothing was counted. Private duels stay unlimited.'
+            : 'Your ranked matches for today ran out before the first '
+                  'question. Nothing was counted. Private duels stay unlimited.',
       BattleReason.readyTimeout => 'Not everyone confirmed in time. No match was played.',
       BattleReason.serverInterruption =>
         'The server restarted. The match was cancelled without a rating '
@@ -49,7 +53,7 @@ final class BattleCancelledView extends StatelessComponent {
           ]),
         div(classes: 'battle-cancelled__actions', <Component>[
           AppButton(label: 'Back to home', size: AppButtonSize.medium, onPressed: context.goHome),
-          if (quota)
+          if (quota && FeatureFlags.billing)
             AppButton(
               label: 'See Pro plans',
               variant: AppButtonVariant.outline,

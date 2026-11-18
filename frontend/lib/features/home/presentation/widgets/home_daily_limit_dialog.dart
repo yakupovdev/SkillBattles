@@ -12,6 +12,7 @@ import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_countdown_text.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/domain/entity/limits_entity.dart';
 
 /// Opens the "daily ranked limit" modal (Paper: "15 Daily limit reached").
@@ -63,20 +64,24 @@ final class HomeDailyLimitDialog extends StatelessComponent {
         ]),
         const p(classes: 'home-limit-dialog__body', <Component>[
           Component.text(
-            'Your free ranked matches come back at midnight Eastern '
-            'Time. Private duels with friends are always unlimited.',
+            FeatureFlags.billing
+                ? 'Your free ranked matches come back at midnight Eastern '
+                      'Time. Private duels with friends are always unlimited.'
+                : 'Your ranked matches come back at midnight Eastern '
+                      'Time. Private duels with friends are always unlimited.',
           ),
         ]),
       ]),
       _ResetBox(resetsAt: limits.resetsAt),
       div(classes: 'home-limit-dialog__actions', <Component>[
-        AppButton(
-          label: 'Unlimited ranked with Pro',
-          variant: AppButtonVariant.dark,
-          expand: true,
-          icon: const AppSvgIcon(AppIcons.star, width: 14, height: 14),
-          onPressed: onGoPro,
-        ),
+        if (FeatureFlags.billing)
+          AppButton(
+            label: 'Unlimited ranked with Pro',
+            variant: AppButtonVariant.dark,
+            expand: true,
+            icon: const AppSvgIcon(AppIcons.star, width: 14, height: 14),
+            onPressed: onGoPro,
+          ),
         div(classes: 'home-limit-dialog__row', <Component>[
           AppButton(
             label: 'Create private duel',

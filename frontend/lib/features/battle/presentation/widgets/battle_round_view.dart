@@ -21,6 +21,7 @@ import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/core/presentation/widgets/question_illustration.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_phase.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_round_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_snapshot_entity.dart';
@@ -81,7 +82,8 @@ final class BattleRoundView extends StatelessComponent {
           BattleColumn(
             child: _RevealSummary(snapshot: snapshot, round: round, reveal: reveal),
           ),
-          if (!reveal.answerAccess.canViewCorrectAnswer) const BattleColumn(child: _FreeRevealCallout()),
+          if (FeatureFlags.billing && !reveal.answerAccess.canViewCorrectAnswer)
+            const BattleColumn(child: _FreeRevealCallout()),
         ],
       ],
     );

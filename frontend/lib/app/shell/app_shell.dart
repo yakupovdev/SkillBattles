@@ -5,6 +5,7 @@ import 'package:jaspr/jaspr.dart';
 import 'package:skill_battles/app/notifications/app_notifications_overlay.dart';
 import 'package:skill_battles/app/router/app_navigation.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
+import 'package:skill_battles/app/shell/tab_keep_alive.dart';
 import 'package:skill_battles/core/presentation/widgets/app_top_bar.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
 import 'package:skill_battles/features/battle/presentation/widgets/sticker_compositions_scope.dart';
@@ -19,6 +20,7 @@ final class AppShell extends StatelessComponent {
   const AppShell({
     required this.activeTab,
     required this.routeName,
+    required this.location,
     required this.pathParameters,
     required this.child,
     super.key,
@@ -28,6 +30,9 @@ final class AppShell extends StatelessComponent {
 
   /// Name of the current route, for the overlay's same-battle filter.
   final String? routeName;
+
+  /// Current location (path and query), for [TabKeepAlive].
+  final String location;
   final Map<String, String> pathParameters;
   final Component child;
 
@@ -84,7 +89,7 @@ final class AppShell extends StatelessComponent {
         ),
       ),
       div(classes: 'app-shell__page', <Component>[
-        child,
+        TabKeepAlive(routeName: routeName, location: location, child: child),
         const StickerCompositionsPreload(),
         AppNotificationsOverlay(routeName: routeName, pathParameters: pathParameters),
       ]),
@@ -103,5 +108,16 @@ List<StyleRule> get appShellStyles => <StyleRule>[
     position: const Position.relative(),
     minHeight: Unit.zero,
     flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  // Each page of [TabKeepAlive] fills the page area; the page's
+  // `AppDesktopViewport` fills and scrolls it.
+  css('.app-shell__tab').styles(
+    position: const Position.absolute(top: Unit.zero, left: Unit.zero, right: Unit.zero, bottom: Unit.zero),
+  ),
+  // `content-visibility` skips painting a kept tab but keeps its scroll
+  // offset (unlike `display: none`); `visibility` covers browsers without it.
+  css('.app-shell__tab--hidden').styles(
+    visibility: Visibility.hidden,
+    raw: const <String, String>{'content-visibility': 'hidden'},
   ),
 ];
