@@ -1,12 +1,13 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 
 /// A 6 px track whose fill is the remaining fraction of a deadline's
 /// [lifetime], corrected by the server [clockOffset]. Display only.
-final class AppDeadlineTrack extends StatefulWidget {
+final class AppDeadlineTrack extends StatefulComponent {
   const AppDeadlineTrack({
     required this.expiresAt,
     required this.lifetime,
@@ -44,36 +45,38 @@ final class _AppDeadlineTrackState extends State<AppDeadlineTrack> {
   }
 
   double get _fraction {
-    if (widget.isExpired || widget.lifetime <= Duration.zero) return 0;
-    final Duration left = widget.expiresAt.difference(
-      DateTime.now().add(widget.clockOffset),
-    );
-    return (left.inMilliseconds / widget.lifetime.inMilliseconds).clamp(
-      0.0,
-      1.0,
-    );
+    if (component.isExpired || component.lifetime <= Duration.zero) return 0;
+    final Duration left = component.expiresAt.difference(DateTime.now().add(component.clockOffset));
+    return (left.inMilliseconds / component.lifetime.inMilliseconds).clamp(0.0, 1.0);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: SizedBox(
-          height: 6,
-          child: ColoredBox(
-            color: widget.isExpired ? AppColors.divider : AppColors.primaryLine,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FractionallySizedBox(
-                widthFactor: _fraction,
-                heightFactor: 1,
-                child: const ColoredBox(color: AppColors.primary),
-              ),
-            ),
-          ),
+  Component build(BuildContext context) {
+    return div(
+      classes: 'app-deadline-track',
+      styles: Styles(backgroundColor: component.isExpired ? AppColors.divider : AppColors.primaryLine),
+      attributes: const <String, String>{'aria-hidden': 'true'},
+      <Component>[
+        div(
+          classes: 'app-deadline-track__fill',
+          styles: Styles(width: Unit.percent(_fraction * 100)),
+          const <Component>[],
         ),
-      ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get appDeadlineTrackStyles => <StyleRule>[
+  css('.app-deadline-track').styles(
+    height: const Unit.pixels(6),
+    radius: const BorderRadius.circular(Unit.pixels(3)),
+    overflow: Overflow.hidden,
+  ),
+  css('.app-deadline-track__fill').styles(
+    height: const Unit.percent(100),
+    transition: const Transition('width', duration: Duration(milliseconds: 500), curve: Curve.linear),
+    backgroundColor: AppColors.primary,
+  ),
+];

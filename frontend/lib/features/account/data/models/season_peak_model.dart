@@ -16,8 +16,7 @@ final class SeasonPeakModel {
     required this.finalRating,
   });
 
-  factory SeasonPeakModel.fromJson(Map<String, dynamic> json) =>
-      _$SeasonPeakModelFromJson(json);
+  factory SeasonPeakModel.fromJson(Map<String, dynamic> json) => _$SeasonPeakModelFromJson(json);
 
   @JsonKey(required: true)
   final SeasonModel season;

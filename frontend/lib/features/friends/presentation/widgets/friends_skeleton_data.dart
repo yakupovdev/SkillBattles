@@ -1,10 +1,9 @@
-import 'package:skeletonizer/skeletonizer.dart';
-
 import 'package:skill_battles/core/domain/entity/calibration_entity.dart';
 import 'package:skill_battles/core/domain/entity/match_stats_entity.dart';
 import 'package:skill_battles/core/domain/entity/page_info_entity.dart';
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
 import 'package:skill_battles/core/domain/entity/rank_progress_entity.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_code_entity.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_discipline_stats_entity.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_list_item_entity.dart';
@@ -50,29 +49,28 @@ final class FriendsSkeletonData {
     ),
   );
 
-  static FriendRequestsPageEntity requests(FriendRequestDirection direction) =>
-      FriendRequestsPageEntity(
-        items: <RelationshipEntity>[
-          for (int i = 0; i < 3; i++)
-            RelationshipEntity(
-              id: 'skeleton-$i',
-              requester: _player(i),
-              recipient: _player(i + 10),
-              status: RelationshipStatus.pending,
-              createdAt: _since,
-              updatedAt: _since,
-              acceptedAt: null,
-              version: 0,
-              direction: direction,
-            ),
-        ],
-        page: const PageInfoEntity(
-          page: 0,
-          size: 20,
-          totalElements: 3,
-          totalPages: 1,
+  static FriendRequestsPageEntity requests(FriendRequestDirection direction) => FriendRequestsPageEntity(
+    items: <RelationshipEntity>[
+      for (int i = 0; i < 3; i++)
+        RelationshipEntity(
+          id: 'skeleton-$i',
+          requester: _player(i),
+          recipient: _player(i + 10),
+          status: RelationshipStatus.pending,
+          createdAt: _since,
+          updatedAt: _since,
+          acceptedAt: null,
+          version: 0,
+          direction: direction,
         ),
-      );
+    ],
+    page: const PageInfoEntity(
+      page: 0,
+      size: 20,
+      totalElements: 3,
+      totalPages: 1,
+    ),
+  );
 
   static const MatchStatsEntity _stats = MatchStatsEntity(
     wins: 12,

@@ -1,8 +1,6 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/page_info_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
@@ -10,6 +8,7 @@ import 'package:skill_battles/core/domain/usecases/generate_id_usecase.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -39,7 +38,7 @@ part 'room_invitation_state.dart';
 /// friend) gets a new id. At most one invitation is pending per room; the
 /// room itself is owned by `PrivateDuelBloc`.
 final class RoomInvitationBloc
-    extends Bloc<RoomInvitationEvent, RoomInvitationState> {
+    extends SignalBloc<RoomInvitationEvent, RoomInvitationState> {
   RoomInvitationBloc({
     required this._getRoomInvitations,
     required this._getDuelInvitation,
@@ -51,21 +50,21 @@ final class RoomInvitationBloc
     required this._generateId,
     this.pageSize = 20,
   }) : super(const RoomInvitationState()) {
-    on<RoomInvitationStarted>(_onStarted, transformer: restartable());
-    on<RoomInvitationRefreshRequested>(_onRefresh, transformer: restartable());
-    on<RoomInvitationFriendsRequested>(
+    handle<RoomInvitationStarted>(_onStarted, transformer: restartable());
+    handle<RoomInvitationRefreshRequested>(_onRefresh, transformer: restartable());
+    handle<RoomInvitationFriendsRequested>(
       _onFriendsRequested,
       transformer: restartable(),
     );
-    on<RoomInvitationFriendsPageRequested>(
+    handle<RoomInvitationFriendsPageRequested>(
       _onFriendsPageRequested,
       transformer: droppable(),
     );
-    on<RoomInvitationSendRequested>(_onSend, transformer: concurrent());
-    on<RoomInvitationWithdrawRequested>(_onWithdraw, transformer: droppable());
-    on<RoomInvitationResultCleared>(_onResultCleared);
-    on<_InvitationReceived>(_onInvitationReceived);
-    on<_Reconnected>(_onReconnected);
+    handle<RoomInvitationSendRequested>(_onSend, transformer: concurrent());
+    handle<RoomInvitationWithdrawRequested>(_onWithdraw, transformer: droppable());
+    handle<RoomInvitationResultCleared>(_onResultCleared);
+    handle<_InvitationReceived>(_onInvitationReceived);
+    handle<_Reconnected>(_onReconnected);
   }
 
   final GetRoomInvitationsUsecase _getRoomInvitations;
@@ -108,7 +107,7 @@ final class RoomInvitationBloc
             add(const _Reconnected());
           }
         });
-    if (state.duelId != event.duelId) {
+    if (stateValue.duelId != event.duelId) {
       _intent = null;
       _invitationVersions.clear();
       _latestInvitation = null;
@@ -123,25 +122,25 @@ final class RoomInvitationBloc
   ) => _restore(emit);
 
   void _onReconnected(_Reconnected event, Emitter<RoomInvitationState> emit) {
-    if (state.duelId != null) add(const RoomInvitationRefreshRequested());
+    if (stateValue.duelId != null) add(const RoomInvitationRefreshRequested());
   }
 
   /// Rebuilds the room's invitation from the server (rooms and invitations
   /// live in memory there and can vanish on a restart).
   Future<void> _restore(Emitter<RoomInvitationState> emit) async {
-    final String? duelId = state.duelId;
+    final String? duelId = stateValue.duelId;
     if (duelId == null) return;
     final int version = ++_restoreVersion;
-    emit(state.copyWith(restoreStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(restoreStatus: LoadStatus.loading));
     final Either<Failure, DuelInvitationsSnapshotEntity> result =
         await _getRoomInvitations(RoomInvitationsParamsEntity(duelId: duelId));
-    if (emit.isDone || version != _restoreVersion || duelId != state.duelId) {
+    if (emit.isDone || version != _restoreVersion || duelId != stateValue.duelId) {
       return;
     }
     final Failure? failure = result.getLeft();
     if (failure != null) {
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           restoreStatus: LoadStatus.failure,
           restoreFailure: failure,
         ),
@@ -150,7 +149,7 @@ final class RoomInvitationBloc
     }
     final DuelInvitationsSnapshotEntity snapshot = result.toNullable()!;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         restoreStatus: LoadStatus.success,
         clockOffset: snapshot.clockOffset,
         resetRestoreFailure: true,
@@ -162,7 +161,7 @@ final class RoomInvitationBloc
       return;
     }
     // The pending list cannot explain a missing invitation: read it.
-    final DuelInvitationEntity? pending = state.pendingInvitation;
+    final DuelInvitationEntity? pending = stateValue.pendingInvitation;
     if (pending == null) return;
     final Either<Failure, DuelInvitationEntity> known =
         await _getDuelInvitation(
@@ -171,8 +170,8 @@ final class RoomInvitationBloc
     if (emit.isDone || version != _restoreVersion) return;
     known.match((Failure failure) {
       if (failure.hasCode(ApiErrorCodes.duelInvitationNotFound) &&
-          state.invitation?.id == pending.id) {
-        emit(state.copyWith(resetInvitation: true));
+          stateValue.invitation?.id == pending.id) {
+        emit(stateValue.copyWith(resetInvitation: true));
       }
     }, (DuelInvitationEntity invitation) => _apply(invitation, emit));
   }
@@ -202,7 +201,7 @@ final class RoomInvitationBloc
     DuelInvitationEntity invitation,
     Emitter<RoomInvitationState> emit,
   ) {
-    if (invitation.duelId != state.duelId || invitation.isIncoming) return;
+    if (invitation.duelId != stateValue.duelId || invitation.isIncoming) return;
     final int? knownVersion = _invitationVersions[invitation.id];
     if (knownVersion != null && invitation.version <= knownVersion) return;
     _invitationVersions[invitation.id] = invitation.version;
@@ -222,7 +221,7 @@ final class RoomInvitationBloc
         intent.friendId == invitation.recipient.id) {
       _intent = null;
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           invitation: invitation,
           sendStatus: LoadStatus.success,
           canRetrySend: false,
@@ -231,7 +230,7 @@ final class RoomInvitationBloc
       );
       return;
     }
-    emit(state.copyWith(invitation: invitation));
+    emit(stateValue.copyWith(invitation: invitation));
   }
 
   // ---------------------------------------------------------------------
@@ -243,7 +242,7 @@ final class RoomInvitationBloc
   ) async {
     final int version = ++_friendsVersion;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         friendsStatus: LoadStatus.loading,
         friendsPageStatus: LoadStatus.initial,
         resetFriendsPageFailure: true,
@@ -255,13 +254,13 @@ final class RoomInvitationBloc
     if (emit.isDone || version != _friendsVersion) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           friendsStatus: LoadStatus.failure,
           friendsFailure: failure,
         ),
       ),
       (FriendsPageEntity page) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           friendsStatus: LoadStatus.success,
           friends: List<FriendListItemEntity>.unmodifiable(page.items),
           friendsPage: page.page,
@@ -278,10 +277,10 @@ final class RoomInvitationBloc
     RoomInvitationFriendsPageRequested event,
     Emitter<RoomInvitationState> emit,
   ) async {
-    final PageInfoEntity? info = state.friendsPage;
+    final PageInfoEntity? info = stateValue.friendsPage;
     if (info == null ||
-        state.friendsStatus.isLoading ||
-        state.friendsPageStatus.isLoading) {
+        stateValue.friendsStatus.isLoading ||
+        stateValue.friendsPageStatus.isLoading) {
       return;
     }
     int page = event.page < 0 ? 0 : event.page;
@@ -291,7 +290,7 @@ final class RoomInvitationBloc
     if (page == info.page) return;
     final int version = ++_friendsVersion;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         friendsPageStatus: LoadStatus.loading,
         resetFriendsPageFailure: true,
       ),
@@ -316,13 +315,13 @@ final class RoomInvitationBloc
     }
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           friendsPageStatus: LoadStatus.failure,
           friendsPageFailure: failure,
         ),
       ),
       (FriendsPageEntity loaded) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           friendsPageStatus: LoadStatus.success,
           friends: List<FriendListItemEntity>.unmodifiable(loaded.items),
           friendsPage: loaded.page,
@@ -339,8 +338,8 @@ final class RoomInvitationBloc
     RoomInvitationSendRequested event,
     Emitter<RoomInvitationState> emit,
   ) async {
-    final String? duelId = state.duelId;
-    if (duelId == null || !state.canInvite) return;
+    final String? duelId = stateValue.duelId;
+    if (duelId == null || !stateValue.canInvite) return;
     final _SendIntent intent =
         _intent != null &&
             _intent!.duelId == duelId &&
@@ -353,7 +352,7 @@ final class RoomInvitationBloc
           );
     _intent = intent;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         sendStatus: LoadStatus.loading,
         sendFriendId: event.friendId,
         canRetrySend: false,
@@ -371,25 +370,25 @@ final class RoomInvitationBloc
     // A push or restore can resolve this intent before the HTTP request
     // finishes. Its later answer must not reopen a retry or replace a newer
     // invitation (including when this bloc has switched rooms meanwhile).
-    if (emit.isDone || duelId != state.duelId || _intent != intent) return;
+    if (emit.isDone || duelId != stateValue.duelId || _intent != intent) return;
     final Failure? failure = result.getLeft();
     if (failure == null) {
       _intent = null;
       final DuelInvitationEntity invitation = result.toNullable()!;
       // The answer to this intent replaces whatever was shown, even a
       // terminal replay of the same request id.
-      if (state.invitation?.id != invitation.id) {
-        emit(state.copyWith(resetInvitation: true));
+      if (stateValue.invitation?.id != invitation.id) {
+        emit(stateValue.copyWith(resetInvitation: true));
       }
       _apply(invitation, emit);
-      emit(state.copyWith(sendStatus: LoadStatus.success));
+      emit(stateValue.copyWith(sendStatus: LoadStatus.success));
       return;
     }
     final bool retryable =
         _isUncertain(failure) || failure.hasCode(ApiErrorCodes.rateLimited);
     if (!retryable) _intent = null;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         sendStatus: LoadStatus.failure,
         sendFailure: failure,
         canRetrySend: retryable,
@@ -404,10 +403,10 @@ final class RoomInvitationBloc
     RoomInvitationWithdrawRequested event,
     Emitter<RoomInvitationState> emit,
   ) async {
-    final DuelInvitationEntity? pending = state.pendingInvitation;
+    final DuelInvitationEntity? pending = stateValue.pendingInvitation;
     if (pending == null) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         withdrawStatus: LoadStatus.loading,
         resetWithdrawFailure: true,
       ),
@@ -421,7 +420,7 @@ final class RoomInvitationBloc
         !failure.hasCode(ApiErrorCodes.matchAlreadyFound) &&
         !failure.hasCode(ApiErrorCodes.duelInvitationNotFound)) {
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           withdrawStatus: LoadStatus.failure,
           withdrawFailure: failure,
         ),
@@ -441,12 +440,12 @@ final class RoomInvitationBloc
       final bool resolved =
           failure == null ||
           failure.hasCode(ApiErrorCodes.duelInvitationNotFound);
-      if (resolved && state.invitation?.id == pending.id) {
-        emit(state.copyWith(resetInvitation: true));
+      if (resolved && stateValue.invitation?.id == pending.id) {
+        emit(stateValue.copyWith(resetInvitation: true));
       }
     }, (DuelInvitationEntity invitation) => _apply(invitation, emit));
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         withdrawStatus: failure == null
             ? LoadStatus.success
             : LoadStatus.initial,
@@ -458,9 +457,9 @@ final class RoomInvitationBloc
     RoomInvitationResultCleared event,
     Emitter<RoomInvitationState> emit,
   ) {
-    if (state.pendingInvitation != null || state.sendStatus.isLoading) return;
+    if (stateValue.pendingInvitation != null || stateValue.sendStatus.isLoading) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         sendStatus: LoadStatus.initial,
         withdrawStatus: LoadStatus.initial,
         canRetrySend: false,

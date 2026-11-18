@@ -1,10 +1,9 @@
-import 'package:skeletonizer/skeletonizer.dart';
-
 import 'package:skill_battles/core/domain/entity/battle_mode.dart';
 import 'package:skill_battles/core/domain/entity/battle_outcome.dart';
 import 'package:skill_battles/core/domain/entity/battle_reason.dart';
 import 'package:skill_battles/core/domain/entity/page_info_entity.dart';
 import 'package:skill_battles/core/domain/entity/public_player_entity.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/features/history/domain/entity/history_item_entity.dart';
 import 'package:skill_battles/features/history/domain/entity/history_page_entity.dart';
 

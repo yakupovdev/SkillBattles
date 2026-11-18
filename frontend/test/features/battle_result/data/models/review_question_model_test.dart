@@ -1,4 +1,4 @@
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/features/battle_result/data/models/review_question_model.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/review_question_entity.dart';

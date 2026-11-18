@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -15,39 +16,22 @@ abstract final class FriendsTableLanes {
 }
 
 /// The header above the friends rows: Player | Friends since | actions lane.
-final class FriendsTableHeader extends StatelessWidget {
+final class FriendsTableHeader extends StatelessComponent {
   const FriendsTableHeader({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle style = AppTextStyles.bodyXs.copyWith(
-      color: AppColors.muted,
-    );
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Row(
-          spacing: 14,
-          children: <Widget>[
-            Expanded(child: Text('Player', style: style)),
-            SizedBox(
-              width: FriendsTableLanes.sinceWidth,
-              child: Text('Friends since', style: style),
-            ),
-            const SizedBox(width: FriendsTableLanes.actionsWidth),
-          ],
-        ),
-      ),
-    );
+  Component build(BuildContext context) {
+    return div(classes: 'friends-table-header', <Component>[
+      p(classes: 'friends-table-header__player', <Component>[Component.text('Player')]),
+      p(classes: 'friends-table-lane-since', <Component>[Component.text('Friends since')]),
+      const div(classes: 'friends-table-lane-actions', <Component>[]),
+    ]);
   }
 }
 
 /// One friend: identity (opens the profile), friends since, and the
 /// View profile / Remove links.
-final class FriendRow extends StatelessWidget {
+final class FriendRow extends StatelessComponent {
   const FriendRow({
     required this.friend,
     required this.onOpenProfile,
@@ -60,87 +44,42 @@ final class FriendRow extends StatelessWidget {
   final VoidCallback onRemove;
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          spacing: 14,
-          children: <Widget>[
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AppTappable(
-                  onTap: onOpenProfile,
-                  borderRadius: BorderRadius.circular(8),
-                  semanticLabel: '${friend.friend.nickname}, view profile',
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: 14,
-                    children: <Widget>[
-                      AppAvatar(
-                        nickname: friend.friend.nickname,
-                        tone: AppAvatarTone.accent,
-                      ),
-                      Flexible(
-                        child: Text(
-                          friend.friend.nickname,
-                          style: AppTextStyles.bodyLg.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (friend.friend.isPro) const ProBadge(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            SizedBox(
-              width: FriendsTableLanes.sinceWidth,
-              child: Text(
-                DisplayFormatters.date(friend.friendsSince),
-                style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
-              ),
-            ),
-            SizedBox(
-              width: FriendsTableLanes.actionsWidth,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                spacing: 4,
-                children: <Widget>[
-                  _RowLink(
-                    label: 'View profile',
-                    style: AppTextStyles.buttonMd.copyWith(
-                      color: AppColors.ink,
-                    ),
-                    onPressed: onOpenProfile,
-                  ),
-                  _RowLink(
-                    label: 'Remove',
-                    style: AppTextStyles.buttonMd.copyWith(
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.muted,
-                    ),
-                    onPressed: onRemove,
-                  ),
-                ],
-              ),
-            ),
-          ],
+  Component build(BuildContext context) {
+    return div(classes: 'friend-row', <Component>[
+      div(classes: 'friend-row__player', <Component>[
+        AppTappable(
+          onTap: onOpenProfile,
+          radius: 8,
+          semanticLabel: '${friend.friend.nickname}, view profile',
+          classes: 'friend-row__identity',
+          child: Component.fragment(<Component>[
+            AppAvatar(nickname: friend.friend.nickname, tone: AppAvatarTone.accent),
+            span(classes: 'friend-row__nickname', <Component>[Component.text(friend.friend.nickname)]),
+            if (friend.friend.isPro) const ProBadge(),
+          ]),
         ),
-      ),
-    );
+      ]),
+      p(classes: 'friends-table-lane-since friend-row__since', <Component>[
+        Component.text(DisplayFormatters.date(friend.friendsSince)),
+      ]),
+      div(classes: 'friends-table-lane-actions friend-row__actions', <Component>[
+        _RowLink(
+          label: 'View profile',
+          style: AppTextStyles.buttonMd.combine(const Styles(color: AppColors.ink)),
+          onPressed: onOpenProfile,
+        ),
+        _RowLink(
+          label: 'Remove',
+          style: AppTextStyles.buttonMd.combine(const Styles(color: AppColors.muted, fontWeight: FontWeight.w500)),
+          onPressed: onRemove,
+        ),
+      ]),
+    ]);
   }
 }
 
 /// A text link with its 48 px high, 16 px padded hit area.
-final class _RowLink extends StatelessWidget {
+final class _RowLink extends StatelessComponent {
   const _RowLink({
     required this.label,
     required this.style,
@@ -148,21 +87,89 @@ final class _RowLink extends StatelessWidget {
   });
 
   final String label;
-  final TextStyle style;
+  final Styles style;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AppTappable(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(10),
-      child: SizedBox(
-        height: 48,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Center(child: Text(label, style: style)),
-        ),
-      ),
+      radius: 10,
+      classes: 'friend-row__link',
+      styles: style,
+      child: span(<Component>[Component.text(label)]),
     );
   }
 }
+
+@css
+List<StyleRule> get friendRowStyles => <StyleRule>[
+  css('.friends-table-header').styles(
+    display: Display.flex,
+    padding: const Padding.only(bottom: Unit.pixels(10)),
+    border: const Border.only(
+      bottom: BorderSide(color: AppColors.divider, width: Unit.pixels(1)),
+    ),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(14)),
+  ),
+  css('.friends-table-header p').combine(AppTextStyles.bodyXs).combine(const Styles(color: AppColors.muted)),
+  css('.friends-table-header__player').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friends-table-lane-since').styles(
+    width: const Unit.pixels(FriendsTableLanes.sinceWidth),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.friends-table-lane-actions').styles(
+    width: const Unit.pixels(FriendsTableLanes.actionsWidth),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.friend-row').styles(
+    display: Display.flex,
+    padding: const Padding.symmetric(vertical: Unit.pixels(10)),
+    border: const Border.only(
+      bottom: BorderSide(color: AppColors.divider, width: Unit.pixels(1)),
+    ),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(14)),
+  ),
+  css('.friend-row__player').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.friend-row__identity').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    maxWidth: const Unit.percent(100),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(14)),
+  ),
+  css('.friend-row__nickname')
+      .styles(
+        minWidth: Unit.zero,
+        overflow: Overflow.hidden,
+        flex: const Flex(grow: 0, shrink: 1, basis: Unit.auto),
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.bodyLg)
+      .combine(const Styles(fontWeight: FontWeight.w600)),
+  css('.friend-row__since').combine(AppTextStyles.bodyMd).combine(const Styles(color: AppColors.muted)),
+  css('.friend-row__actions').styles(
+    display: Display.flex,
+    justifyContent: JustifyContent.end,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(4)),
+  ),
+  css('.friend-row__link').styles(
+    display: Display.flex,
+    height: const Unit.pixels(48),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(16)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    whiteSpace: WhiteSpace.noWrap,
+  ),
+];

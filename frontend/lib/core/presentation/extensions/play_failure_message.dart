@@ -2,12 +2,11 @@ import 'package:skill_battles/core/presentation/formatters/display_formatters.da
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// Wording for failures of starting or playing a match.
 extension PlayFailureMessage on Failure {
-  bool get isDailyLimit =>
-      hasCode(ApiErrorCodes.dailyLimitReached) ||
-      hasCode(ApiErrorCodes.quotaExhausted);
+  bool get isDailyLimit => hasCode(ApiErrorCodes.dailyLimitReached) || hasCode(ApiErrorCodes.quotaExhausted);
 
   /// Next ET midnight of a quota failure.
   DateTime? get limitResetsAt => switch (this) {
@@ -18,9 +17,12 @@ extension PlayFailureMessage on Failure {
   String playMessage(DateTime now) {
     if (isDailyLimit) {
       final DateTime? resetsAt = limitResetsAt;
-      return resetsAt == null
+      const String used = FeatureFlags.billing
           ? "You've used today's free ranked matches."
-          : "You've used today's free ranked matches. They reset at "
+          : "You've used today's ranked matches.";
+      return resetsAt == null
+          ? used
+          : '$used They reset at '
                 '${DisplayFormatters.resetsAt(resetsAt, now)}.';
     }
     if (hasCode(ApiErrorCodes.activityConflict)) {
@@ -38,8 +40,10 @@ extension PlayFailureMessage on Failure {
       return 'Connecting to live updates… try again in a moment.';
     }
     if (hasCode(ApiErrorCodes.historyAccessRequired)) {
-      return 'This match is older than your latest 10. Pro opens your full '
-          'history.';
+      return FeatureFlags.billing
+          ? 'This match is older than your latest 10. Pro opens your full '
+                'history.'
+          : 'This match is older than your latest 10.';
     }
     return userMessage;
   }

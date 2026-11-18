@@ -1,11 +1,12 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 
 /// Centered failure message with a retry button.
-final class AppErrorView extends StatelessWidget {
+final class AppErrorView extends StatelessComponent {
   const AppErrorView({
     required this.message,
     this.onRetry,
@@ -18,10 +19,11 @@ final class AppErrorView extends StatelessWidget {
   final VoidCallback? onRetry;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return _StatusLayout(
       title: title,
       message: message,
+      isAlert: true,
       action: onRetry == null
           ? null
           : AppButton(
@@ -35,7 +37,7 @@ final class AppErrorView extends StatelessWidget {
 }
 
 /// Centered empty state (a successful answer with nothing in it).
-final class AppEmptyView extends StatelessWidget {
+final class AppEmptyView extends StatelessComponent {
   const AppEmptyView({
     required this.title,
     required this.message,
@@ -45,53 +47,62 @@ final class AppEmptyView extends StatelessWidget {
 
   final String title;
   final String message;
-  final Widget? action;
+  final Component? action;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return _StatusLayout(title: title, message: message, action: action);
   }
 }
 
-final class _StatusLayout extends StatelessWidget {
+final class _StatusLayout extends StatelessComponent {
   const _StatusLayout({
     required this.title,
     required this.message,
     this.action,
+    this.isAlert = false,
   });
 
   final String title;
   final String message;
-  final Widget? action;
+  final Component? action;
+  final bool isAlert;
 
   @override
-  Widget build(BuildContext context) {
-    final Widget? button = action;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 12,
-            children: <Widget>[
-              Text(
-                title,
-                style: AppTextStyles.titleMd,
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                message,
-                style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
-                textAlign: TextAlign.center,
-              ),
-              if (button != null)
-                Padding(padding: const EdgeInsets.only(top: 8), child: button),
-            ],
-          ),
-        ),
+  Component build(BuildContext context) {
+    final Component? button = action;
+    return div(classes: 'app-status-view', <Component>[
+      div(
+        classes: 'app-status-view__content',
+        attributes: isAlert ? const <String, String>{'role': 'alert'} : null,
+        <Component>[
+          h2(classes: 'app-status-view__title', <Component>[Component.text(title)]),
+          p(classes: 'app-status-view__message', <Component>[Component.text(message)]),
+          if (button != null) div(classes: 'app-status-view__action', <Component>[button]),
+        ],
       ),
-    );
+    ]);
   }
 }
+
+@css
+List<StyleRule> get appStatusViewStyles => <StyleRule>[
+  css('.app-status-view').styles(
+    display: Display.flex,
+    padding: const Padding.symmetric(horizontal: Unit.pixels(24), vertical: Unit.pixels(48)),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    flex: const Flex(grow: 1),
+  ),
+  css('.app-status-view__content').styles(
+    display: Display.flex,
+    maxWidth: const Unit.pixels(440),
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.center,
+    gap: const Gap.row(Unit.pixels(12)),
+    textAlign: TextAlign.center,
+  ),
+  css('.app-status-view__title').combine(AppTextStyles.titleMd),
+  css('.app-status-view__message').combine(AppTextStyles.bodyMd).combine(const Styles(color: AppColors.muted)),
+  css('.app-status-view__action').styles(padding: const Padding.only(top: Unit.pixels(8))),
+];

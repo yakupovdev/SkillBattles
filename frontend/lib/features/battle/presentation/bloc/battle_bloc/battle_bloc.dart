@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/generate_id_usecase.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -37,7 +36,7 @@ part 'battle_state.dart';
 ///   accepted answer never changes.
 /// - Local clocks never advance the phase: when a server transition is due
 ///   and no event came, the snapshot is read again.
-final class BattleBloc extends Bloc<BattleEvent, BattleState> {
+final class BattleBloc extends SignalBloc<BattleEvent, BattleState> {
   BattleBloc({
     required this.battleId,
     required this._getBattle,
@@ -50,14 +49,14 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     this.transitionGrace = const Duration(milliseconds: 1500),
     this.offlinePollInterval = const Duration(seconds: 3),
   }) : super(const BattleState()) {
-    on<BattleStarted>(_onStarted, transformer: droppable());
-    on<BattleRefreshRequested>(_onRefreshRequested, transformer: restartable());
-    on<BattleOptionSelected>(_onOptionSelected);
-    on<BattleAnswerSubmitted>(_onAnswerSubmitted, transformer: droppable());
-    on<BattleReadyPressed>(_onReadyPressed, transformer: droppable());
-    on<BattleSurrenderRequested>(_onSurrender, transformer: droppable());
-    on<_SnapshotReceived>(_onSnapshotReceived);
-    on<_ConnectionChanged>(_onConnectionChanged);
+    handle<BattleStarted>(_onStarted, transformer: droppable());
+    handle<BattleRefreshRequested>(_onRefreshRequested, transformer: restartable());
+    handle<BattleOptionSelected>(_onOptionSelected);
+    handle<BattleAnswerSubmitted>(_onAnswerSubmitted, transformer: droppable());
+    handle<BattleReadyPressed>(_onReadyPressed, transformer: droppable());
+    handle<BattleSurrenderRequested>(_onSurrender, transformer: droppable());
+    handle<_SnapshotReceived>(_onSnapshotReceived);
+    handle<_ConnectionChanged>(_onConnectionChanged);
   }
 
   final String battleId;
@@ -87,7 +86,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     );
     _connectionSubscription ??= _watchConnection(const NoParams())
         .listen((RealtimeStatus status) => add(_ConnectionChanged(status)));
-    emit(state.copyWith(loadStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(loadStatus: LoadStatus.loading));
     await _load(emit, force: false);
   }
 
@@ -102,8 +101,8 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     );
     if (emit.isDone) return;
     result.match((Failure failure) {
-      emit(state.copyWith(loadStatus: LoadStatus.failure, failure: failure));
-      if (state.snapshot != null) _scheduleTransition(state.snapshot!);
+      emit(stateValue.copyWith(loadStatus: LoadStatus.failure, failure: failure));
+      if (stateValue.snapshot != null) _scheduleTransition(stateValue.snapshot!);
     }, (BattleSnapshotEntity snapshot) => _apply(snapshot, emit, force: force));
   }
 
@@ -116,7 +115,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     Emitter<BattleState> emit, {
     required bool force,
   }) {
-    final BattleSnapshotEntity? current = state.snapshot;
+    final BattleSnapshotEntity? current = stateValue.snapshot;
     final bool isNewer =
         current == null ||
         next.version > current.version ||
@@ -124,17 +123,17 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
             (force ||
                 next.entitlements.version != current.entitlements.version));
     if (!isNewer) {
-      if (state.loadStatus != LoadStatus.success) {
+      if (stateValue.loadStatus != LoadStatus.success) {
         emit(
-          state.copyWith(loadStatus: LoadStatus.success, resetFailure: true),
+          stateValue.copyWith(loadStatus: LoadStatus.success, resetFailure: true),
         );
       }
       return;
     }
     final BattleRoundEntity? round = next.round;
-    final bool sameRound = round != null && round.id == state.roundId;
-    AnswerSubmission? submission = sameRound ? state.submission : null;
-    String? selected = sameRound ? state.selectedOptionId : null;
+    final bool sameRound = round != null && round.id == stateValue.roundId;
+    AnswerSubmission? submission = sameRound ? stateValue.submission : null;
+    String? selected = sameRound ? stateValue.selectedOptionId : null;
     final String? accepted = round?.mySelectedOptionId;
     if (round != null && accepted != null) {
       // The server holds this answer: it is final.
@@ -157,11 +156,11 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
         roundId: round?.id,
         selectedOptionId: selected,
         submission: submission,
-        readyStatus: state.readyStatus,
-        readyFailure: state.readyFailure,
-        surrenderStatus: state.surrenderStatus,
-        surrenderFailure: state.surrenderFailure,
-        connection: state.connection,
+        readyStatus: stateValue.readyStatus,
+        readyFailure: stateValue.readyFailure,
+        surrenderStatus: stateValue.surrenderStatus,
+        surrenderFailure: stateValue.surrenderFailure,
+        connection: stateValue.connection,
       ),
     );
     _scheduleTransition(next);
@@ -184,18 +183,18 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     _ConnectionChanged event,
     Emitter<BattleState> emit,
   ) {
-    final RealtimeStatus previous = state.connection;
-    emit(state.copyWith(connection: event.status));
+    final RealtimeStatus previous = stateValue.connection;
+    emit(stateValue.copyWith(connection: event.status));
     if (event.status == RealtimeStatus.connected) {
       _offlinePoll?.cancel();
       _offlinePoll = null;
       // Events may have been missed while offline.
-      if (previous != RealtimeStatus.connected && state.snapshot != null) {
+      if (previous != RealtimeStatus.connected && stateValue.snapshot != null) {
         add(const BattleRefreshRequested());
       }
     } else {
       _offlinePoll ??= Timer.periodic(offlinePollInterval, (_) {
-        if (!isClosed && !(state.snapshot?.phase.isTerminal ?? false)) {
+        if (!isClosed && !(stateValue.snapshot?.phase.isTerminal ?? false)) {
           add(const BattleRefreshRequested());
         }
       });
@@ -206,25 +205,25 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     BattleOptionSelected event,
     Emitter<BattleState> emit,
   ) {
-    if (!state.canChangeSelection) return;
-    emit(state.copyWith(selectedOptionId: event.optionId));
+    if (!stateValue.canChangeSelection) return;
+    emit(stateValue.copyWith(selectedOptionId: event.optionId));
   }
 
   Future<void> _onAnswerSubmitted(
     BattleAnswerSubmitted event,
     Emitter<BattleState> emit,
   ) async {
-    final BattleSnapshotEntity? snapshot = state.snapshot;
+    final BattleSnapshotEntity? snapshot = stateValue.snapshot;
     final BattleRoundEntity? round = snapshot?.round;
-    final String? optionId = state.selectedOptionId;
+    final String? optionId = stateValue.selectedOptionId;
     if (snapshot == null ||
         round == null ||
         optionId == null ||
         snapshot.phase != BattlePhase.question ||
-        !state.canSubmit) {
+        !stateValue.canSubmit) {
       return;
     }
-    final AnswerSubmission? previous = state.submission;
+    final AnswerSubmission? previous = stateValue.submission;
     // A retry keeps the id (and the option) of the first attempt.
     final String submissionId =
         previous != null &&
@@ -238,7 +237,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
       submissionId: submissionId,
       status: SubmissionStatus.sending,
     );
-    emit(state.copyWith(submission: sending));
+    emit(stateValue.copyWith(submission: sending));
     final Either<Failure, AnswerReceiptEntity> result = await _submitAnswer(
       SubmitAnswerParamsEntity(
         battleId: battleId,
@@ -249,7 +248,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     );
     if (emit.isDone) return;
     // The round may have moved on while waiting.
-    final AnswerSubmission? latest = state.submission;
+    final AnswerSubmission? latest = stateValue.submission;
     if (latest == null || latest.submissionId != submissionId) return;
     await result.match(
       (Failure failure) async {
@@ -261,7 +260,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
         }
         if (failure.hasCode(ApiErrorCodes.roundClosed)) {
           emit(
-            state.copyWith(
+            stateValue.copyWith(
               submission: latest.copyWith(
                 status: SubmissionStatus.closed,
                 failure: failure,
@@ -271,7 +270,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
           return;
         }
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             submission: latest.copyWith(
               status: SubmissionStatus.failed,
               failure: failure,
@@ -281,7 +280,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
       },
       (AnswerReceiptEntity receipt) async {
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             submission: latest.copyWith(
               status: SubmissionStatus.accepted,
               resetFailure: true,
@@ -297,7 +296,7 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     Emitter<BattleState> emit,
   ) async {
     emit(
-      state.copyWith(readyStatus: LoadStatus.loading, resetReadyFailure: true),
+      stateValue.copyWith(readyStatus: LoadStatus.loading, resetReadyFailure: true),
     );
     final Either<Failure, BattleSnapshotEntity> result = await _setReady(
       _params,
@@ -305,10 +304,10 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(readyStatus: LoadStatus.failure, readyFailure: failure),
+        stateValue.copyWith(readyStatus: LoadStatus.failure, readyFailure: failure),
       ),
       (BattleSnapshotEntity snapshot) {
-        emit(state.copyWith(readyStatus: LoadStatus.success));
+        emit(stateValue.copyWith(readyStatus: LoadStatus.success));
         _apply(snapshot, emit, force: false);
       },
     );
@@ -318,20 +317,20 @@ final class BattleBloc extends Bloc<BattleEvent, BattleState> {
     BattleSurrenderRequested event,
     Emitter<BattleState> emit,
   ) async {
-    emit(state.copyWith(surrenderStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(surrenderStatus: LoadStatus.loading));
     final Either<Failure, BattleSnapshotEntity> result = await _surrender(
       _params,
     );
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           surrenderStatus: LoadStatus.failure,
           surrenderFailure: failure,
         ),
       ),
       (BattleSnapshotEntity snapshot) {
-        emit(state.copyWith(surrenderStatus: LoadStatus.success));
+        emit(stateValue.copyWith(surrenderStatus: LoadStatus.success));
         _apply(snapshot, emit, force: false);
       },
     );

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/entity/battle_result_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
@@ -11,12 +11,13 @@ import 'package:skill_battles/features/battle_result/domain/entity/rematch_entit
 import 'package:skill_battles/features/battle_result/domain/entity/rematch_status.dart';
 import 'package:skill_battles/features/notifications/presentation/bloc/notification_bloc/notification_bloc.dart';
 
+import '../../../../helpers/fake_timers.dart';
 import '../../../../helpers/notification_fakes.dart';
 
 const String _id = 'rematch:b1';
 
 /// Lets queued events, stream deliveries and futures run.
-Future<void> _flush(WidgetTester tester) async {
+Future<void> _flush(FakeTimers tester) async {
   for (int i = 0; i < 8; i++) {
     await tester.pump();
   }
@@ -31,7 +32,7 @@ Future<void> _settle() async {
 
 /// Moves the injected clock and the fake timers together.
 Future<void> _advance(
-  WidgetTester tester,
+  FakeTimers tester,
   NotificationFixture f,
   Duration by,
 ) async {
@@ -41,7 +42,7 @@ Future<void> _advance(
 }
 
 Future<NotificationFixture> _started(
-  WidgetTester tester, {
+  FakeTimers tester, {
   bool signedIn = true,
 }) async {
   final NotificationFixture f = NotificationFixture(signedIn: signedIn);
@@ -52,7 +53,7 @@ Future<NotificationFixture> _started(
 }
 
 Future<void> _push(
-  WidgetTester tester,
+  FakeTimers tester,
   NotificationFixture f,
   RematchEntity entity,
 ) async {
@@ -68,8 +69,8 @@ RematchNotificationPayload _payload(NotificationItem item) =>
 
 void main() {
   group('NotificationBloc', () {
-    testWidgets('starts empty, disconnected-aware and reads activity', (
-      WidgetTester tester,
+    fakeTimersTest('starts empty, disconnected-aware and reads activity', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
 
@@ -79,8 +80,8 @@ void main() {
       expect(f.account.activityCalls, 1);
     });
 
-    testWidgets('incoming waiting rematch becomes a prompt with details', (
-      WidgetTester tester,
+    fakeTimersTest('incoming waiting rematch becomes a prompt with details', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
 
@@ -96,8 +97,8 @@ void main() {
       expect(f.results.getResultCalls, <String>['b1']);
     });
 
-    testWidgets('own outgoing rematch is tracked but is not a prompt', (
-      WidgetTester tester,
+    fakeTimersTest('own outgoing rematch is tracked but is not a prompt', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
 
@@ -108,8 +109,8 @@ void main() {
       expect(_payload(_item(f)).isIncoming, isFalse);
     });
 
-    testWidgets('holds the rematch back until the own id is known', (
-      WidgetTester tester,
+    fakeTimersTest('holds the rematch back until the own id is known', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       final Completer<Either<Failure, BattleResultEntity>> pending =
@@ -126,8 +127,8 @@ void main() {
       expect(_item(f).isPrompt, isFalse);
     });
 
-    testWidgets('shows the rematch as incoming when getResult fails', (
-      WidgetTester tester,
+    fakeTimersTest('shows the rematch as incoming when getResult fails', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       f.results.onGetResult = (_) async => const Left(ConnectionFailure());
@@ -139,8 +140,8 @@ void main() {
       expect(_payload(_item(f)).disciplineCode, isNull);
     });
 
-    testWidgets('a late lower version after removal does not reopen it', (
-      WidgetTester tester,
+    fakeTimersTest('a late lower version after removal does not reopen it', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', version: 2));
@@ -157,8 +158,8 @@ void main() {
       expect(f.state.items, isEmpty);
     });
 
-    testWidgets('a lower version is ignored while the item is live', (
-      WidgetTester tester,
+    fakeTimersTest('a lower version is ignored while the item is live', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', version: 5));
@@ -173,8 +174,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('MATCHED removes the item, opens the battle once, notices', (
-      WidgetTester tester,
+    fakeTimersTest('MATCHED removes the item, opens the battle once, notices', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -203,8 +204,8 @@ void main() {
       expect(f.state.notices, hasLength(1));
     });
 
-    testWidgets('NotificationBattleOpened for another id keeps the request', (
-      WidgetTester tester,
+    fakeTimersTest('NotificationBattleOpened for another id keeps the request', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(
@@ -224,8 +225,8 @@ void main() {
       expect(f.state.battleToOpen, 'new1');
     });
 
-    testWidgets('visible prompt expires locally, then lingers 4 s silently', (
-      WidgetTester tester,
+    fakeTimersTest('visible prompt expires locally, then lingers 4 s silently', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -243,8 +244,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('hidden prompt expiry removes it with an expired notice', (
-      WidgetTester tester,
+    fakeTimersTest('hidden prompt expiry removes it with an expired notice', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -258,8 +259,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.expired);
     });
 
-    testWidgets('outgoing expiry gives an expired notice', (
-      WidgetTester tester,
+    fakeTimersTest('outgoing expiry gives an expired notice', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', requestedBy: <String>[testMeId]));
@@ -270,8 +271,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.expired);
     });
 
-    testWidgets('server EXPIRED on a visible prompt marks it expired', (
-      WidgetTester tester,
+    fakeTimersTest('server EXPIRED on a visible prompt marks it expired', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -286,8 +287,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('a waiting rematch already past its deadline is not shown', (
-      WidgetTester tester,
+    fakeTimersTest('a waiting rematch already past its deadline is not shown', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
 
@@ -301,8 +302,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('CANCELLED incoming gives a cancelled notice', (
-      WidgetTester tester,
+    fakeTimersTest('CANCELLED incoming gives a cancelled notice', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -317,8 +318,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.cancelled);
     });
 
-    testWidgets('CANCELLED outgoing gives a declined notice with the name', (
-      WidgetTester tester,
+    fakeTimersTest('CANCELLED outgoing gives a declined notice with the name', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', requestedBy: <String>[testMeId]));
@@ -339,9 +340,9 @@ void main() {
       expect(f.state.notices.single.playerNickname, testNickname);
     });
 
-    testWidgets(
+    fakeTimersTest(
       'own Decline cancels, removes, and the CANCELLED push is silent',
-      (WidgetTester tester) async {
+      (FakeTimers tester) async {
         final NotificationFixture f = await _started(tester);
         await _push(tester, f, rematch('b1'));
 
@@ -361,8 +362,8 @@ void main() {
       },
     );
 
-    testWidgets('a CANCELLED push during the Decline request gives no notice', (
-      WidgetTester tester,
+    fakeTimersTest('a CANCELLED push during the Decline request gives no notice', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -386,8 +387,8 @@ void main() {
       expect(f.state.notices, isEmpty);
     });
 
-    testWidgets('a failed Decline keeps the item with a failed action', (
-      WidgetTester tester,
+    fakeTimersTest('a failed Decline keeps the item with a failed action', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -406,8 +407,8 @@ void main() {
       expect(f.state.items, isEmpty);
     });
 
-    testWidgets('Accept calls requestRematch and applies MATCHED', (
-      WidgetTester tester,
+    fakeTimersTest('Accept calls requestRematch and applies MATCHED', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -430,8 +431,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.accepted);
     });
 
-    testWidgets('Accept answered with waiting turns the card into outgoing', (
-      WidgetTester tester,
+    fakeTimersTest('Accept answered with waiting turns the card into outgoing', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -450,8 +451,8 @@ void main() {
       expect(_item(f).action, isNull);
     });
 
-    testWidgets('Accept with REMATCH_EXPIRED takes the expired path', (
-      WidgetTester tester,
+    fakeTimersTest('Accept with REMATCH_EXPIRED takes the expired path', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -467,8 +468,8 @@ void main() {
       expect(f.state.items, isEmpty);
     });
 
-    testWidgets('Accept with REMATCH_NOT_ALLOWED removes it as cancelled', (
-      WidgetTester tester,
+    fakeTimersTest('Accept with REMATCH_NOT_ALLOWED removes it as cancelled', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -482,8 +483,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.cancelled);
     });
 
-    testWidgets('Accept with ACTIVITY_CONFLICT sets busy and a failed action', (
-      WidgetTester tester,
+    fakeTimersTest('Accept with ACTIVITY_CONFLICT sets busy and a failed action', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -497,8 +498,8 @@ void main() {
       expect(_item(f).action?.status, NotificationActionStatus.failed);
     });
 
-    testWidgets('Accept with another failure keeps it pending and failed', (
-      WidgetTester tester,
+    fakeTimersTest('Accept with another failure keeps it pending and failed', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -512,8 +513,8 @@ void main() {
       expect(_item(f).isPrompt, isTrue);
     });
 
-    testWidgets('actions are ignored while one is in flight', (
-      WidgetTester tester,
+    fakeTimersTest('actions are ignored while one is in flight', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -532,8 +533,8 @@ void main() {
       expect(_item(f).action?.status, NotificationActionStatus.accepting);
     });
 
-    testWidgets('actions on unknown, outgoing or expired items are ignored', (
-      WidgetTester tester,
+    fakeTimersTest('actions on unknown, outgoing or expired items are ignored', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', requestedBy: <String>[testMeId]));
@@ -548,8 +549,8 @@ void main() {
       expect(f.results.cancelCalls, isEmpty);
     });
 
-    testWidgets('Hidden hides the prompt, HiddenShown restores it', (
-      WidgetTester tester,
+    fakeTimersTest('Hidden hides the prompt, HiddenShown restores it', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -566,8 +567,8 @@ void main() {
       expect(f.state.hiddenCount, 0);
     });
 
-    testWidgets('hiding an outgoing item does nothing', (
-      WidgetTester tester,
+    fakeTimersTest('hiding an outgoing item does nothing', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1', requestedBy: <String>[testMeId]));
@@ -578,7 +579,7 @@ void main() {
       expect(_item(f).isHidden, isFalse);
     });
 
-    testWidgets('prompts are sorted by deadline', (WidgetTester tester) async {
+    fakeTimersTest('prompts are sorted by deadline', (FakeTimers tester) async {
       final NotificationFixture f = await _started(tester);
       await _push(
         tester,
@@ -597,8 +598,8 @@ void main() {
       );
     });
 
-    testWidgets('activity sets isBusy and a failed read keeps the value', (
-      WidgetTester tester,
+    fakeTimersTest('activity sets isBusy and a failed read keeps the value', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       expect(f.state.isBusy, isFalse);
@@ -614,8 +615,8 @@ void main() {
       expect(f.state.isBusy, isTrue);
     });
 
-    testWidgets('a new prompt re-reads the activity', (
-      WidgetTester tester,
+    fakeTimersTest('a new prompt re-reads the activity', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       final int before = f.account.activityCalls;
@@ -625,8 +626,8 @@ void main() {
       expect(f.account.activityCalls, before + 1);
     });
 
-    testWidgets('connection state follows the stream', (
-      WidgetTester tester,
+    fakeTimersTest('connection state follows the stream', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       // The use case yields the current (connected) status first.
@@ -641,8 +642,8 @@ void main() {
       expect(f.state.isConnected, isTrue);
     });
 
-    testWidgets('reconnect re-reads known waiting items', (
-      WidgetTester tester,
+    fakeTimersTest('reconnect re-reads known waiting items', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       f.connection.changes.add(RealtimeStatus.connected);
@@ -666,8 +667,8 @@ void main() {
       expect(f.state.notices.single.type, NotificationNoticeType.cancelled);
     });
 
-    testWidgets('the first connected status does not trigger recovery', (
-      WidgetTester tester,
+    fakeTimersTest('the first connected status does not trigger recovery', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
@@ -678,7 +679,7 @@ void main() {
       expect(f.results.getRematchCalls, isEmpty);
     });
 
-    testWidgets('sign-out clears everything', (WidgetTester tester) async {
+    fakeTimersTest('sign-out clears everything', (FakeTimers tester) async {
       final NotificationFixture f = await _started(tester);
       await _push(tester, f, rematch('b1'));
       await _push(
@@ -766,8 +767,8 @@ void main() {
       f.dispose();
     });
 
-    testWidgets('notices are consumed one by one with unique ids', (
-      WidgetTester tester,
+    fakeTimersTest('notices are consumed one by one with unique ids', (
+      FakeTimers tester,
     ) async {
       final NotificationFixture f = await _started(tester);
       for (final String id in <String>['b1', 'b2']) {

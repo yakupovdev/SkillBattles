@@ -1,4 +1,4 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/core/utils/error/app_exception.dart';
 import 'package:skill_battles/core/utils/session/session_tokens.dart';
@@ -15,26 +15,29 @@ abstract interface class TokenStorage {
   Future<void> clear();
 }
 
-final class SecureTokenStorage implements TokenStorage {
-  const SecureTokenStorage(this._storage);
+/// Keeps the pair in the browser's `localStorage`, the same place
+/// `flutter_secure_storage` used on web. Tokens never go to cookies, so
+/// requests carry them only through the `Authorization` header.
+final class BrowserTokenStorage implements TokenStorage {
+  const BrowserTokenStorage(this._storage);
 
-  final FlutterSecureStorage _storage;
+  final web.Storage _storage;
 
   @override
   Future<SessionTokens?> read() async {
     try {
-      final String? access = await _storage.read(key: StorageKeys.accessToken);
-      final String? refresh = await _storage.read(
-        key: StorageKeys.refreshToken,
-      );
-      final String? userId = await _storage.read(key: StorageKeys.userId);
+      final String? access = _storage.getItem(StorageKeys.accessToken);
+      final String? refresh = _storage.getItem(StorageKeys.refreshToken);
+      final String? userId = _storage.getItem(StorageKeys.userId);
       if (access == null || refresh == null || userId == null) return null;
       return SessionTokens(
         accessToken: access,
         refreshToken: refresh,
         userId: userId,
       );
-    } on Exception catch (error) {
+    } on Object catch (error) {
+      // A blocked storage (private mode, disabled site data) throws a
+      // `DOMException`, which is not an `Exception` in Dart.
       throw StorageException('Token read failed: ${error.runtimeType}');
     }
   }
@@ -42,16 +45,11 @@ final class SecureTokenStorage implements TokenStorage {
   @override
   Future<void> write(SessionTokens tokens) async {
     try {
-      await _storage.write(
-        key: StorageKeys.accessToken,
-        value: tokens.accessToken,
-      );
-      await _storage.write(
-        key: StorageKeys.refreshToken,
-        value: tokens.refreshToken,
-      );
-      await _storage.write(key: StorageKeys.userId, value: tokens.userId);
-    } on Exception catch (error) {
+      _storage
+        ..setItem(StorageKeys.accessToken, tokens.accessToken)
+        ..setItem(StorageKeys.refreshToken, tokens.refreshToken)
+        ..setItem(StorageKeys.userId, tokens.userId);
+    } on Object catch (error) {
       throw StorageException('Token write failed: ${error.runtimeType}');
     }
   }
@@ -59,10 +57,11 @@ final class SecureTokenStorage implements TokenStorage {
   @override
   Future<void> clear() async {
     try {
-      await _storage.delete(key: StorageKeys.accessToken);
-      await _storage.delete(key: StorageKeys.refreshToken);
-      await _storage.delete(key: StorageKeys.userId);
-    } on Exception catch (error) {
+      _storage
+        ..removeItem(StorageKeys.accessToken)
+        ..removeItem(StorageKeys.refreshToken)
+        ..removeItem(StorageKeys.userId);
+    } on Object catch (error) {
       throw StorageException('Token clear failed: ${error.runtimeType}');
     }
   }

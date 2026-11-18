@@ -14,8 +14,7 @@ final class UpdateProfileResponseModel {
     required this.reauthenticationRequired,
   });
 
-  factory UpdateProfileResponseModel.fromJson(Map<String, dynamic> json) =>
-      _$UpdateProfileResponseModelFromJson(json);
+  factory UpdateProfileResponseModel.fromJson(Map<String, dynamic> json) => _$UpdateProfileResponseModelFromJson(json);
 
   @JsonKey(required: true)
   final UserModel user;

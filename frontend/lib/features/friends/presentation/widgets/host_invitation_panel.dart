@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -40,7 +41,7 @@ final class HostInvitationNotice {
 /// [hasPendingInvitation] switches the button; [isCancelling] shows its
 /// spinner. [rateLimitedUntil] disables Invite until the instant passes and
 /// shows `Too many invitations. Try again in 0:42.`
-final class HostInvitationPanel extends StatefulWidget {
+final class HostInvitationPanel extends StatefulComponent {
   const HostInvitationPanel({
     required this.hasPendingInvitation,
     required this.onInvite,
@@ -82,9 +83,9 @@ final class _HostInvitationPanelState extends State<HostInvitationPanel> {
   }
 
   @override
-  void didUpdateWidget(HostInvitationPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.rateLimitedUntil != widget.rateLimitedUntil) {
+  void didUpdateComponent(HostInvitationPanel oldComponent) {
+    super.didUpdateComponent(oldComponent);
+    if (oldComponent.rateLimitedUntil != component.rateLimitedUntil) {
       _scheduleRateLimitEnd();
     }
   }
@@ -96,11 +97,9 @@ final class _HostInvitationPanelState extends State<HostInvitationPanel> {
   }
 
   Duration? _remaining() {
-    final DateTime? until = widget.rateLimitedUntil;
+    final DateTime? until = component.rateLimitedUntil;
     if (until == null) return null;
-    final Duration left = until.difference(
-      DateTime.now().add(widget.clockOffset),
-    );
+    final Duration left = until.difference(DateTime.now().add(component.clockOffset));
     return left > Duration.zero ? left : null;
   }
 
@@ -116,80 +115,69 @@ final class _HostInvitationPanelState extends State<HostInvitationPanel> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final HostInvitationNotice? note = widget.notice;
-    final String? error = widget.errorText;
-    final DateTime? limitedUntil = _remaining() == null
-        ? null
-        : widget.rateLimitedUntil;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 10,
-      children: <Widget>[
-        if (widget.hasPendingInvitation)
-          AppButton(
-            label: 'Cancel invitation',
-            variant: AppButtonVariant.outline,
-            size: AppButtonSize.medium,
-            expand: true,
-            isLoading: widget.isCancelling,
-            onPressed: widget.onCancelInvitation,
-          )
-        else
-          AppButton(
-            label: 'Invite friend',
-            variant: AppButtonVariant.outline,
-            size: AppButtonSize.medium,
-            expand: true,
-            onPressed: limitedUntil == null ? widget.onInvite : null,
-          ),
-        if (note != null) AppNotice(message: note.message, tone: note.tone),
-        if (limitedUntil != null)
-          _RateLimitedError(
-            until: limitedUntil,
-            clockOffset: widget.clockOffset,
-          ),
-        if (error != null) AppInlineError(error),
-      ],
-    );
+  Component build(BuildContext context) {
+    final HostInvitationNotice? note = component.notice;
+    final String? error = component.errorText;
+    final DateTime? limitedUntil = _remaining() == null ? null : component.rateLimitedUntil;
+    return div(classes: 'host-invitation-panel', <Component>[
+      if (component.hasPendingInvitation)
+        AppButton(
+          label: 'Cancel invitation',
+          variant: AppButtonVariant.outline,
+          size: AppButtonSize.medium,
+          expand: true,
+          isLoading: component.isCancelling,
+          onPressed: component.onCancelInvitation,
+        )
+      else
+        AppButton(
+          label: 'Invite friend',
+          variant: AppButtonVariant.outline,
+          size: AppButtonSize.medium,
+          expand: true,
+          onPressed: limitedUntil == null ? component.onInvite : null,
+        ),
+      if (note != null) AppNotice(message: note.message, tone: note.tone),
+      if (limitedUntil != null) _RateLimitedError(until: limitedUntil, clockOffset: component.clockOffset),
+      if (error != null) AppInlineError(error),
+    ]);
   }
 }
 
-final class _RateLimitedError extends StatelessWidget {
+final class _RateLimitedError extends StatelessComponent {
   const _RateLimitedError({required this.until, required this.clockOffset});
 
   final DateTime until;
   final Duration clockOffset;
 
   @override
-  Widget build(BuildContext context) {
-    final TextStyle style = AppTextStyles.bodySm.copyWith(
-      color: AppColors.danger,
-      height: 18 / 13,
-    );
-    return Semantics(
-      liveRegion: true,
-      child: Text.rich(
-        TextSpan(
-          children: <InlineSpan>[
-            const TextSpan(text: 'Too many invitations. Try again in '),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.baseline,
-              baseline: TextBaseline.alphabetic,
-              child: AppCountdownText(
-                target: until,
-                clockOffset: clockOffset,
-                style: AppTextStyles.monoBodySm.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.danger,
-                ),
-              ),
-            ),
-            const TextSpan(text: '.'),
-          ],
+  Component build(BuildContext context) {
+    return p(
+      classes: 'host-invitation-panel__rate-limit',
+      attributes: const <String, String>{'aria-live': 'polite'},
+      <Component>[
+        span(<Component>[Component.text('Too many invitations. Try again in ')]),
+        AppCountdownText(
+          target: until,
+          clockOffset: clockOffset,
+          style: AppTextStyles.monoBodySm.combine(
+            const Styles(color: AppColors.danger, fontWeight: FontWeight.w600),
+          ),
         ),
-        style: style,
-      ),
+        span(<Component>[Component.text('.')]),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get hostInvitationPanelStyles => <StyleRule>[
+  css('.host-invitation-panel').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(10)),
+  ),
+  css('.host-invitation-panel__rate-limit')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.danger, lineHeight: Unit.pixels(18))),
+];

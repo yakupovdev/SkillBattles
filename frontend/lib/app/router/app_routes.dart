@@ -52,4 +52,14 @@ enum AppRoutes {
     forgotPassword,
     resetPassword,
   };
+
+  /// Roots of the top-bar tabs. `AppShell` keeps a visited root alive while
+  /// another page is shown, so going back to its tab shows it as it was.
+  static const Set<AppRoutes> tabRoots = <AppRoutes>{
+    home,
+    leaderboard,
+    profile,
+    history,
+    friends,
+  };
 }

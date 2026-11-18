@@ -17,6 +17,8 @@
 **/.pub/
 **/coverage/
 **/node_modules/
+frontend/frontend/
+frontend/.fvm/
 .ai/
 .agents/
 .codex/

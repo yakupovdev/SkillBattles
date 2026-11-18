@@ -17,8 +17,7 @@ final class TopicStatsModel {
     required this.isWeakTopic,
   });
 
-  factory TopicStatsModel.fromJson(Map<String, dynamic> json) =>
-      _$TopicStatsModelFromJson(json);
+  factory TopicStatsModel.fromJson(Map<String, dynamic> json) => _$TopicStatsModelFromJson(json);
 
   @JsonKey(required: true)
   final String topicCode;

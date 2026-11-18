@@ -21,8 +21,7 @@ final class LimitsResponseModel {
     required this.entitlements,
   });
 
-  factory LimitsResponseModel.fromJson(Map<String, dynamic> json) =>
-      _$LimitsResponseModelFromJson(json);
+  factory LimitsResponseModel.fromJson(Map<String, dynamic> json) => _$LimitsResponseModelFromJson(json);
 
   @JsonKey(required: true)
   final PlanCodeModel planCode;

@@ -1,20 +1,24 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
+import 'package:skill_battles/app/router/app_navigation.dart';
 import 'package:skill_battles/app/router/app_routes.dart';
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_callout.dart';
+import 'package:skill_battles/core/presentation/widgets/app_form.dart';
 import 'package:skill_battles/core/presentation/widgets/app_inline_error.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_field.dart';
-import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/core/presentation/widgets/app_text_input.dart';
+import 'package:skill_battles/core/utils/error/failure.dart';
+import 'package:skill_battles/core/utils/extensions/route_extension.dart';
 import 'package:skill_battles/core/utils/form_validators.dart';
 import 'package:skill_battles/features/auth/domain/entity/password_reset_request_params_entity.dart';
 import 'package:skill_battles/features/auth/domain/usecases/confirm_password_reset_usecase.dart';
@@ -24,14 +28,13 @@ import 'package:skill_battles/features/auth/presentation/screens/auth_screen.dar
 import 'package:skill_battles/features/auth/presentation/widgets/auth_failure_message.dart';
 
 /// "Forgot password" (Paper: "12 Forgot password"): the answer is the same whether the account exists.
-final class ForgotPasswordScreen extends StatefulWidget
-    implements GoRouterWrapper {
+final class ForgotPasswordScreen extends StatefulComponent implements RouteWrapper {
   const ForgotPasswordScreen({super.key});
 
   @override
-  Widget wrappedRoute(BuildContext context) {
+  Component wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<PasswordResetBloc>(
+    return BlocSignalProvider<PasswordResetBloc>(
       create: (_) => PasswordResetBloc(
         requestReset: dependencies.getDep<RequestPasswordResetUsecase>(),
         confirmReset: dependencies.getDep<ConfirmPasswordResetUsecase>(),
@@ -45,14 +48,14 @@ final class ForgotPasswordScreen extends StatefulWidget
 }
 
 final class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  late final GlobalKey<FormState> _formKey;
+  late final GlobalStateKey<AppFormState> _formKey;
   late final TextEditingController _emailController;
   late final FocusNode _emailFocus;
 
   @override
   void initState() {
     super.initState();
-    _formKey = GlobalKey<FormState>();
+    _formKey = GlobalStateKey<AppFormState>();
     _emailController = TextEditingController();
     _emailFocus = FocusNode();
   }
@@ -65,80 +68,65 @@ final class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   void _submit() {
-    FocusScope.of(context).unfocus();
     if (!(_formKey.currentState?.validate() ?? false)) return;
     context.read<PasswordResetBloc>().add(
-      PasswordResetRequested(
-        PasswordResetRequestParamsEntity(email: _emailController.text),
-      ),
+      PasswordResetRequested(PasswordResetRequestParamsEntity(email: _emailController.text)),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AuthLayout(
-      child: Form(
+      child: AppForm(
         key: _formKey,
         autovalidateMode: AutovalidateMode.onUserInteractionIfError,
-        child: BlocBuilder<PasswordResetBloc, PasswordResetState>(
+        onSubmit: _submit,
+        child: BlocSignalBuilder<PasswordResetBloc, PasswordResetState>(
           builder: (BuildContext context, PasswordResetState state) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 32,
-              children: <Widget>[
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _BackLink(
-                    onPressed: () => context.goNamed(AppRoutes.auth.name),
-                  ),
+            final Failure? failure = state.failure;
+            return div(classes: 'auth-form', <Component>[
+              _BackLink(onPressed: () => context.goNamed(AppRoutes.auth.name)),
+              const AuthHeading(
+                title: 'Forgot your password?',
+                gap: 12,
+                subtitle:
+                    "Enter the email you signed up with. We'll send a link "
+                    'that works for 20 minutes.',
+              ),
+              div(classes: 'auth-form__fields', <Component>[
+                // No onFieldSubmitted: Enter submits the form.
+                AppTextField(
+                  label: 'Email',
+                  controller: _emailController,
+                  focusNode: _emailFocus,
+                  validator: FormValidators.email,
+                  keyboardType: InputType.email,
+                  textInputAction: TextInputAction.done,
+                  autofillHints: const <String>[AutofillHints.email],
                 ),
-                const AuthHeading(
-                  title: 'Forgot your password?',
-                  gap: 12,
-                  subtitle:
-                      "Enter the email you signed up with. We'll send a link "
-                      'that works for 20 minutes.',
+                if (failure != null) AppInlineError(failure.authMessage),
+              ]),
+              AppButton(
+                label: state.status.isLoading
+                    ? 'Sending…'
+                    : state.status.isSuccess
+                    ? 'Send again'
+                    : 'Send reset link',
+                variant: AppButtonVariant.dark,
+                expand: true,
+                type: ButtonType.submit,
+                onPressed: state.status.isLoading ? null : _submitsEnclosingForm,
+              ),
+              if (state.status.isSuccess)
+                AppCallout(
+                  title: 'Check your inbox',
+                  message:
+                      state.message ??
+                      'If an account exists for this email, password reset '
+                          'instructions will be sent.',
+                  tone: AppCalloutTone.success,
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: 16,
-                  children: <Widget>[
-                    AppTextField(
-                      label: 'Email',
-                      controller: _emailController,
-                      focusNode: _emailFocus,
-                      validator: FormValidators.email,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const <String>[AutofillHints.email],
-                      onFieldSubmitted: (_) => _submit(),
-                    ),
-                    if (state.failure != null)
-                      AppInlineError(state.failure!.authMessage),
-                  ],
-                ),
-                AppButton(
-                  label: state.status.isLoading
-                      ? 'Sending…'
-                      : state.status.isSuccess
-                      ? 'Send again'
-                      : 'Send reset link',
-                  variant: AppButtonVariant.dark,
-                  expand: true,
-                  onPressed: state.status.isLoading ? null : _submit,
-                ),
-                if (state.status.isSuccess)
-                  AppCallout(
-                    title: 'Check your inbox',
-                    message:
-                        state.message ??
-                        'If an account exists for this email, password reset '
-                            'instructions will be sent.',
-                    tone: AppCalloutTone.success,
-                  ),
-              ],
-            );
+            ]);
           },
         ),
       ),
@@ -146,32 +134,40 @@ final class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
+/// `onPressed` of the submit button: the click submits the [AppForm], whose
+/// `onSubmit` does the work (also for Enter in the field).
+void _submitsEnclosingForm() {}
+
 /// "‹ Back to log in" above the form.
-final class _BackLink extends StatelessWidget {
+final class _BackLink extends StatelessComponent {
   const _BackLink({required this.onPressed});
 
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     return AppTappable(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(4),
+      radius: 4,
+      classes: 'auth-back-link',
       semanticLabel: 'Back to log in',
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        spacing: 8,
-        children: <Widget>[
-          const AppSvgIcon(AppIcons.chevronLeft, width: 16, height: 16),
-          Text(
-            'Back to log in',
-            style: AppTextStyles.bodyMd.copyWith(
-              color: AppColors.muted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+      child: const span(classes: 'auth-back-link__row', <Component>[
+        AppSvgIcon(AppIcons.chevronLeft, width: 16, height: 16),
+        span(classes: 'auth-back-link__label', <Component>[Component.text('Back to log in')]),
+      ]),
     );
   }
 }
+
+@css
+List<StyleRule> get forgotPasswordScreenStyles => <StyleRule>[
+  css('.auth-back-link').styles(width: Unit.fitContent),
+  css('.auth-back-link__row').styles(
+    display: Display.flex,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+  ),
+  css('.auth-back-link__label')
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(color: AppColors.muted, fontWeight: FontWeight.w500)),
+];

@@ -1,13 +1,18 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// A Pro-only block shown to Free readers. It says what is restricted; it
 /// never pretends there is no data and never renders hidden values.
-final class AppLockedPanel extends StatelessWidget {
+///
+/// Without billing ([FeatureFlags.billing]) it has no PRO badge and no
+/// upgrade button; callers pass a [message] that does not offer Pro.
+final class AppLockedPanel extends StatelessComponent {
   const AppLockedPanel({
     required this.title,
     required this.message,
@@ -22,43 +27,43 @@ final class AppLockedPanel extends StatelessWidget {
   final VoidCallback? onUpgrade;
 
   @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          spacing: 16,
-          children: <Widget>[
-            const ProBadge(),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 4,
-                children: <Widget>[
-                  Text(title, style: AppTextStyles.buttonLg),
-                  Text(
-                    message,
-                    style: AppTextStyles.bodySm.copyWith(
-                      color: AppColors.muted,
-                      height: 18 / 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            AppButton(
-              label: actionLabel,
-              variant: AppButtonVariant.dark,
-              size: AppButtonSize.small,
-              onPressed: onUpgrade,
-            ),
-          ],
+  Component build(BuildContext context) {
+    return div(classes: 'app-locked-panel', <Component>[
+      const ProBadge(),
+      div(classes: 'app-locked-panel__text', <Component>[
+        p(classes: 'app-locked-panel__title', <Component>[Component.text(title)]),
+        p(classes: 'app-locked-panel__message', <Component>[Component.text(message)]),
+      ]),
+      if (FeatureFlags.billing)
+        AppButton(
+          label: actionLabel,
+          variant: AppButtonVariant.dark,
+          size: AppButtonSize.small,
+          onPressed: onUpgrade,
         ),
-      ),
-    );
+    ]);
   }
 }
+
+@css
+List<StyleRule> get appLockedPanelStyles => <StyleRule>[
+  css('.app-locked-panel').styles(
+    display: Display.flex,
+    padding: const Padding.all(Unit.pixels(20)),
+    radius: const BorderRadius.circular(Unit.pixels(14)),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(16)),
+    backgroundColor: AppColors.surface,
+  ),
+  css('.app-locked-panel__text').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(4)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.app-locked-panel__title').combine(AppTextStyles.buttonLg),
+  css('.app-locked-panel__message')
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.muted, lineHeight: Unit.pixels(18))),
+];

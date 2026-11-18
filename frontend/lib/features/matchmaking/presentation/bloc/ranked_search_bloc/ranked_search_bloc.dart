@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -29,7 +28,7 @@ part 'ranked_search_state.dart';
 /// polling fallback, cancel. MATCHED hands over to the battle; an
 /// asynchronous cancellation (e.g. QUOTA_EXHAUSTED) frees the screen.
 final class RankedSearchBloc
-    extends Bloc<RankedSearchEvent, RankedSearchState> {
+    extends SignalBloc<RankedSearchEvent, RankedSearchState> {
   RankedSearchBloc({
     required this._joinQueue,
     required this._getEntry,
@@ -39,11 +38,11 @@ final class RankedSearchBloc
     required this._getStatistics,
     this.pollInterval = const Duration(seconds: 4),
   }) : super(const RankedSearchState()) {
-    on<RankedSearchStarted>(_onStarted, transformer: droppable());
-    on<RankedSearchCancelRequested>(_onCancel, transformer: droppable());
-    on<_EntryReceived>(_onEntryReceived);
-    on<_RefreshTick>(_onRefreshTick, transformer: droppable());
-    on<_StatisticsRequested>(_onStatisticsRequested, transformer: droppable());
+    handle<RankedSearchStarted>(_onStarted, transformer: droppable());
+    handle<RankedSearchCancelRequested>(_onCancel, transformer: droppable());
+    handle<_EntryReceived>(_onEntryReceived);
+    handle<_RefreshTick>(_onRefreshTick, transformer: droppable());
+    handle<_StatisticsRequested>(_onStatisticsRequested, transformer: droppable());
   }
 
   final JoinQueueUsecase _joinQueue;
@@ -71,10 +70,10 @@ final class RankedSearchBloc
       RankedSearchState(
         status: RankedSearchStatus.joining,
         disciplineCode: event.disciplineCode,
-        statistics: state.statistics,
+        statistics: stateValue.statistics,
       ),
     );
-    if (state.statistics == null) add(const _StatisticsRequested());
+    if (stateValue.statistics == null) add(const _StatisticsRequested());
     final String? resumeId = event.entryId;
     if (resumeId != null) {
       _follow(resumeId);
@@ -83,7 +82,7 @@ final class RankedSearchBloc
     }
     final String? code = event.disciplineCode;
     if (code == null) {
-      emit(state.copyWith(status: RankedSearchStatus.failure));
+      emit(stateValue.copyWith(status: RankedSearchStatus.failure));
       return;
     }
     final Either<Failure, QueueEntryEntity> result = await _joinQueue(
@@ -92,7 +91,7 @@ final class RankedSearchBloc
     if (emit.isDone) return;
     await result.match(
       (Failure failure) async => emit(
-        state.copyWith(status: RankedSearchStatus.failure, failure: failure),
+        stateValue.copyWith(status: RankedSearchStatus.failure, failure: failure),
       ),
       (QueueEntryEntity entry) async {
         _apply(entry, emit);
@@ -123,9 +122,9 @@ final class RankedSearchBloc
     );
     if (emit.isDone) return;
     result.match((Failure failure) {
-      if (state.entry == null) {
+      if (stateValue.entry == null) {
         emit(
-          state.copyWith(status: RankedSearchStatus.failure, failure: failure),
+          stateValue.copyWith(status: RankedSearchStatus.failure, failure: failure),
         );
       }
     }, (QueueEntryEntity entry) => _apply(entry, emit));
@@ -142,7 +141,7 @@ final class RankedSearchBloc
     );
     if (emit.isDone) return;
     final StatisticsEntity? statistics = result.toNullable();
-    if (statistics != null) emit(state.copyWith(statistics: statistics));
+    if (statistics != null) emit(stateValue.copyWith(statistics: statistics));
   }
 
   void _onEntryReceived(_EntryReceived event, Emitter<RankedSearchState> emit) {
@@ -153,13 +152,13 @@ final class RankedSearchBloc
     _RefreshTick event,
     Emitter<RankedSearchState> emit,
   ) async {
-    final QueueEntryEntity? entry = state.entry;
-    if (entry == null || state.isOver) return;
+    final QueueEntryEntity? entry = stateValue.entry;
+    if (entry == null || stateValue.isOver) return;
     await _refresh(entry.id, emit);
   }
 
   void _apply(QueueEntryEntity entry, Emitter<RankedSearchState> emit) {
-    final QueueEntryEntity? current = state.entry;
+    final QueueEntryEntity? current = stateValue.entry;
     if (current != null &&
         current.id == entry.id &&
         entry.version < current.version) {
@@ -171,26 +170,26 @@ final class RankedSearchBloc
       QueueStatus.cancelled || QueueStatus.expired => RankedSearchStatus.ended,
     };
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         status: status,
         entry: entry,
         disciplineCode: entry.disciplineCode,
         resetFailure: true,
       ),
     );
-    if (state.isOver) _stopFollowing();
+    if (stateValue.isOver) _stopFollowing();
   }
 
   Future<void> _onCancel(
     RankedSearchCancelRequested event,
     Emitter<RankedSearchState> emit,
   ) async {
-    final QueueEntryEntity? entry = state.entry;
-    if (entry == null || state.isOver) {
-      emit(state.copyWith(cancelStatus: LoadStatus.success));
+    final QueueEntryEntity? entry = stateValue.entry;
+    if (entry == null || stateValue.isOver) {
+      emit(stateValue.copyWith(cancelStatus: LoadStatus.success));
       return;
     }
-    emit(state.copyWith(cancelStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(cancelStatus: LoadStatus.loading));
     final Either<Failure, Unit> result = await _cancelEntry(
       QueueEntryParamsEntity(entryId: entry.id),
     );
@@ -199,12 +198,12 @@ final class RankedSearchBloc
       (Failure failure) async {
         if (failure.hasCode(ApiErrorCodes.matchAlreadyFound)) {
           // Too late: the match exists. Go on to it.
-          emit(state.copyWith(cancelStatus: LoadStatus.initial));
+          emit(stateValue.copyWith(cancelStatus: LoadStatus.initial));
           await _refresh(entry.id, emit);
           return;
         }
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             cancelStatus: LoadStatus.failure,
             cancelFailure: failure,
           ),
@@ -212,7 +211,7 @@ final class RankedSearchBloc
       },
       (_) async {
         _stopFollowing();
-        emit(state.copyWith(cancelStatus: LoadStatus.success));
+        emit(stateValue.copyWith(cancelStatus: LoadStatus.success));
       },
     );
   }

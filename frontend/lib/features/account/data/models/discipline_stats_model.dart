@@ -29,8 +29,7 @@ final class DisciplineStatsModel {
     required this.ratingHistory,
   });
 
-  factory DisciplineStatsModel.fromJson(Map<String, dynamic> json) =>
-      _$DisciplineStatsModelFromJson(json);
+  factory DisciplineStatsModel.fromJson(Map<String, dynamic> json) => _$DisciplineStatsModelFromJson(json);
 
   @JsonKey(required: true)
   final String disciplineCode;
@@ -87,11 +86,7 @@ final class DisciplineStatsModel {
     seasonRolloverPending: seasonRolloverPending,
     ranked: ranked.toEntity(),
     privateMatches: privateMatches.toEntity(),
-    topicStats: topicStats
-        ?.map((TopicStatsModel topic) => topic.toEntity())
-        .toList(growable: false),
-    ratingHistory: ratingHistory
-        ?.map((RatingHistoryPointModel point) => point.toEntity())
-        .toList(growable: false),
+    topicStats: topicStats?.map((TopicStatsModel topic) => topic.toEntity()).toList(growable: false),
+    ratingHistory: ratingHistory?.map((RatingHistoryPointModel point) => point.toEntity()).toList(growable: false),
   );
 }

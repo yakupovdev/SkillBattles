@@ -1,14 +1,13 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/page_info_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -49,7 +48,7 @@ typedef _SliceUpdate = FriendsListSlice<T> Function<T extends Object>(
 /// lists dirty and their CURRENT page is read again (invalidations are
 /// coalesced; a page now past the end falls back to the last page). Each
 /// list has a version, so only the newest load of a list lands.
-final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
+final class FriendsBloc extends SignalBloc<FriendsEvent, FriendsState> {
   FriendsBloc({
     required this._getFriendCode,
     required this._getFriends,
@@ -63,18 +62,18 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     required this._watchConnection,
     this.pageSize = 20,
   }) : super(const FriendsState()) {
-    on<FriendsStarted>(_onStarted, transformer: droppable());
-    on<FriendsRefreshRequested>(_onRefresh, transformer: restartable());
-    on<FriendsListRetryRequested>(_onListRetry);
-    on<FriendsPageRequested>(_onPageRequested);
-    on<FriendRequestSubmitted>(_onSubmitted, transformer: droppable());
-    on<FriendRequestAcceptRequested>(_onAccept);
-    on<FriendRequestDeclineRequested>(_onDecline);
-    on<FriendRequestCancelRequested>(_onCancel);
-    on<FriendRemoveRequested>(_onRemove);
-    on<_FriendshipChanged>(_onFriendshipChanged);
-    on<_Reconnected>(_onReconnected);
-    on<_InvalidatedListsFlushed>(_onFlush, transformer: droppable());
+    handle<FriendsStarted>(_onStarted, transformer: droppable());
+    handle<FriendsRefreshRequested>(_onRefresh, transformer: restartable());
+    handle<FriendsListRetryRequested>(_onListRetry);
+    handle<FriendsPageRequested>(_onPageRequested);
+    handle<FriendRequestSubmitted>(_onSubmitted, transformer: droppable());
+    handle<FriendRequestAcceptRequested>(_onAccept);
+    handle<FriendRequestDeclineRequested>(_onDecline);
+    handle<FriendRequestCancelRequested>(_onCancel);
+    handle<FriendRemoveRequested>(_onRemove);
+    handle<_FriendshipChanged>(_onFriendshipChanged);
+    handle<_Reconnected>(_onReconnected);
+    handle<_InvalidatedListsFlushed>(_onFlush, transformer: droppable());
   }
 
   final GetFriendCodeUsecase _getFriendCode;
@@ -132,7 +131,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     Emitter<FriendsState> emit,
   ) async {
     await Future.wait<void>(<Future<void>>[
-      if (!state.codeStatus.isSuccess) _loadCode(emit),
+      if (!stateValue.codeStatus.isSuccess) _loadCode(emit),
       for (final FriendsList list in FriendsList.values)
         _loadCurrent(list, emit),
     ]);
@@ -147,17 +146,17 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
       _invalidate(FriendsList.values);
 
   Future<void> _loadCode(Emitter<FriendsState> emit) async {
-    emit(state.copyWith(codeStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(codeStatus: LoadStatus.loading));
     final Either<Failure, FriendCodeEntity> result = await _getFriendCode(
       const NoParams(),
     );
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(codeStatus: LoadStatus.failure, codeFailure: failure),
+        stateValue.copyWith(codeStatus: LoadStatus.failure, codeFailure: failure),
       ),
       (FriendCodeEntity code) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           codeStatus: LoadStatus.success,
           code: code,
           resetCodeFailure: true,
@@ -262,7 +261,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     Emitter<FriendsState> emit,
   ) async {
     final FriendsList list = event.list;
-    final FriendsListSlice<Object> slice = state.slice(list);
+    final FriendsListSlice<Object> slice = stateValue.slice(list);
     if (slice.loadStatus.isLoading || slice.pageStatus.isLoading) return;
     final int totalPages = slice.page?.totalPages ?? 0;
     // Out of range: clamped to the known pages (the server answers an
@@ -302,14 +301,14 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
 
   FriendsState _mapSlice(FriendsList list, _SliceUpdate update) =>
       switch (list) {
-        FriendsList.friends => state.copyWith(
-          friends: update<FriendListItemEntity>(state.friends),
+        FriendsList.friends => stateValue.copyWith(
+          friends: update<FriendListItemEntity>(stateValue.friends),
         ),
-        FriendsList.incoming => state.copyWith(
-          incoming: update<RelationshipEntity>(state.incoming),
+        FriendsList.incoming => stateValue.copyWith(
+          incoming: update<RelationshipEntity>(stateValue.incoming),
         ),
-        FriendsList.outgoing => state.copyWith(
-          outgoing: update<RelationshipEntity>(state.outgoing),
+        FriendsList.outgoing => stateValue.copyWith(
+          outgoing: update<RelationshipEntity>(stateValue.outgoing),
         ),
       };
 
@@ -356,28 +355,28 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
   /// Actions of rows that left their lists.
   void _pruneActions(Emitter<FriendsState> emit) {
     final Set<String> requestIds = <String>{
-      ...state.incoming.items.map((RelationshipEntity r) => r.id),
-      ...state.outgoing.items.map((RelationshipEntity r) => r.id),
+      ...stateValue.incoming.items.map((RelationshipEntity r) => r.id),
+      ...stateValue.outgoing.items.map((RelationshipEntity r) => r.id),
     };
-    final Set<String> friendIds = state.friends.items
+    final Set<String> friendIds = stateValue.friends.items
         .map((FriendListItemEntity f) => f.friend.id)
         .toSet();
     final Map<String, FriendsItemAction> requests =
-        Map<String, FriendsItemAction>.of(state.requestActions)..removeWhere(
+        Map<String, FriendsItemAction>.of(stateValue.requestActions)..removeWhere(
           (String id, FriendsItemAction action) =>
               !requestIds.contains(id) && !action.status.isLoading,
         );
     final Map<String, FriendsItemAction> friends =
-        Map<String, FriendsItemAction>.of(state.friendActions)..removeWhere(
+        Map<String, FriendsItemAction>.of(stateValue.friendActions)..removeWhere(
           (String id, FriendsItemAction action) =>
               !friendIds.contains(id) && !action.status.isLoading,
         );
-    if (requests.length == state.requestActions.length &&
-        friends.length == state.friendActions.length) {
+    if (requests.length == stateValue.requestActions.length &&
+        friends.length == stateValue.friendActions.length) {
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         requestActions: Map<String, FriendsItemAction>.unmodifiable(requests),
         friendActions: Map<String, FriendsItemAction>.unmodifiable(friends),
       ),
@@ -392,7 +391,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     Emitter<FriendsState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         sendStatus: LoadStatus.loading,
         resetSendFailure: true,
         resetSentRequest: true,
@@ -405,7 +404,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     result.match(
       (Failure failure) {
         emit(
-          state.copyWith(sendStatus: LoadStatus.failure, sendFailure: failure),
+          stateValue.copyWith(sendStatus: LoadStatus.failure, sendFailure: failure),
         );
         // Show the authoritative lists the error refers to; never accept
         // a crossed request automatically.
@@ -418,7 +417,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
       (RelationshipEntity relationship) {
         // 201 (new) and 200 (own pending already existed) look the same.
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             sendStatus: LoadStatus.success,
             sentRequest: relationship,
           ),
@@ -470,7 +469,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     List<FriendsList> affected,
     Emitter<FriendsState> emit,
   ) async {
-    if (state.requestActions[requestId]?.status.isLoading ?? false) return;
+    if (stateValue.requestActions[requestId]?.status.isLoading ?? false) return;
     _setRequestAction(
       requestId,
       const FriendsItemAction(status: LoadStatus.loading),
@@ -496,7 +495,7 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     Emitter<FriendsState> emit,
   ) async {
     final String friendId = event.friendId;
-    if (state.friendActions[friendId]?.status.isLoading ?? false) return;
+    if (stateValue.friendActions[friendId]?.status.isLoading ?? false) return;
     _setFriendAction(
       friendId,
       const FriendsItemAction(status: LoadStatus.loading),
@@ -522,9 +521,9 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     FriendsItemAction action,
     Emitter<FriendsState> emit,
   ) => emit(
-    state.copyWith(
+    stateValue.copyWith(
       requestActions: Map<String, FriendsItemAction>.unmodifiable(
-        <String, FriendsItemAction>{...state.requestActions, requestId: action},
+        <String, FriendsItemAction>{...stateValue.requestActions, requestId: action},
       ),
     ),
   );
@@ -534,9 +533,9 @@ final class FriendsBloc extends Bloc<FriendsEvent, FriendsState> {
     FriendsItemAction action,
     Emitter<FriendsState> emit,
   ) => emit(
-    state.copyWith(
+    stateValue.copyWith(
       friendActions: Map<String, FriendsItemAction>.unmodifiable(
-        <String, FriendsItemAction>{...state.friendActions, friendId: action},
+        <String, FriendsItemAction>{...stateValue.friendActions, friendId: action},
       ),
     ),
   );

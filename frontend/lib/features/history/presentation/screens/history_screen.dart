@@ -1,17 +1,19 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/di/app_dependencies.dart';
 import 'package:skill_battles/app/di/app_dependencies_provider.dart';
 import 'package:skill_battles/app/router/app_navigation.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/domain/entity/battle_mode.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 import 'package:skill_battles/core/presentation/widgets/app_desktop_viewport.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
 import 'package:skill_battles/core/presentation/widgets/app_status_view.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
-import 'package:skill_battles/core/utils/extensions/go_router_extension.dart';
+import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
 import 'package:skill_battles/features/catalog/domain/usecases/get_disciplines_usecase.dart';
 import 'package:skill_battles/features/history/domain/entity/history_page_entity.dart';
@@ -24,13 +26,13 @@ import 'package:skill_battles/features/history/presentation/widgets/history_tabl
 
 /// Match history (Paper: "23 History (Free — latest 10)"). For Free the
 /// server keeps only the latest matches before filtering.
-final class HistoryScreen extends StatelessWidget implements GoRouterWrapper {
+final class HistoryScreen extends StatelessComponent implements RouteWrapper {
   const HistoryScreen({super.key});
 
   @override
-  Widget wrappedRoute(BuildContext context) {
+  Component wrappedRoute(BuildContext context) {
     final AppDependencies dependencies = AppDependenciesProvider.of(context);
-    return BlocProvider<HistoryBloc>(
+    return BlocSignalProvider<HistoryBloc>(
       create: (_) => HistoryBloc(
         getDisciplines: dependencies.getDep<GetDisciplinesUsecase>(),
         getHistory: dependencies.getDep<GetHistoryUsecase>(),
@@ -40,69 +42,46 @@ final class HistoryScreen extends StatelessWidget implements GoRouterWrapper {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     // The Free limit changes what the server returns: re-read on upgrade.
-    return BlocListener<AccountBloc, AccountState>(
+    return BlocSignalListener<AccountBloc, AccountState>(
       listenWhen: (AccountState previous, AccountState current) =>
-          previous.entitlementsVersion != null &&
-          previous.entitlementsVersion != current.entitlementsVersion,
-      listener: (BuildContext context, AccountState state) =>
-          context.read<HistoryBloc>().add(const HistoryStarted()),
+          previous.entitlementsVersion != null && previous.entitlementsVersion != current.entitlementsVersion,
+      listener: (BuildContext context, AccountState state) => context.read<HistoryBloc>().add(const HistoryStarted()),
       child: const AppDesktopViewport(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 64, vertical: 44),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: 24,
-            children: <Widget>[_Header(), _Body(), _UpgradeBanner()],
-          ),
-        ),
+        child: div(classes: 'history-screen', <Component>[_Header(), _Body(), _UpgradeBanner()]),
       ),
     );
   }
 }
 
-final class _Header extends StatelessWidget {
+final class _Header extends StatelessComponent {
   const _Header();
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 8,
-            children: <Widget>[
-              BlocSelector<AccountBloc, AccountState, int?>(
-                selector: (AccountState state) =>
-                    state.entitlements?.historyMatchLimit,
-                builder: (BuildContext context, int? limit) => AppEyebrow(
-                  limit == null
-                      ? 'All your matches'
-                      : 'Your latest $limit matches',
-                ),
-              ),
-              const Text('Match history', style: AppTextStyles.displayMd),
-            ],
-          ),
+  Component build(BuildContext context) {
+    return div(classes: 'history-header', <Component>[
+      div(classes: 'history-header__titles', <Component>[
+        BlocSignalSelector<AccountBloc, AccountState, int?>(
+          selector: (AccountState state) => state.entitlements?.historyMatchLimit,
+          builder: (BuildContext context, int? limit) =>
+              AppEyebrow(limit == null ? 'All your matches' : 'Your latest $limit matches'),
         ),
-        const _Filters(),
-      ],
-    );
+        const h1(classes: 'history-header__title', <Component>[Component.text('Match history')]),
+      ]),
+      const _Filters(),
+    ]);
   }
 }
 
-final class _Filters extends StatelessWidget {
+final class _Filters extends StatelessComponent {
   const _Filters();
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<HistoryBloc, HistoryState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<HistoryBloc, HistoryState>(
       buildWhen: (HistoryState previous, HistoryState current) =>
-          previous.disciplines != current.disciplines ||
-          previous.params != current.params,
+          previous.disciplines != current.disciplines || previous.params != current.params,
       builder: (BuildContext context, HistoryState state) {
         final HistoryParamsEntity params = state.params;
         return HistoryFilters(
@@ -110,14 +89,9 @@ final class _Filters extends StatelessWidget {
           disciplineCode: params.disciplineCode,
           mode: params.mode,
           onDisciplineSelected: (String? code) =>
-              context.read<HistoryBloc>().add(
-                HistoryParamsChanged(mode: params.mode, disciplineCode: code),
-              ),
+              context.read<HistoryBloc>().add(HistoryParamsChanged(mode: params.mode, disciplineCode: code)),
           onModeSelected: (BattleMode? mode) => context.read<HistoryBloc>().add(
-            HistoryParamsChanged(
-              mode: mode,
-              disciplineCode: params.disciplineCode,
-            ),
+            HistoryParamsChanged(mode: mode, disciplineCode: params.disciplineCode),
           ),
         );
       },
@@ -125,12 +99,12 @@ final class _Filters extends StatelessWidget {
   }
 }
 
-final class _Body extends StatelessWidget {
+final class _Body extends StatelessComponent {
   const _Body();
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<HistoryBloc, HistoryState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<HistoryBloc, HistoryState>(
       buildWhen: (HistoryState previous, HistoryState current) =>
           previous.loadStatus != current.loadStatus ||
           previous.page != current.page ||
@@ -143,11 +117,7 @@ final class _Body extends StatelessWidget {
           return AppErrorView(
             message: state.failure?.userMessage ?? '',
             onRetry: () => context.read<HistoryBloc>().add(
-              HistoryParamsChanged(
-                page: params.page,
-                mode: params.mode,
-                disciplineCode: params.disciplineCode,
-              ),
+              HistoryParamsChanged(page: params.page, mode: params.mode, disciplineCode: params.disciplineCode),
             ),
           );
         }
@@ -163,11 +133,7 @@ final class _Body extends StatelessWidget {
             onPageSelected: isLoading
                 ? null
                 : (int index) => context.read<HistoryBloc>().add(
-                    HistoryParamsChanged(
-                      page: index,
-                      mode: params.mode,
-                      disciplineCode: params.disciplineCode,
-                    ),
+                    HistoryParamsChanged(page: index, mode: params.mode, disciplineCode: params.disciplineCode),
                   ),
           ),
         );
@@ -176,16 +142,36 @@ final class _Body extends StatelessWidget {
   }
 }
 
-final class _UpgradeBanner extends StatelessWidget {
+final class _UpgradeBanner extends StatelessComponent {
   const _UpgradeBanner();
 
   @override
-  Widget build(BuildContext context) {
-    return BlocSelector<AccountBloc, AccountState, int?>(
+  Component build(BuildContext context) {
+    return BlocSignalSelector<AccountBloc, AccountState, int?>(
       selector: (AccountState state) => state.entitlements?.historyMatchLimit,
-      builder: (BuildContext context, int? limit) => limit == null
-          ? const SizedBox.shrink()
+      builder: (BuildContext context, int? limit) => limit == null || !FeatureFlags.billing
+          ? const Component.empty()
           : HistoryUpgradeBanner(limit: limit, onUpgrade: context.goPro),
     );
   }
 }
+
+@css
+List<StyleRule> get historyScreenStyles => <StyleRule>[
+  css('.history-screen').styles(
+    display: Display.flex,
+    padding: const Padding.symmetric(horizontal: Unit.pixels(64), vertical: Unit.pixels(44)),
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(24)),
+  ),
+  css('.history-header').styles(display: Display.flex, alignItems: AlignItems.end),
+  css('.history-header__titles').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(8)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.history-header__title').combine(AppTextStyles.displayMd),
+];

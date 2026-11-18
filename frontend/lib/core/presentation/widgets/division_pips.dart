@@ -1,9 +1,10 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 /// Three small pips; the first [division] are filled with [color].
 ///
 /// Hidden for a single-division league ([division] is `null`).
-final class DivisionPips extends StatelessWidget {
+final class DivisionPips extends StatelessComponent {
   const DivisionPips({
     required this.division,
     required this.color,
@@ -16,25 +17,35 @@ final class DivisionPips extends StatelessWidget {
   final Color emptyColor;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final int? filled = division;
-    if (filled == null) return const SizedBox.shrink();
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 4,
-      children: <Widget>[
+    if (filled == null) return const Component.empty();
+    return div(
+      classes: 'division-pips',
+      attributes: const <String, String>{'aria-hidden': 'true'},
+      <Component>[
         for (int i = 1; i <= 3; i++)
-          SizedBox(
-            width: 16,
-            height: 4,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: i <= filled ? color : emptyColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+          span(
+            classes: 'division-pips__pip',
+            styles: Styles(backgroundColor: i <= filled ? color : emptyColor),
+            const <Component>[],
           ),
       ],
     );
   }
 }
+
+@css
+List<StyleRule> get divisionPipsStyles => <StyleRule>[
+  css('.division-pips').styles(
+    display: Display.inlineFlex,
+    gap: const Gap.column(Unit.pixels(4)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.division-pips__pip').styles(
+    display: Display.block,
+    width: const Unit.pixels(16),
+    height: const Unit.pixels(4),
+    radius: const BorderRadius.circular(Unit.pixels(2)),
+  ),
+];

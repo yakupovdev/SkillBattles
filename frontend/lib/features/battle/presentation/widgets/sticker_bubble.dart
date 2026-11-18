@@ -1,4 +1,8 @@
-import 'package:material_ui/material_ui.dart';
+import 'dart:async';
+
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_shadows.dart';
@@ -16,13 +20,8 @@ enum StickerBubbleVariant { outgoing, incoming, notSent }
 ///
 /// Give it a `ValueKey` of the message (submission or event id) so a
 /// re-send restarts the animation. Expiry is owned by the bloc.
-final class StickerBubble extends StatelessWidget {
-  const StickerBubble({
-    required this.variant,
-    required this.stickerId,
-    this.caption = '',
-    super.key,
-  });
+final class StickerBubble extends StatelessComponent {
+  const StickerBubble({required this.variant, required this.stickerId, this.caption = '', super.key});
 
   static const double width = 120;
 
@@ -33,14 +32,8 @@ final class StickerBubble extends StatelessWidget {
   final String caption;
 
   @override
-  Widget build(BuildContext context) {
-    final (
-      Color fill,
-      Color line,
-      Color dot,
-      Color text,
-      String label,
-    ) = switch (variant) {
+  Component build(BuildContext context) {
+    final (Color fill, Color line, Color dot, Color text, String label) = switch (variant) {
       StickerBubbleVariant.outgoing => (
         AppColors.primarySurface,
         AppColors.primaryLine,
@@ -65,87 +58,40 @@ final class StickerBubble extends StatelessWidget {
     };
     final bool isIncoming = variant == StickerBubbleVariant.incoming;
     final bool isNotSent = variant == StickerBubbleVariant.notSent;
-    final Widget sticker = StickerView(
-      key: ValueKey<bool>(isNotSent),
-      stickerId: stickerId,
-      size: 96,
-      isAnimated: !isNotSent,
-    );
-    final Widget bubble = SizedBox(
-      width: width,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: <Widget>[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: fill,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: line),
-              boxShadow: AppShadows.overlay,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 2,
-                children: <Widget>[
-                  isNotSent ? Opacity(opacity: 0.4, child: sticker) : sticker,
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: 6,
-                    children: <Widget>[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: dot,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const SizedBox.square(dimension: 6),
-                      ),
-                      Flexible(
-                        child: Text(
-                          label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.bodyXs.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: text,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+    final String semanticLabel = switch (variant) {
+      StickerBubbleVariant.incoming => '$caption sent ${stickerId.label}',
+      StickerBubbleVariant.outgoing => 'You sent ${stickerId.label}',
+      StickerBubbleVariant.notSent => 'Sticker not sent',
+    };
+    return div(classes: 'sticker-bubble', <Component>[
+      // Announced instead of the drawing (the incoming switcher is a polite
+      // live region, see `StickerBubbleSwitcher`).
+      span(classes: 'sticker-bubble__sr', <Component>[Component.text(semanticLabel)]),
+      div(
+        classes: 'sticker-bubble__box',
+        styles: Styles(
+          border: Border.all(color: line, width: const Unit.pixels(1)),
+          backgroundColor: fill,
+        ),
+        attributes: const <String, String>{'aria-hidden': 'true'},
+        <Component>[
+          div(
+            key: ValueKey<bool>(isNotSent),
+            styles: Styles(opacity: isNotSent ? 0.4 : 1),
+            <Component>[StickerView(stickerId: stickerId, size: 96, isAnimated: !isNotSent)],
           ),
-          Positioned(
-            top: -8,
-            left: isIncoming ? null : 16,
-            right: isIncoming ? 16 : null,
-            child: StickerCaret(fill: fill, stroke: line),
-          ),
+          div(classes: 'sticker-bubble__caption', <Component>[
+            span(
+              classes: 'sticker-bubble__dot',
+              styles: Styles(backgroundColor: dot),
+              const <Component>[],
+            ),
+            span(classes: 'sticker-bubble__label', styles: Styles(color: text), <Component>[Component.text(label)]),
+          ]),
         ],
       ),
-    );
-    return switch (variant) {
-      // Announced once, politely, when it appears.
-      StickerBubbleVariant.incoming => Semantics(
-        liveRegion: true,
-        label: '$caption sent ${stickerId.label}',
-        excludeSemantics: true,
-        child: bubble,
-      ),
-      StickerBubbleVariant.outgoing => Semantics(
-        label: 'You sent ${stickerId.label}',
-        excludeSemantics: true,
-        child: bubble,
-      ),
-      StickerBubbleVariant.notSent => Semantics(
-        label: 'Sticker not sent',
-        excludeSemantics: true,
-        child: bubble,
-      ),
-    };
+      StickerCaret(fill: fill, stroke: line, left: isIncoming ? null : 16, right: isIncoming ? 16 : null),
+    ]);
   }
 }
 
@@ -154,13 +100,11 @@ final class StickerBubble extends StatelessWidget {
 /// when that happens.
 ///
 /// Enter: scale 0.6 to 1 from the caret plus fade, 180 ms ease-out-back.
-/// Exit: fade and 8 px up, 200 ms. With reduced motion both are plain fades.
-final class StickerBubbleSwitcher extends StatelessWidget {
-  const StickerBubbleSwitcher({
-    required this.child,
-    required this.isCaretRight,
-    super.key,
-  });
+/// Exit: fade and 8 px up, 200 ms. With reduced motion both are plain fades
+/// (120 ms). Like `AnimatedSwitcher`, the bubble already there when the
+/// switcher first appears is not animated in.
+final class StickerBubbleSwitcher extends StatefulComponent {
+  const StickerBubbleSwitcher({required this.child, required this.isCaretRight, super.key});
 
   final StickerBubble? child;
 
@@ -168,52 +112,187 @@ final class StickerBubbleSwitcher extends StatelessWidget {
   final bool isCaretRight;
 
   @override
-  Widget build(BuildContext context) {
-    final bool isReduced = MediaQuery.disableAnimationsOf(context);
-    final StickerBubble? current = child;
-    final Key? currentKey = current?.key;
-    return AnimatedSwitcher(
-      duration: isReduced
-          ? const Duration(milliseconds: 120)
-          : const Duration(milliseconds: 180),
-      reverseDuration: isReduced
-          ? const Duration(milliseconds: 120)
-          : const Duration(milliseconds: 200),
-      layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) =>
-          Stack(
-            alignment: isCaretRight ? Alignment.topRight : Alignment.topLeft,
-            clipBehavior: Clip.none,
-            children: <Widget>[...previousChildren, ?currentChild],
-          ),
-      transitionBuilder: (Widget bubble, Animation<double> animation) {
-        final bool isEntering = bubble.key == currentKey;
-        final Animation<double> opacity = animation.drive(
-          CurveTween(curve: isEntering ? Curves.easeOut : Curves.easeIn),
+  State<StickerBubbleSwitcher> createState() => _StickerBubbleSwitcherState();
+}
+
+final class _StickerBubbleSwitcherState extends State<StickerBubbleSwitcher> {
+  late StickerBubble? _current;
+  late bool _animateCurrent;
+  late List<_ExitingBubble> _exiting;
+  late int _nextExitId;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = component.child;
+    _animateCurrent = false;
+    _exiting = <_ExitingBubble>[];
+    _nextExitId = 0;
+  }
+
+  static bool _isReduced() => kIsWeb && web.window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  @override
+  void didUpdateComponent(StickerBubbleSwitcher oldComponent) {
+    super.didUpdateComponent(oldComponent);
+    final StickerBubble? next = component.child;
+    final StickerBubble? previous = _current;
+    if (next?.key == previous?.key) {
+      _current = next;
+      return;
+    }
+    if (previous != null) {
+      final _ExitingBubble exiting = _ExitingBubble(id: _nextExitId++, bubble: previous);
+      exiting.timer = Timer(Duration(milliseconds: _isReduced() ? 120 : 200), () {
+        if (!mounted) return;
+        setState(
+          () => _exiting = <_ExitingBubble>[
+            for (final _ExitingBubble item in _exiting)
+              if (item != exiting) item,
+          ],
         );
-        if (isReduced) return FadeTransition(opacity: opacity, child: bubble);
-        if (isEntering) {
-          return FadeTransition(
-            opacity: opacity,
-            child: ScaleTransition(
-              scale: animation
-                  .drive(CurveTween(curve: Curves.easeOutBack))
-                  .drive(Tween<double>(begin: 0.6, end: 1)),
-              alignment: Alignment(isCaretRight ? 0.73 : -0.73, -1),
-              child: bubble,
-            ),
-          );
-        }
-        return FadeTransition(
-          opacity: opacity,
-          child: SlideTransition(
-            position: animation.drive(
-              Tween<Offset>(begin: const Offset(0, -8 / 132), end: Offset.zero),
-            ),
-            child: bubble,
+      });
+      _exiting = <_ExitingBubble>[..._exiting, exiting];
+    }
+    _current = next;
+    _animateCurrent = true;
+  }
+
+  @override
+  void dispose() {
+    for (final _ExitingBubble item in _exiting) {
+      item.timer?.cancel();
+    }
+    super.dispose();
+  }
+
+  @override
+  Component build(BuildContext context) {
+    final bool isReduced = _isReduced();
+    final StickerBubble? current = _current;
+    final String side = component.isCaretRight ? 'right' : 'left';
+    return div(
+      classes: 'sticker-bubble-switcher sticker-bubble-switcher--$side',
+      attributes: component.isCaretRight ? const <String, String>{'aria-live': 'polite'} : null,
+      <Component>[
+        for (final _ExitingBubble item in _exiting)
+          div(
+            key: ValueKey<String>('exit-${item.id}'),
+            classes: isReduced
+                ? 'sticker-bubble-switcher__item sticker-bubble-switcher__item--fade-out'
+                : 'sticker-bubble-switcher__item sticker-bubble-switcher__item--exit',
+            attributes: const <String, String>{'aria-hidden': 'true'},
+            <Component>[item.bubble],
           ),
-        );
-      },
-      child: current ?? const SizedBox.shrink(key: ValueKey<String>('none')),
+        if (current != null)
+          div(
+            key: current.key,
+            classes: <String>[
+              'sticker-bubble-switcher__item',
+              if (_animateCurrent)
+                isReduced ? 'sticker-bubble-switcher__item--fade-in' : 'sticker-bubble-switcher__item--enter',
+            ].join(' '),
+            <Component>[current],
+          ),
+      ],
     );
   }
 }
+
+final class _ExitingBubble {
+  _ExitingBubble({required this.id, required this.bubble});
+
+  final int id;
+  final StickerBubble bubble;
+  Timer? timer;
+}
+
+@css
+List<StyleRule> get stickerBubbleStyles => <StyleRule>[
+  css('.sticker-bubble').styles(position: const Position.relative(), width: const Unit.pixels(StickerBubble.width)),
+  css('.sticker-bubble__sr').styles(
+    position: const Position.absolute(),
+    width: const Unit.pixels(1),
+    height: const Unit.pixels(1),
+    overflow: Overflow.hidden,
+    whiteSpace: WhiteSpace.noWrap,
+    raw: const <String, String>{'clip': 'rect(0 0 0 0)', 'clip-path': 'inset(50%)'},
+  ),
+  css('.sticker-bubble__box').styles(
+    display: Display.flex,
+    padding: const Padding.fromLTRB(Unit.pixels(8), Unit.pixels(8), Unit.pixels(8), Unit.pixels(10)),
+    radius: const BorderRadius.circular(Unit.pixels(18)),
+    shadow: AppShadows.overlay,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.center,
+    gap: const Gap.row(Unit.pixels(2)),
+  ),
+  css('.sticker-bubble__caption').styles(
+    display: Display.flex,
+    maxWidth: const Unit.percent(100),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(6)),
+  ),
+  css('.sticker-bubble__dot').styles(
+    width: const Unit.pixels(6),
+    height: const Unit.pixels(6),
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.sticker-bubble__label')
+      .styles(
+        minWidth: Unit.zero,
+        overflow: Overflow.hidden,
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.bodyXs)
+      .combine(const Styles(fontWeight: FontWeight.w600)),
+  // All bubbles share one grid cell, like the Stack of `AnimatedSwitcher`.
+  css('.sticker-bubble-switcher').styles(display: Display.grid),
+  css('.sticker-bubble-switcher--left').styles(justifyItems: JustifyItems.start),
+  css('.sticker-bubble-switcher--right').styles(justifyItems: JustifyItems.end),
+  css('.sticker-bubble-switcher__item').styles(raw: const <String, String>{'grid-area': '1 / 1'}),
+  css('.sticker-bubble-switcher--left .sticker-bubble-switcher__item').styles(
+    raw: const <String, String>{'transform-origin': '13.5% 0'},
+  ),
+  css('.sticker-bubble-switcher--right .sticker-bubble-switcher__item').styles(
+    raw: const <String, String>{'transform-origin': '86.5% 0'},
+  ),
+  css('.sticker-bubble-switcher__item--enter').styles(
+    raw: const <String, String>{
+      'animation':
+          'sticker-bubble-fade-in 180ms cubic-bezier(0, 0, 0.58, 1) both, '
+          'sticker-bubble-scale-in 180ms cubic-bezier(0.175, 0.885, 0.32, 1.275) both',
+    },
+  ),
+  css('.sticker-bubble-switcher__item--exit').styles(
+    raw: const <String, String>{
+      'animation':
+          'sticker-bubble-fade-out 200ms cubic-bezier(0, 0, 0.58, 1) both, '
+          'sticker-bubble-rise-out 200ms linear both',
+    },
+  ),
+  css('.sticker-bubble-switcher__item--fade-in').styles(
+    raw: const <String, String>{'animation': 'sticker-bubble-fade-in 120ms cubic-bezier(0, 0, 0.58, 1) both'},
+  ),
+  css('.sticker-bubble-switcher__item--fade-out').styles(
+    raw: const <String, String>{'animation': 'sticker-bubble-fade-out 120ms cubic-bezier(0, 0, 0.58, 1) both'},
+  ),
+  css.keyframes('sticker-bubble-fade-in', <String, Styles>{
+    'from': const Styles(opacity: 0),
+    'to': const Styles(opacity: 1),
+  }),
+  css.keyframes('sticker-bubble-scale-in', <String, Styles>{
+    'from': const Styles(transform: Transform.scale(0.6)),
+    'to': const Styles(transform: Transform.scale(1)),
+  }),
+  css.keyframes('sticker-bubble-fade-out', <String, Styles>{
+    'from': const Styles(opacity: 1),
+    'to': const Styles(opacity: 0),
+  }),
+  css.keyframes('sticker-bubble-rise-out', <String, Styles>{
+    'from': const Styles(transform: Transform.translate(y: Unit.zero)),
+    'to': const Styles(transform: Transform.translate(y: Unit.pixels(-8))),
+  }),
+];

@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -25,7 +24,7 @@ part 'private_duel_state.dart';
 
 /// The host's code room: create (or resume), wait for the guest, cancel.
 /// MATCHED hands over to the battle, where both players pass Ready.
-final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
+final class PrivateDuelBloc extends SignalBloc<PrivateDuelEvent, PrivateDuelState> {
   PrivateDuelBloc({
     required this._createDuel,
     required this._getDuel,
@@ -34,10 +33,10 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     required this._watchConnection,
     this.pollInterval = const Duration(seconds: 4),
   }) : super(const PrivateDuelState()) {
-    on<PrivateDuelStarted>(_onStarted, transformer: droppable());
-    on<PrivateDuelCancelRequested>(_onCancel, transformer: droppable());
-    on<_DuelReceived>(_onDuelReceived);
-    on<_DuelRefreshTick>(_onRefreshTick, transformer: droppable());
+    handle<PrivateDuelStarted>(_onStarted, transformer: droppable());
+    handle<PrivateDuelCancelRequested>(_onCancel, transformer: droppable());
+    handle<_DuelReceived>(_onDuelReceived);
+    handle<_DuelRefreshTick>(_onRefreshTick, transformer: droppable());
   }
 
   final CreateDuelUsecase _createDuel;
@@ -77,7 +76,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     }
     final String? code = event.disciplineCode;
     if (code == null) {
-      emit(state.copyWith(loadStatus: LoadStatus.failure));
+      emit(stateValue.copyWith(loadStatus: LoadStatus.failure));
       return;
     }
     final Future<Either<Failure, DuelEntity>> request = _createDuel(
@@ -88,7 +87,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     if (emit.isDone || _isClosing) return;
     await result.match(
       (Failure failure) async => emit(
-        state.copyWith(loadStatus: LoadStatus.failure, failure: failure),
+        stateValue.copyWith(loadStatus: LoadStatus.failure, failure: failure),
       ),
       (DuelEntity duel) async {
         _apply(duel, emit);
@@ -128,8 +127,8 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     final Either<Failure, DuelEntity> result = await request;
     if (emit.isDone || _isClosing) return;
     result.match((Failure failure) {
-      if (state.duel == null) {
-        emit(state.copyWith(loadStatus: LoadStatus.failure, failure: failure));
+      if (stateValue.duel == null) {
+        emit(stateValue.copyWith(loadStatus: LoadStatus.failure, failure: failure));
       }
     }, (DuelEntity duel) => _apply(duel, emit));
   }
@@ -142,21 +141,21 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     _DuelRefreshTick event,
     Emitter<PrivateDuelState> emit,
   ) async {
-    final DuelEntity? duel = state.duel;
+    final DuelEntity? duel = stateValue.duel;
     if (duel == null || duel.status != DuelStatus.waiting) return;
     await _refresh(duel.id, emit);
   }
 
   void _apply(DuelEntity duel, Emitter<PrivateDuelState> emit) {
     if (emit.isDone || _isClosing) return;
-    final DuelEntity? current = state.duel;
+    final DuelEntity? current = stateValue.duel;
     if (current != null &&
         current.id == duel.id &&
         duel.version < current.version) {
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         loadStatus: LoadStatus.success,
         duel: duel,
         resetFailure: true,
@@ -170,26 +169,26 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     Emitter<PrivateDuelState> emit,
   ) async {
     if (_isClosing) return;
-    final DuelEntity? duel = state.duel;
+    final DuelEntity? duel = stateValue.duel;
     if (duel == null ||
         duel.status != DuelStatus.waiting ||
         duel.guest != null) {
-      emit(state.copyWith(cancelStatus: LoadStatus.success));
+      emit(stateValue.copyWith(cancelStatus: LoadStatus.success));
       return;
     }
-    emit(state.copyWith(cancelStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(cancelStatus: LoadStatus.loading));
     final Either<Failure, Unit> result = await _cancel(duel.id);
     if (emit.isDone || _isClosing) return;
     await result.match(
       (Failure failure) async {
         if (failure.hasCode(ApiErrorCodes.matchAlreadyFound)) {
-          emit(state.copyWith(cancelStatus: LoadStatus.initial));
+          emit(stateValue.copyWith(cancelStatus: LoadStatus.initial));
           await _refresh(duel.id, emit);
           return;
         }
         _cancelRequest = null;
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             cancelStatus: LoadStatus.failure,
             cancelFailure: failure,
           ),
@@ -197,7 +196,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
       },
       (_) async {
         _stopPolling();
-        emit(state.copyWith(cancelStatus: LoadStatus.success));
+        emit(stateValue.copyWith(cancelStatus: LoadStatus.success));
       },
     );
   }
@@ -232,7 +231,7 @@ final class PrivateDuelBloc extends Bloc<PrivateDuelEvent, PrivateDuelState> {
     await Future.wait(cleanup);
     // Leaving while creation/resume is in flight must also release that room.
     final DuelEntity? acquired = (await _initialDuelRequest)?.toNullable();
-    DuelEntity? duel = state.duel;
+    DuelEntity? duel = stateValue.duel;
     if (acquired != null &&
         (duel == null ||
             (duel.id == acquired.id && acquired.version > duel.version))) {

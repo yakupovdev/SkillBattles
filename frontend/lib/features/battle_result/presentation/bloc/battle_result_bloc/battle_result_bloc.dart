@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/battle_mode.dart';
 import 'package:skill_battles/core/domain/entity/battle_result_entity.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
@@ -31,7 +30,7 @@ part 'battle_result_state.dart';
 /// Everything is re-read when the entitlement version changes, so an
 /// upgrade opens old reviews and a downgrade closes them again.
 final class BattleResultBloc
-    extends Bloc<BattleResultEvent, BattleResultState> {
+    extends SignalBloc<BattleResultEvent, BattleResultState> {
   BattleResultBloc({
     required this.battleId,
     required this._getResult,
@@ -42,26 +41,26 @@ final class BattleResultBloc
     required this._watchRematch,
     required this._reportRound,
   }) : super(const BattleResultState()) {
-    on<BattleResultStarted>(_onStarted, transformer: restartable());
-    on<BattleResultRefreshRequested>(_onStarted, transformer: restartable());
-    on<BattleResultMistakesOnlyChanged>(
+    handle<BattleResultStarted>(_onStarted, transformer: restartable());
+    handle<BattleResultRefreshRequested>(_onStarted, transformer: restartable());
+    handle<BattleResultMistakesOnlyChanged>(
       _onMistakesOnlyChanged,
       transformer: restartable(),
     );
-    on<BattleResultRematchRequested>(
+    handle<BattleResultRematchRequested>(
       _onRematchRequested,
       transformer: droppable(),
     );
-    on<BattleResultRematchCancelled>(
+    handle<BattleResultRematchCancelled>(
       _onRematchCancelled,
       transformer: droppable(),
     );
-    on<BattleResultReportSubmitted>(
+    handle<BattleResultReportSubmitted>(
       _onReportSubmitted,
       transformer: droppable(),
     );
-    on<BattleResultReportDismissed>(_onReportDismissed);
-    on<_RematchReceived>(_onRematchReceived);
+    handle<BattleResultReportDismissed>(_onReportDismissed);
+    handle<_RematchReceived>(_onRematchReceived);
   }
 
   final String battleId;
@@ -83,7 +82,7 @@ final class BattleResultBloc
   ) async {
     // Paid data of the previous rights is dropped before the new read.
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         resultStatus: LoadStatus.loading,
         reviewStatus: LoadStatus.loading,
         resetReview: true,
@@ -97,7 +96,7 @@ final class BattleResultBloc
     if (loaded == null) {
       final Failure failure = result.getLeft()!;
       emit(
-        state.copyWith(
+        stateValue.copyWith(
           resultStatus: LoadStatus.failure,
           resultFailure: failure,
           reviewStatus: LoadStatus.initial,
@@ -106,7 +105,7 @@ final class BattleResultBloc
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         resultStatus: LoadStatus.success,
         result: loaded,
         resetResultFailure: true,
@@ -123,20 +122,20 @@ final class BattleResultBloc
   }
 
   Future<void> _loadReview(Emitter<BattleResultState> emit) async {
-    final bool mistakesOnly = state.mistakesOnly;
+    final bool mistakesOnly = stateValue.mistakesOnly;
     final Either<Failure, BattleReviewEntity> review = await _getReview(
       ReviewParamsEntity(battleId: battleId, mistakesOnly: mistakesOnly),
     );
-    if (emit.isDone || mistakesOnly != state.mistakesOnly) return;
+    if (emit.isDone || mistakesOnly != stateValue.mistakesOnly) return;
     review.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           reviewStatus: LoadStatus.failure,
           reviewFailure: failure,
         ),
       ),
       (BattleReviewEntity value) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           reviewStatus: LoadStatus.success,
           review: value,
           resetReviewFailure: true,
@@ -158,7 +157,7 @@ final class BattleResultBloc
     Emitter<BattleResultState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         mistakesOnly: event.mistakesOnly,
         reviewStatus: LoadStatus.loading,
         resetReview: true,
@@ -172,7 +171,7 @@ final class BattleResultBloc
     Emitter<BattleResultState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         rematchActionStatus: LoadStatus.loading,
         resetRematchFailure: true,
       ),
@@ -183,13 +182,13 @@ final class BattleResultBloc
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           rematchActionStatus: LoadStatus.failure,
           rematchFailure: failure,
         ),
       ),
       (RematchEntity rematch) {
-        emit(state.copyWith(rematchActionStatus: LoadStatus.success));
+        emit(stateValue.copyWith(rematchActionStatus: LoadStatus.success));
         _applyRematch(rematch, emit);
       },
     );
@@ -199,18 +198,18 @@ final class BattleResultBloc
     BattleResultRematchCancelled event,
     Emitter<BattleResultState> emit,
   ) async {
-    emit(state.copyWith(rematchActionStatus: LoadStatus.loading));
+    emit(stateValue.copyWith(rematchActionStatus: LoadStatus.loading));
     final Either<Failure, Unit> result = await _cancelRematch(_params);
     if (emit.isDone) return;
     await result.match(
       (Failure failure) async => emit(
-        state.copyWith(
+        stateValue.copyWith(
           rematchActionStatus: LoadStatus.failure,
           rematchFailure: failure,
         ),
       ),
       (_) async {
-        emit(state.copyWith(rematchActionStatus: LoadStatus.success));
+        emit(stateValue.copyWith(rematchActionStatus: LoadStatus.success));
         await _loadRematch(emit);
       },
     );
@@ -222,9 +221,9 @@ final class BattleResultBloc
   ) => _applyRematch(event.rematch, emit);
 
   void _applyRematch(RematchEntity rematch, Emitter<BattleResultState> emit) {
-    final RematchEntity? current = state.rematch;
+    final RematchEntity? current = stateValue.rematch;
     if (current != null && rematch.version < current.version) return;
-    emit(state.copyWith(rematch: rematch));
+    emit(stateValue.copyWith(rematch: rematch));
   }
 
   Future<void> _onReportSubmitted(
@@ -232,7 +231,7 @@ final class BattleResultBloc
     Emitter<BattleResultState> emit,
   ) async {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         reportStatus: LoadStatus.loading,
         reportingRoundId: event.params.roundId,
         resetReportFailure: true,
@@ -244,15 +243,15 @@ final class BattleResultBloc
     if (emit.isDone) return;
     result.match(
       (Failure failure) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           reportStatus: LoadStatus.failure,
           reportFailure: failure,
         ),
       ),
       (ReportEntity report) => emit(
-        state.copyWith(
+        stateValue.copyWith(
           reportStatus: LoadStatus.success,
-          reportedRoundIds: <String>{...state.reportedRoundIds, report.roundId},
+          reportedRoundIds: <String>{...stateValue.reportedRoundIds, report.roundId},
         ),
       ),
     );
@@ -263,7 +262,7 @@ final class BattleResultBloc
     Emitter<BattleResultState> emit,
   ) {
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         reportStatus: LoadStatus.initial,
         resetReportFailure: true,
       ),

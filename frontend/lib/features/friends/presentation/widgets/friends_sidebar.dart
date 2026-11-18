@@ -1,10 +1,11 @@
-import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:bloc_signals_jaspr/bloc_signals_jaspr.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
+import 'package:skill_battles/core/presentation/widgets/app_form.dart';
 import 'package:skill_battles/core/presentation/widgets/app_notice.dart';
+import 'package:skill_battles/core/presentation/widgets/app_text_input.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/features/friends/domain/entity/friend_code_entity.dart';
@@ -17,15 +18,14 @@ import 'package:skill_battles/features/friends/presentation/widgets/friend_code_
 import 'package:skill_battles/features/friends/presentation/widgets/friends_skeleton_data.dart';
 
 /// The own friend code, skeletonized while it loads.
-final class FriendsCodeSection extends StatelessWidget {
+final class FriendsCodeSection extends StatelessComponent {
   const FriendsCodeSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FriendsBloc, FriendsState>(
+  Component build(BuildContext context) {
+    return BlocSignalBuilder<FriendsBloc, FriendsState>(
       buildWhen: (FriendsState previous, FriendsState current) =>
-          previous.codeStatus != current.codeStatus ||
-          previous.code != current.code,
+          previous.codeStatus != current.codeStatus || previous.code != current.code,
       builder: (BuildContext context, FriendsState state) {
         final FriendCodeEntity? code = state.code;
         return Skeletonizer(
@@ -33,9 +33,7 @@ final class FriendsCodeSection extends StatelessWidget {
           child: FriendCodeCard(
             code: code ?? FriendsSkeletonData.friendCode,
             hasFailed: code == null && state.codeStatus.isFailure,
-            onRetry: () => context.read<FriendsBloc>().add(
-              const FriendsRefreshRequested(),
-            ),
+            onRetry: () => context.read<FriendsBloc>().add(const FriendsRefreshRequested()),
           ),
         );
       },
@@ -44,9 +42,9 @@ final class FriendsCodeSection extends StatelessWidget {
 }
 
 /// The add-friend form wired to [FriendsBloc]. The screen owns the form key,
-/// controller and focus node (forms.md); this widget owns the local
+/// controller and focus node (forms.md); this component owns the local
 /// "server error dismissed by typing" flag and the rate-limit instant.
-final class FriendsAddSection extends StatefulWidget {
+final class FriendsAddSection extends StatefulComponent {
   const FriendsAddSection({
     required this.formKey,
     required this.controller,
@@ -55,7 +53,7 @@ final class FriendsAddSection extends StatefulWidget {
     super.key,
   });
 
-  final GlobalKey<FormState> formKey;
+  final GlobalStateKey<AppFormState> formKey;
   final TextEditingController controller;
   final FocusNode focusNode;
 
@@ -78,22 +76,20 @@ final class _FriendsAddSectionState extends State<FriendsAddSection> {
   }
 
   void _submit() {
-    FocusScope.of(context).unfocus();
-    if (!(widget.formKey.currentState?.validate() ?? false)) return;
+    component.focusNode.unfocus();
+    if (!(component.formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _isErrorDismissed = false;
       _rateLimitedUntil = null;
     });
     context.read<FriendsBloc>().add(
-      FriendRequestSubmitted(
-        SendFriendRequestParamsEntity(friendCode: widget.controller.text),
-      ),
+      FriendRequestSubmitted(SendFriendRequestParamsEntity(friendCode: component.controller.text)),
     );
   }
 
   void _onSendStatusChanged(BuildContext context, FriendsState state) {
     if (state.sendStatus.isSuccess) {
-      widget.controller.clear();
+      component.controller.clear();
       return;
     }
     final Failure? failure = state.sendFailure;
@@ -106,11 +102,10 @@ final class _FriendsAddSectionState extends State<FriendsAddSection> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return BlocConsumer<FriendsBloc, FriendsState>(
+  Component build(BuildContext context) {
+    return BlocSignalConsumer<FriendsBloc, FriendsState>(
       listenWhen: (FriendsState previous, FriendsState current) =>
-          previous.sendStatus != current.sendStatus &&
-          (current.sendStatus.isSuccess || current.sendStatus.isFailure),
+          previous.sendStatus != current.sendStatus && (current.sendStatus.isSuccess || current.sendStatus.isFailure),
       listener: _onSendStatusChanged,
       buildWhen: (FriendsState previous, FriendsState current) =>
           previous.sendStatus != current.sendStatus ||
@@ -118,16 +113,12 @@ final class _FriendsAddSectionState extends State<FriendsAddSection> {
           previous.sentRequest != current.sentRequest,
       builder: (BuildContext context, FriendsState state) {
         final Failure? failure = _isErrorDismissed ? null : state.sendFailure;
-        final _SendOutcome outcome = _SendOutcome.of(
-          state.sendStatus,
-          failure,
-          rateLimitedUntil: _rateLimitedUntil,
-        );
+        final _SendOutcome outcome = _SendOutcome.of(state.sendStatus, failure, rateLimitedUntil: _rateLimitedUntil);
         final RelationshipEntity? sent = state.sentRequest;
         return AddFriendForm(
-          formKey: widget.formKey,
-          controller: widget.controller,
-          focusNode: widget.focusNode,
+          formKey: component.formKey,
+          controller: component.controller,
+          focusNode: component.focusNode,
           onSubmit: _submit,
           isSending: state.sendStatus.isLoading,
           serverError: outcome.fieldError,
@@ -143,7 +134,7 @@ final class _FriendsAddSectionState extends State<FriendsAddSection> {
                       'This player already sent you a request. Accept it '
                       'under Incoming.',
                   actionLabel: 'Show',
-                  onAction: widget.onShowIncoming,
+                  onAction: component.onShowIncoming,
                 )
               : state.sendStatus.isSuccess && sent != null
               ? AddFriendNotice(
@@ -189,41 +180,27 @@ final class _SendOutcome {
         case ApiErrorCodes.validationError:
           return const _SendOutcome(fieldError: FriendCodeInput.invalidMessage);
         case ApiErrorCodes.friendCodeNotFound:
-          return const _SendOutcome(
-            fieldError:
-                'No player has this friend code. Check it and try '
-                'again.',
-          );
+          return const _SendOutcome(fieldError: 'No player has this friend code. Check it and try again.');
         case ApiErrorCodes.selfFriendRequestNotAllowed:
-          return const _SendOutcome(
-            fieldError:
-                "That's your own friend code. Share it with a friend instead.",
-          );
+          return const _SendOutcome(fieldError: "That's your own friend code. Share it with a friend instead.");
         case ApiErrorCodes.friendAlreadyExists:
-          return const _SendOutcome(
-            fieldError: "You're already friends with this player.",
-          );
+          return const _SendOutcome(fieldError: "You're already friends with this player.");
         case ApiErrorCodes.friendRequestAlreadyReceived:
           return const _SendOutcome(isAlreadyReceived: true);
         case ApiErrorCodes.rateLimited:
           // With a Retry-After the field shows the countdown.
           return rateLimitedUntil != null
               ? const _SendOutcome()
-              : const _SendOutcome(
-                  message: 'Too many requests. Try again in a moment.',
-                );
+              : const _SendOutcome(message: 'Too many requests. Try again in a moment.');
       }
     }
-    return const _SendOutcome(
-      message:
-          "Couldn't send the request. Check your connection and try again.",
-    );
+    return const _SendOutcome(message: "Couldn't send the request. Check your connection and try again.");
   }
 }
 
 /// Copies the canonical friend code (the empty-state button).
 Future<void> copyFriendCode(BuildContext context) async {
-  final FriendCodeEntity? code = context.read<FriendsBloc>().state.code;
+  final FriendCodeEntity? code = context.read<FriendsBloc>().stateValue.code;
   if (code == null) return;
-  await Clipboard.setData(ClipboardData(text: code.code));
+  await writeClipboardText(code.code);
 }

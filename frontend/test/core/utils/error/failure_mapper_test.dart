@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/utils/error/app_exception.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';

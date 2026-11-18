@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:skill_battles/core/domain/entity/battle_result_entity.dart';
 import 'package:skill_battles/core/domain/entity/realtime_status.dart';
 import 'package:skill_battles/core/domain/usecases/usecase.dart';
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
+import 'package:skill_battles/core/presentation/bloc/signal_bloc.dart';
 import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/functional/either.dart';
@@ -98,7 +97,7 @@ part 'notification_state.dart';
 ///   shows its room is no longer the own activity, so a lost ACCEPTED push
 ///   still reaches the host on the next route change or reconnect.
 final class NotificationBloc
-    extends Bloc<NotificationEvent, NotificationState> {
+    extends SignalBloc<NotificationEvent, NotificationState> {
   NotificationBloc({
     required this._watchRematches,
     required this._getRematch,
@@ -124,34 +123,34 @@ final class NotificationBloc
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now,
        super(const NotificationState()) {
-    on<NotificationStarted>(_onStarted);
-    on<NotificationAcceptRequested>(_onAcceptRequested);
-    on<NotificationDeclineRequested>(_onDeclineRequested);
-    on<NotificationHidden>(_onHidden);
-    on<NotificationHiddenShown>(_onHiddenShown);
-    on<NotificationActivityRefreshRequested>(
+    handle<NotificationStarted>(_onStarted);
+    handle<NotificationAcceptRequested>(_onAcceptRequested);
+    handle<NotificationDeclineRequested>(_onDeclineRequested);
+    handle<NotificationHidden>(_onHidden);
+    handle<NotificationHiddenShown>(_onHiddenShown);
+    handle<NotificationActivityRefreshRequested>(
       _onActivityRefreshRequested,
       transformer: restartable(),
     );
-    on<NotificationBattleOpened>(_onBattleOpened);
-    on<NotificationNoticeShown>(_onNoticeShown);
-    on<_SignedInChanged>(_onSignedInChanged);
-    on<_ConnectionChanged>(_onConnectionChanged);
-    on<_DeadlineReached>(_onDeadlineReached);
-    on<_ExpiredLingerElapsed>(_onExpiredLingerElapsed);
-    on<_RematchReceived>(_onRematchReceived);
-    on<_RematchRecoveryRequested>(
+    handle<NotificationBattleOpened>(_onBattleOpened);
+    handle<NotificationNoticeShown>(_onNoticeShown);
+    handle<_SignedInChanged>(_onSignedInChanged);
+    handle<_ConnectionChanged>(_onConnectionChanged);
+    handle<_DeadlineReached>(_onDeadlineReached);
+    handle<_ExpiredLingerElapsed>(_onExpiredLingerElapsed);
+    handle<_RematchReceived>(_onRematchReceived);
+    handle<_RematchRecoveryRequested>(
       _onRematchRecoveryRequested,
       transformer: restartable(),
     );
-    on<_RematchEnrichmentRequested>(_onRematchEnrichmentRequested);
-    on<_SignedInUserChanged>(_onSignedInUserChanged);
-    on<_FriendsRecoveryRequested>(
+    handle<_RematchEnrichmentRequested>(_onRematchEnrichmentRequested);
+    handle<_SignedInUserChanged>(_onSignedInUserChanged);
+    handle<_FriendsRecoveryRequested>(
       _onFriendsRecoveryRequested,
       transformer: restartable(),
     );
-    on<_FriendshipReceived>(_onFriendshipReceived);
-    on<_DuelInvitationReceived>(_onDuelInvitationReceived);
+    handle<_FriendshipReceived>(_onFriendshipReceived);
+    handle<_DuelInvitationReceived>(_onDuelInvitationReceived);
   }
 
   final WatchRematchesUsecase _watchRematches;
@@ -280,7 +279,7 @@ final class NotificationBloc
     if (event.isSignedIn == _isSignedIn) return;
     _isSignedIn = event.isSignedIn;
     _clearSession();
-    emit(NotificationState(isConnected: state.isConnected));
+    emit(NotificationState(isConnected: stateValue.isConnected));
     if (_isSignedIn) add(const _FriendsRecoveryRequested(baseline: true));
   }
 
@@ -291,8 +290,8 @@ final class NotificationBloc
     final RealtimeStatus? previous = _lastStatus;
     _lastStatus = event.status;
     final bool isConnected = event.status == RealtimeStatus.connected;
-    if (isConnected != state.isConnected) {
-      emit(state.copyWith(isConnected: isConnected));
+    if (isConnected != stateValue.isConnected) {
+      emit(stateValue.copyWith(isConnected: isConnected));
     }
     if (isConnected &&
         previous != null &&
@@ -316,7 +315,7 @@ final class NotificationBloc
     // A failed read keeps the last known value.
     final ActivityEntity? activity = result.toNullable();
     if (activity == null) return;
-    emit(state.copyWith(isBusy: !activity.isNone));
+    emit(stateValue.copyWith(isBusy: !activity.isNone));
     await _checkOutgoingInvitation(activity, session, run, emit);
   }
 
@@ -356,7 +355,7 @@ final class NotificationBloc
   }
 
   void _onHidden(NotificationHidden event, Emitter<NotificationState> emit) {
-    final NotificationItem? item = state.item(event.id);
+    final NotificationItem? item = stateValue.item(event.id);
     if (item == null || !item.isPrompt) return;
     if (item.isExpired) {
       _removeItem(item.id, emit);
@@ -369,11 +368,11 @@ final class NotificationBloc
     NotificationHiddenShown event,
     Emitter<NotificationState> emit,
   ) {
-    if (!state.items.any(_isHiddenPending)) return;
+    if (!stateValue.items.any(_isHiddenPending)) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         items: List<NotificationItem>.unmodifiable(<NotificationItem>[
-          for (final NotificationItem item in state.items)
+          for (final NotificationItem item in stateValue.items)
             _isHiddenPending(item) ? item.copyWith(isHidden: false) : item,
         ]),
       ),
@@ -390,21 +389,21 @@ final class NotificationBloc
     // Also sent by screens that navigate themselves (the private room on
     // MATCHED): the id never becomes `battleToOpen` afterwards.
     _openedBattles.add(event.battleId);
-    if (state.battleToOpen != event.battleId) return;
-    emit(state.copyWith(resetBattleToOpen: true));
+    if (stateValue.battleToOpen != event.battleId) return;
+    emit(stateValue.copyWith(resetBattleToOpen: true));
   }
 
   void _onNoticeShown(
     NotificationNoticeShown event,
     Emitter<NotificationState> emit,
   ) {
-    if (!state.notices.any((NotificationNotice n) => n.id == event.noticeId)) {
+    if (!stateValue.notices.any((NotificationNotice n) => n.id == event.noticeId)) {
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         notices: List<NotificationNotice>.unmodifiable(
-          state.notices.where((NotificationNotice n) => n.id != event.noticeId),
+          stateValue.notices.where((NotificationNotice n) => n.id != event.noticeId),
         ),
       ),
     );
@@ -426,14 +425,14 @@ final class NotificationBloc
     Emitter<NotificationState> emit,
   ) {
     _lingers.remove(event.itemId);
-    final NotificationItem? item = state.item(event.itemId);
+    final NotificationItem? item = stateValue.item(event.itemId);
     if (item != null && item.isExpired) _removeItem(item.id, emit);
   }
 
   /// Local deadline, server EXPIRED and a REMATCH_EXPIRED answer all end
   /// here.
   void _expire(String itemId, Emitter<NotificationState> emit) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     if (item == null || item.isExpired) return;
     _deadlines.remove(itemId)?.cancel();
     if (item.isPrompt && !item.isHidden) {
@@ -480,7 +479,7 @@ final class NotificationBloc
     final String sourceId = rematch.sourceBattleId;
     final int? seen = _rematchVersions[sourceId];
     final bool isLive =
-        state.item(_rematchItemId(sourceId)) != null ||
+        stateValue.item(_rematchItemId(sourceId)) != null ||
         _unclassifiedRematches.containsKey(sourceId);
     if (seen != null &&
         (isLive ? rematch.version < seen : rematch.version <= seen)) {
@@ -516,7 +515,7 @@ final class NotificationBloc
   ) {
     final String sourceId = rematch.sourceBattleId;
     final String itemId = _rematchItemId(sourceId);
-    final NotificationItem? existing = state.item(itemId);
+    final NotificationItem? existing = stateValue.item(itemId);
     if (!rematch.expiresAt.isAfter(_now())) {
       // The backend expires lazily. A rematch never shown is dropped.
       _expire(itemId, emit);
@@ -563,13 +562,13 @@ final class NotificationBloc
   ) {
     final String sourceId = rematch.sourceBattleId;
     final String itemId = _rematchItemId(sourceId);
-    final NotificationItem? existing = state.item(itemId);
+    final NotificationItem? existing = stateValue.item(itemId);
     _cancelTimers(itemId);
     final String? battleId = rematch.battleId;
     final bool opens = battleId != null && _openedBattles.add(battleId);
     if (existing == null && !opens) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         items: existing == null ? null : _itemsWithout(itemId),
         battleToOpen: opens ? battleId : null,
         notices: opens
@@ -590,7 +589,7 @@ final class NotificationBloc
     Emitter<NotificationState> emit,
   ) {
     final String sourceId = rematch.sourceBattleId;
-    final NotificationItem? existing = state.item(_rematchItemId(sourceId));
+    final NotificationItem? existing = stateValue.item(_rematchItemId(sourceId));
     if (existing == null) return;
     final bool isIncoming = _rematchPayload(existing)?.isIncoming ?? true;
     final bool silent = _ownDeclines.contains(sourceId) || existing.isExpired;
@@ -636,7 +635,7 @@ final class NotificationBloc
     Failure failure,
     Emitter<NotificationState> emit,
   ) {
-    final NotificationItem? current = state.item(itemId);
+    final NotificationItem? current = stateValue.item(itemId);
     // Already settled by a push (e.g. CANCELLED): no second notice.
     if (current == null) return;
     if (failure.hasCode(ApiErrorCodes.rematchExpired)) {
@@ -649,7 +648,7 @@ final class NotificationBloc
       return;
     }
     if (failure.hasCode(ApiErrorCodes.activityConflict)) {
-      emit(state.copyWith(isBusy: true));
+      emit(stateValue.copyWith(isBusy: true));
     }
     _putItem(
       current.copyWith(
@@ -684,7 +683,7 @@ final class NotificationBloc
     if (emit.isDone || session != _session) return;
     result.match((Failure failure) {
       _ownDeclines.remove(item.resourceId);
-      final NotificationItem? current = state.item(item.id);
+      final NotificationItem? current = stateValue.item(item.id);
       if (current == null) return;
       _putItem(
         current.copyWith(
@@ -723,7 +722,7 @@ final class NotificationBloc
         disciplineCode: loaded.disciplineCode,
       );
       _rematchDetails[sourceId] = details;
-      final NotificationItem? item = state.item(_rematchItemId(sourceId));
+      final NotificationItem? item = stateValue.item(_rematchItemId(sourceId));
       final RematchNotificationPayload? payload = _rematchPayload(item);
       if (item != null && payload != null) {
         _putItem(
@@ -754,7 +753,7 @@ final class NotificationBloc
   ) async {
     if (!_isSignedIn) return;
     final List<String> sourceIds = <String>[
-      for (final NotificationItem item in state.items)
+      for (final NotificationItem item in stateValue.items)
         if (item.kind == NotificationKind.rematch && !item.isExpired)
           item.resourceId,
     ];
@@ -802,7 +801,7 @@ final class NotificationBloc
       return;
     }
     _clearSession();
-    emit(NotificationState(isConnected: state.isConnected));
+    emit(NotificationState(isConnected: stateValue.isConnected));
     if (_isSignedIn) add(const _FriendsRecoveryRequested(baseline: true));
   }
 
@@ -863,7 +862,7 @@ final class NotificationBloc
     // From here to the end no await: the snapshot and the buffered pushes
     // are applied in one step, so nothing slips in between.
     if (activityRun == _activityRun && own != null) {
-      emit(state.copyWith(isBusy: !own.isNone));
+      emit(stateValue.copyWith(isBusy: !own.isNone));
     }
     requests.match(
       (_) {},
@@ -931,11 +930,11 @@ final class NotificationBloc
   void _showFriendsPrompts(Emitter<NotificationState> emit) {
     bool isFriendsHidden(NotificationItem item) =>
         item.kind != NotificationKind.rematch && _isHiddenPending(item);
-    if (!state.items.any(isFriendsHidden)) return;
+    if (!stateValue.items.any(isFriendsHidden)) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         items: List<NotificationItem>.unmodifiable(<NotificationItem>[
-          for (final NotificationItem item in state.items)
+          for (final NotificationItem item in stateValue.items)
             isFriendsHidden(item) ? item.copyWith(isHidden: false) : item,
         ]),
       ),
@@ -987,7 +986,7 @@ final class NotificationBloc
       _putRequest(item, emit);
     }
     for (final NotificationItem item in List<NotificationItem>.of(
-      state.items,
+      stateValue.items,
     )) {
       if (item.kind != NotificationKind.friendRequest ||
           pending.contains(item.resourceId) ||
@@ -1003,7 +1002,7 @@ final class NotificationBloc
     RelationshipEntity relationship,
     Emitter<NotificationState> emit,
   ) {
-    final NotificationItem? existing = state.item(
+    final NotificationItem? existing = stateValue.item(
       _requestItemId(relationship.id),
     );
     final FriendRequestNotificationPayload? previous = _requestPayload(
@@ -1050,7 +1049,7 @@ final class NotificationBloc
       if (record.status == RelationshipStatus.accepted &&
           _noticedRelationships.add('${record.id}:accepted')) {
         emit(
-          state.copyWith(
+          stateValue.copyWith(
             notices: _noticesWith(
               NotificationKind.friendRequest,
               NotificationNoticeType.accepted,
@@ -1070,7 +1069,7 @@ final class NotificationBloc
       return;
     }
     _requestTombstones[record.id] = record.version;
-    final NotificationItem? item = state.item(_requestItemId(record.id));
+    final NotificationItem? item = stateValue.item(_requestItemId(record.id));
     if (item == null || item.isExpired) return;
     final NotificationActionStatus? action = item.action?.status;
     final bool ownAccept =
@@ -1200,7 +1199,7 @@ final class NotificationBloc
       _putIncomingInvitation(item, emit);
     }
     for (final NotificationItem item in List<NotificationItem>.of(
-      state.items,
+      stateValue.items,
     )) {
       if (item.kind != NotificationKind.duelInvitation ||
           !item.isPrompt ||
@@ -1235,7 +1234,7 @@ final class NotificationBloc
     Emitter<NotificationState> emit,
   ) {
     final String itemId = _invitationItemId(invitation.id);
-    final NotificationItem? existing = state.item(itemId);
+    final NotificationItem? existing = stateValue.item(itemId);
     final DuelInvitationNotificationPayload? previous = _invitationPayload(
       existing,
     );
@@ -1289,7 +1288,7 @@ final class NotificationBloc
       return;
     }
     _invitationTombstones[record.id] = record.version;
-    final NotificationItem? item = state.item(_invitationItemId(record.id));
+    final NotificationItem? item = stateValue.item(_invitationItemId(record.id));
     if (item == null) return;
     final DuelInvitationNotificationPayload payload =
         DuelInvitationNotificationPayload(invitation: record);
@@ -1306,7 +1305,7 @@ final class NotificationBloc
           _closeRoomUnavailable(item, payload, emit);
         } else if (record.status == DuelInvitationStatus.expired) {
           _clearAction(item.id, emit);
-          final NotificationItem? current = state.item(item.id);
+          final NotificationItem? current = stateValue.item(item.id);
           if (current != null) {
             _putItem(current.copyWith(payload: payload), emit);
           }
@@ -1357,7 +1356,7 @@ final class NotificationBloc
       if (!deadline.isAfter(_now())) return;
       // At most one pending invitation per room: a newer one replaces it.
       for (final NotificationItem other in List<NotificationItem>.of(
-        state.items,
+        stateValue.items,
       )) {
         if (other.kind == NotificationKind.duelInvitation &&
             !other.isPrompt &&
@@ -1365,7 +1364,7 @@ final class NotificationBloc
           _removeItem(other.id, emit);
         }
       }
-      final NotificationItem? existing = state.item(itemId);
+      final NotificationItem? existing = stateValue.item(itemId);
       final DuelInvitationNotificationPayload payload =
           DuelInvitationNotificationPayload(invitation: record);
       final NotificationItem next = existing == null
@@ -1415,7 +1414,7 @@ final class NotificationBloc
       return;
     }
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         notices: _noticesWith(
           NotificationKind.duelInvitation,
           type,
@@ -1479,7 +1478,7 @@ final class NotificationBloc
     }
     if (failure.hasCode(ApiErrorCodes.activityConflict)) {
       _acceptingInvitations.remove(id);
-      emit(state.copyWith(isBusy: true));
+      emit(stateValue.copyWith(isBusy: true));
       _fail(item.id, failure, emit);
       add(const NotificationActivityRefreshRequested());
       return;
@@ -1558,7 +1557,7 @@ final class NotificationBloc
     if (emit.isDone || session != _session) return;
     final ActivityEntity? own = activity.toNullable();
     if (activityRun == _activityRun && own != null) {
-      emit(state.copyWith(isBusy: !own.isNone));
+      emit(stateValue.copyWith(isBusy: !own.isNone));
     }
     final String? activityBattle = accepting && own?.type == ActivityType.battle
         ? own?.battleId
@@ -1568,7 +1567,7 @@ final class NotificationBloc
       (Failure failure) {
         _acceptingInvitations.remove(id);
         final bool gone = failure.hasCode(ApiErrorCodes.duelInvitationNotFound);
-        final NotificationItem? current = state.item(item.id);
+        final NotificationItem? current = stateValue.item(item.id);
         if (activityBattle != null && (gone || original == null)) {
           // Lost ACCEPTED (server restart): the battle is in activity.
           _tombstoneInvitation(id);
@@ -1689,7 +1688,7 @@ final class NotificationBloc
   }) {
     if (!_openedBattles.add(battleId)) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         battleToOpen: battleId,
         notices: _noticesWith(
           kind,
@@ -1708,7 +1707,7 @@ final class NotificationBloc
   }
 
   NotificationItem? _outgoingItem() {
-    for (final NotificationItem item in state.items) {
+    for (final NotificationItem item in stateValue.items) {
       if (item.kind == NotificationKind.duelInvitation && !item.isPrompt) {
         return item;
       }
@@ -1748,13 +1747,13 @@ final class NotificationBloc
     NotificationActionStatus status,
     Emitter<NotificationState> emit,
   ) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     if (item == null) return;
     _putItem(item.copyWith(action: NotificationAction(status: status)), emit);
   }
 
   void _fail(String itemId, Failure failure, Emitter<NotificationState> emit) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     if (item == null || item.isExpired) return;
     _putItem(
       item.copyWith(
@@ -1770,7 +1769,7 @@ final class NotificationBloc
   /// Clears an in-flight action the result did not settle (the card is
   /// still pending, e.g. a push already applied the same version).
   void _settleAction(String itemId, Emitter<NotificationState> emit) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     if (item != null && item.isActionInFlight) _clearAction(itemId, emit);
   }
 
@@ -1779,7 +1778,7 @@ final class NotificationBloc
 
   /// A prompt that can take Accept or Decline now.
   NotificationItem? _actionable(String id) {
-    final NotificationItem? item = state.item(id);
+    final NotificationItem? item = stateValue.item(id);
     if (item == null ||
         !item.isPrompt ||
         item.isExpired ||
@@ -1814,7 +1813,7 @@ final class NotificationBloc
   void _putItem(NotificationItem item, Emitter<NotificationState> emit) {
     final List<NotificationItem> items = <NotificationItem>[];
     bool replaced = false;
-    for (final NotificationItem current in state.items) {
+    for (final NotificationItem current in stateValue.items) {
       if (current.id == item.id) {
         if (current == item) return;
         items.add(item);
@@ -1824,11 +1823,11 @@ final class NotificationBloc
       }
     }
     if (!replaced) items.add(item);
-    emit(state.copyWith(items: List<NotificationItem>.unmodifiable(items)));
+    emit(stateValue.copyWith(items: List<NotificationItem>.unmodifiable(items)));
   }
 
   void _clearAction(String itemId, Emitter<NotificationState> emit) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     if (item == null || item.action == null) return;
     _putItem(item.copyWith(resetAction: true), emit);
   }
@@ -1838,11 +1837,11 @@ final class NotificationBloc
     Emitter<NotificationState> emit, {
     NotificationNoticeType? notice,
   }) {
-    final NotificationItem? item = state.item(itemId);
+    final NotificationItem? item = stateValue.item(itemId);
     _cancelTimers(itemId);
     if (item == null) return;
     emit(
-      state.copyWith(
+      stateValue.copyWith(
         items: _itemsWithout(itemId),
         notices: notice == null
             ? null
@@ -1860,7 +1859,7 @@ final class NotificationBloc
 
   List<NotificationItem> _itemsWithout(String itemId) =>
       List<NotificationItem>.unmodifiable(
-        state.items.where((NotificationItem item) => item.id != itemId),
+        stateValue.items.where((NotificationItem item) => item.id != itemId),
       );
 
   List<NotificationNotice> _noticesWith(
@@ -1871,7 +1870,7 @@ final class NotificationBloc
     bool isOutgoing = false,
     DuelInvitationReason? reason,
   }) => List<NotificationNotice>.unmodifiable(<NotificationNotice>[
-    ...state.notices,
+    ...stateValue.notices,
     NotificationNotice(
       id: 'notice-${_noticeSequence++}',
       kind: kind,

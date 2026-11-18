@@ -3,7 +3,6 @@ import 'dart:developer' as developer;
 
 import 'package:json_annotation/json_annotation.dart';
 
-import 'package:skill_battles/core/data/models/subscription_model.dart';
 import 'package:skill_battles/core/data/models/user_model.dart';
 import 'package:skill_battles/core/domain/entity/user_entity.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
@@ -29,20 +28,17 @@ import 'package:skill_battles/features/account/domain/entity/statistics_entity.d
 import 'package:skill_battles/features/account/domain/entity/update_profile_params_entity.dart';
 import 'package:skill_battles/features/account/domain/entity/update_profile_result_entity.dart';
 import 'package:skill_battles/features/account/domain/repository/account_repository.dart';
-import 'package:skill_battles/features/subscription/data/sources/remote/subscription_remote.dart';
 
 /// Remote only. Personal statistics, limits and entitlements are never
 /// cached on the device (the API marks them `no-store`).
 final class AccountRepositoryImpl implements AccountRepository {
   const AccountRepositoryImpl({
     required this._remote,
-    required this._subscriptionRemote,
     required this._realtime,
     required this._session,
   });
 
   final AccountRemote _remote;
-  final SubscriptionRemote _subscriptionRemote;
   final RealtimeClient _realtime;
   final AuthSession _session;
 
@@ -119,45 +115,10 @@ final class AccountRepositoryImpl implements AccountRepository {
   }
 
   @override
-  Future<Either<Failure, AccountStateEntity>> getAccountState() async {
-    try {
-      final (
-        UserModel user,
-        SubscriptionModel subscription,
-        LimitsResponseModel limits,
-      ) = await (
-        _remote.getMe(),
-        _subscriptionRemote.getMySubscription(),
-        _remote.getLimits(),
-      ).wait;
-      return Right(
-        AccountStateEntity(
-          user: user.toEntity(),
-          subscription: subscription.toEntity(),
-          limits: limits.toEntity(),
-        ),
-      );
-    } on ParallelWaitError<
-      (UserModel?, SubscriptionModel?, LimitsResponseModel?),
-      (AsyncError?, AsyncError?, AsyncError?)
-    > catch (error, stackTrace) {
-      final AsyncError? first =
-          error.errors.$1 ?? error.errors.$2 ?? error.errors.$3;
-      final Object exception = first?.error ?? error;
-      return Left(
-        mapExceptionToFailure(exception, first?.stackTrace ?? stackTrace),
-      );
-    } on Exception catch (exception, stackTrace) {
-      return Left(mapExceptionToFailure(exception, stackTrace));
-    }
-  }
-
-  @override
   Stream<AccountStateEntity> watchAccountChanges() => _realtime.events
       .where(
         (RealtimeEnvelope event) =>
-            event.type == RealtimeEventType.accountChanged &&
-            event.resourceId == _session.userId,
+            event.type == RealtimeEventType.accountChanged && event.resourceId == _session.userId,
       )
       .expand((RealtimeEnvelope event) {
         try {

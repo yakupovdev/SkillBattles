@@ -1,8 +1,8 @@
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:skeletonizer/skeletonizer.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/core/presentation/league/league_rank.dart';
+import 'package:skill_battles/core/presentation/skeleton/skeletonizer.dart';
 
 /// The emblem of a league and division (`assets/leagues/`).
 ///
@@ -10,7 +10,7 @@ import 'package:skill_battles/core/presentation/league/league_rank.dart';
 /// preview). While a `Skeletonizer` is enabled it is one bone of its size and
 /// the file is not loaded. The emblem is hidden from screen readers unless a
 /// [semanticLabel] is given, because the rank name is shown next to it.
-final class LeagueEmblem extends StatelessWidget {
+final class LeagueEmblem extends StatelessComponent {
   const LeagueEmblem({
     required this.rank,
     required this.size,
@@ -26,38 +26,34 @@ final class LeagueEmblem extends StatelessWidget {
   final bool dimmed;
   final String? semanticLabel;
 
-  static const ColorFilter _grayscale = ColorFilter.matrix(<double>[
-    0.2126, 0.7152, 0.0722, 0, 0, //
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0, 0, 0, 1, 0,
-  ]);
-
   @override
-  Widget build(BuildContext context) {
-    if (Skeletonizer.maybeOf(context)?.enabled ?? false) {
-      return Skeleton.leaf(child: SizedBox.square(dimension: size));
+  Component build(BuildContext context) {
+    final Styles box = Styles(width: Unit.pixels(size), height: Unit.pixels(size));
+    if (Skeletonizer.isEnabled(context)) {
+      return Skeleton.leaf(
+        child: span(classes: 'league-emblem', styles: box, const <Component>[]),
+      );
     }
-    Widget emblem = SvgPicture.asset(
-      rank.asset,
-      width: size,
-      height: size,
-      excludeFromSemantics: true,
-    );
     final double? opacity = locked
         ? 0.35
         : dimmed
         ? 0.7
         : null;
-    if (opacity != null) {
-      emblem = Opacity(
-        opacity: opacity,
-        child: ColorFiltered(colorFilter: _grayscale, child: emblem),
-      );
-    }
     final String? label = semanticLabel;
-    return label == null
-        ? ExcludeSemantics(child: emblem)
-        : Semantics(label: label, image: true, child: emblem);
+    return img(
+      src: rank.asset,
+      alt: label ?? '',
+      width: size.round(),
+      height: size.round(),
+      classes: opacity == null ? 'league-emblem' : 'league-emblem league-emblem--muted',
+      styles: opacity == null ? box : box.combine(Styles(opacity: opacity)),
+      attributes: label == null ? const <String, String>{'aria-hidden': 'true'} : null,
+    );
   }
 }
+
+@css
+List<StyleRule> get leagueEmblemStyles => <StyleRule>[
+  css('.league-emblem').styles(display: Display.block, flex: const Flex(shrink: 0)),
+  css('.league-emblem--muted').styles(filter: const Filter.grayscale(1)),
+];

@@ -28,9 +28,6 @@ abstract interface class AccountRepository {
     SeasonHistoryParamsEntity params,
   );
 
-  /// Profile, verified subscription and limits read together.
-  Future<Either<Failure, AccountStateEntity>> getAccountState();
-
   /// ACCOUNT_CHANGED notifications of the signed-in account.
   Stream<AccountStateEntity> watchAccountChanges();
 }

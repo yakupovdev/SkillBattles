@@ -1,13 +1,19 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_icons.dart';
+import 'package:skill_battles/app/theme/app_shadows.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/markdown/markdown_spans.dart';
+import 'package:skill_battles/core/presentation/overlay/app_overlay.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/app_eyebrow.dart';
+import 'package:skill_battles/core/presentation/widgets/app_form.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
+import 'package:skill_battles/core/presentation/widgets/app_text_input.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/report_params_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/report_reason.dart';
@@ -23,7 +29,7 @@ Future<ReportParamsEntity?> showReportRoundDialog(
   required String roundId,
   required String eyebrow,
   required String prompt,
-}) => showDialog<ReportParamsEntity>(
+}) => showAppDialog<ReportParamsEntity>(
   context: context,
   barrierColor: AppColors.scrim,
   builder: (BuildContext dialogContext) => ReportRoundDialog(
@@ -34,7 +40,7 @@ Future<ReportParamsEntity?> showReportRoundDialog(
   ),
 );
 
-final class ReportRoundDialog extends StatefulWidget {
+final class ReportRoundDialog extends StatefulComponent {
   const ReportRoundDialog({
     required this.battleId,
     required this.roundId,
@@ -53,7 +59,7 @@ final class ReportRoundDialog extends StatefulWidget {
 }
 
 final class _ReportRoundDialogState extends State<ReportRoundDialog> {
-  late final GlobalKey<FormState> _formKey;
+  late final GlobalStateKey<AppFormState> _formKey;
   late final TextEditingController _comment;
   late ReportReason _reason;
 
@@ -69,7 +75,7 @@ final class _ReportRoundDialogState extends State<ReportRoundDialog> {
   @override
   void initState() {
     super.initState();
-    _formKey = GlobalKey<FormState>();
+    _formKey = GlobalStateKey<AppFormState>();
     _comment = TextEditingController();
     _reason = ReportReason.incorrectAnswer;
   }
@@ -80,13 +86,16 @@ final class _ReportRoundDialogState extends State<ReportRoundDialog> {
     super.dispose();
   }
 
+  void _close() => closeAppDialog<ReportParamsEntity>(context);
+
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final String comment = _comment.text.trim();
-    Navigator.of(context).pop(
+    closeAppDialog<ReportParamsEntity>(
+      context,
       ReportParamsEntity(
-        battleId: widget.battleId,
-        roundId: widget.roundId,
+        battleId: component.battleId,
+        roundId: component.roundId,
         reason: _reason,
         comment: comment.isEmpty ? null : comment,
       ),
@@ -94,164 +103,94 @@ final class _ReportRoundDialogState extends State<ReportRoundDialog> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     // The preview quotes the question as plain text: cutting Markdown or a
     // formula at a fixed length would leave half of its markup.
-    final String plain = MarkdownSpans.plainText(widget.prompt);
+    final String plain = MarkdownSpans.plainText(component.prompt);
     final String prompt = plain.length > _promptPreviewLength
         ? '${plain.substring(0, _promptPreviewLength).trimRight()}…'
         : plain;
-    final TextStyle muted = AppTextStyles.bodyMd.copyWith(
-      color: AppColors.muted,
-      height: 20 / 14,
-    );
     final bool commentRequired = _reason == ReportReason.other;
-    return Dialog(
-      backgroundColor: AppColors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: AppColors.dialogShadow,
-              offset: Offset(0, 24),
-              blurRadius: 64,
-            ),
-          ],
-        ),
-        child: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Form(
-              key: _formKey,
-              autovalidateMode: AutovalidateMode.onUserInteractionIfError,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: 22,
-                children: <Widget>[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          spacing: 8,
-                          children: <Widget>[
-                            AppEyebrow(widget.eyebrow),
-                            Text(
-                              'Report this question',
-                              style: AppTextStyles.titleXlCompact.copyWith(
-                                height: 32 / 28,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      AppTappable(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(6),
-                        semanticLabel: 'Close',
-                        child: const AppSvgIcon(
-                          AppIcons.close,
-                          width: 20,
-                          height: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    '"$prompt" — our content team reviews every report. It '
-                    "won't change ratings or reveal the answer.",
-                    style: muted,
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 8,
-                    children: <Widget>[
-                      for (final ReportReason reason in ReportReason.values)
-                        _ReasonTile(
-                          label: _labels[reason]!,
-                          note: reason == ReportReason.other
-                              ? ' (comment required)'
-                              : null,
-                          isSelected: reason == _reason,
-                          onTap: () => setState(() => _reason = reason),
-                        ),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 6,
-                    children: <Widget>[
-                      Text.rich(
-                        TextSpan(
-                          children: <InlineSpan>[
-                            const TextSpan(text: 'Comment '),
-                            TextSpan(
-                              text: commentRequired
-                                  ? '· required'
-                                  : '· optional',
-                              style: AppTextStyles.bodySm.copyWith(
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: AppTextStyles.bodySm.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      _CommentField(
-                        controller: _comment,
-                        isRequired: commentRequired,
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    spacing: 10,
-                    children: <Widget>[
-                      SizedBox(
-                        height: 46,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Center(
-                            widthFactor: 1,
-                            child: AppTextLink(
-                              label: 'Cancel',
-                              style: AppTextStyles.bodyMd.copyWith(
-                                color: AppColors.muted,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
-                          ),
-                        ),
-                      ),
-                      AppButton(
-                        label: 'Send report',
-                        variant: AppButtonVariant.dark,
-                        size: AppButtonSize.small,
-                        onPressed: _submit,
-                      ),
-                    ],
-                  ),
-                ],
+    return div(
+      classes: 'report-dialog',
+      attributes: const <String, String>{'aria-labelledby': 'report-dialog-title'},
+      <Component>[
+        AppForm(
+          key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteractionIfError,
+          onSubmit: _submit,
+          child: div(classes: 'report-dialog__body', <Component>[
+            div(classes: 'report-dialog__header', <Component>[
+              div(classes: 'report-dialog__heading', <Component>[
+                AppEyebrow(component.eyebrow),
+                const h2(
+                  id: 'report-dialog-title',
+                  classes: 'report-dialog__title',
+                  <Component>[Component.text('Report this question')],
+                ),
+              ]),
+              AppTappable(
+                onTap: _close,
+                radius: 6,
+                semanticLabel: 'Close',
+                classes: 'report-dialog__close',
+                child: const AppSvgIcon(AppIcons.close, width: 20, height: 20),
               ),
+            ]),
+            p(classes: 'report-dialog__intro', <Component>[
+              Component.text(
+                '"$prompt" — our content team reviews every report. It '
+                "won't change ratings or reveal the answer.",
+              ),
+            ]),
+            div(
+              classes: 'report-dialog__reasons',
+              attributes: const <String, String>{'role': 'group', 'aria-label': 'Reason'},
+              <Component>[
+                for (final ReportReason reason in ReportReason.values)
+                  _ReasonTile(
+                    label: _labels[reason]!,
+                    note: reason == ReportReason.other ? ' (comment required)' : null,
+                    isSelected: reason == _reason,
+                    onTap: () => setState(() => _reason = reason),
+                  ),
+              ],
             ),
-          ),
+            div(classes: 'report-dialog__comment', <Component>[
+              label(htmlFor: 'report-dialog-comment', classes: 'report-dialog__comment-label', <Component>[
+                const span(<Component>[Component.text('Comment ')]),
+                span(classes: 'report-dialog__comment-hint', <Component>[
+                  Component.text(commentRequired ? '· required' : '· optional'),
+                ]),
+              ]),
+              _CommentField(controller: _comment, isRequired: commentRequired),
+            ]),
+            div(classes: 'report-dialog__actions', <Component>[
+              div(classes: 'report-dialog__cancel', <Component>[
+                AppTextLink(
+                  label: 'Cancel',
+                  style: AppTextStyles.bodyMd.combine(
+                    const Styles(color: AppColors.muted, fontWeight: FontWeight.w500),
+                  ),
+                  onPressed: _close,
+                ),
+              ]),
+              AppButton(
+                label: 'Send report',
+                variant: AppButtonVariant.dark,
+                size: AppButtonSize.small,
+                onPressed: _submit,
+              ),
+            ]),
+          ]),
         ),
-      ),
+      ],
     );
   }
 }
 
 /// A 48 px radio row: blue outline and filled ring when selected.
-final class _ReasonTile extends StatelessWidget {
+final class _ReasonTile extends StatelessComponent {
   const _ReasonTile({
     required this.label,
     required this.isSelected,
@@ -265,118 +204,240 @@ final class _ReasonTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Component build(BuildContext context) {
     final String? note = this.note;
     return AppTappable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      radius: 10,
       isSelected: isSelected,
       semanticLabel: '$label${note ?? ''}',
-      child: Container(
-        height: 48,
-        padding: EdgeInsets.symmetric(horizontal: isSelected ? 16 : 17),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primarySurface : AppColors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          spacing: 12,
-          children: <Widget>[
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.borderStrong,
-                  width: isSelected ? 5 : 1.5,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Text.rich(
-                TextSpan(
-                  children: <InlineSpan>[
-                    TextSpan(text: label),
-                    if (note != null)
-                      TextSpan(
-                        text: note,
-                        style: AppTextStyles.bodyLg.copyWith(
-                          color: AppColors.muted,
-                        ),
-                      ),
-                  ],
-                ),
-                style: AppTextStyles.bodyLg.copyWith(
-                  fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      classes: isSelected ? 'report-reason report-reason--selected' : 'report-reason',
+      child: Component.fragment(<Component>[
+        const span(classes: 'report-reason__radio', <Component>[]),
+        p(classes: 'report-reason__label', <Component>[
+          span(<Component>[Component.text(label)]),
+          if (note != null) span(classes: 'report-reason__note', <Component>[Component.text(note)]),
+        ]),
+      ]),
     );
   }
 }
 
-/// The comment box with a "48 / 1000" counter inside its bottom edge.
-final class _CommentField extends StatelessWidget {
+/// The comment box with a "48 / 1000" counter under its bottom edge.
+final class _CommentField extends StatelessComponent {
   const _CommentField({required this.controller, required this.isRequired});
 
   final TextEditingController controller;
   final bool isRequired;
 
   @override
-  Widget build(BuildContext context) {
-    final OutlineInputBorder border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: const BorderSide(color: AppColors.border),
-    );
-    return TextFormField(
-      controller: controller,
-      minLines: 2,
-      maxLines: 4,
-      maxLength: ReportParamsEntity.maxCommentLength,
-      style: AppTextStyles.bodyMd.copyWith(height: 20 / 14),
-      buildCounter:
-          (
-            BuildContext context, {
-            required int currentLength,
-            required bool isFocused,
-            required int? maxLength,
-          }) => Text(
-            '$currentLength / $maxLength',
-            style: AppTextStyles.monoCaption.copyWith(color: AppColors.faint),
-          ),
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 12,
-        ),
-        hintText: isRequired ? 'Describe the problem' : null,
-        hintStyle: AppTextStyles.bodyMd.copyWith(color: AppColors.faint),
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        errorBorder: border.copyWith(
-          borderSide: const BorderSide(color: AppColors.danger),
-        ),
-        focusedErrorBorder: border.copyWith(
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
-        ),
-      ),
-      validator: (String? value) => isRequired && (value?.trim() ?? '').isEmpty
-          ? 'Describe the problem'
-          : null,
+  Component build(BuildContext context) {
+    return AppFormField<String>(
+      initialValue: controller.text,
+      validator: (String? value) => isRequired && (value?.trim() ?? '').isEmpty ? 'Describe the problem' : null,
+      builder: (AppFormFieldState<String> field) =>
+          _CommentInput(field: field, controller: controller, isRequired: isRequired),
     );
   }
 }
+
+final class _CommentInput extends StatelessComponent {
+  const _CommentInput({
+    required this.field,
+    required this.controller,
+    required this.isRequired,
+  });
+
+  final AppFormFieldState<String> field;
+  final TextEditingController controller;
+  final bool isRequired;
+
+  @override
+  Component build(BuildContext context) {
+    final String? error = field.errorText;
+    final int length = (field.value ?? '').length;
+    return div(classes: 'report-comment', <Component>[
+      textarea(
+        id: 'report-dialog-comment',
+        rows: 2,
+        placeholder: isRequired ? 'Describe the problem' : null,
+        classes: error == null ? 'report-comment__input' : 'report-comment__input report-comment__input--error',
+        attributes: <String, String>{
+          'maxlength': '${ReportParamsEntity.maxCommentLength}',
+          if (error != null) 'aria-invalid': 'true',
+          if (error != null) 'aria-describedby': 'report-dialog-comment-error',
+        },
+        events: <String, void Function(web.Event)>{
+          'input': (web.Event event) {
+            final String value = (event.target! as web.HTMLTextAreaElement).value;
+            controller.text = value;
+            field.didChange(value);
+          },
+        },
+        const <Component>[],
+      ),
+      div(classes: 'report-comment__footer', <Component>[
+        if (error != null)
+          p(
+            id: 'report-dialog-comment-error',
+            classes: 'report-comment__error',
+            attributes: const <String, String>{'aria-live': 'polite'},
+            <Component>[Component.text(error)],
+          ),
+        span(classes: 'report-comment__counter', <Component>[
+          Component.text('$length / ${ReportParamsEntity.maxCommentLength}'),
+        ]),
+      ]),
+    ]);
+  }
+}
+
+@css
+List<StyleRule> get reportRoundDialogStyles => <StyleRule>[
+  css('.report-dialog').styles(
+    width: const Unit.pixels(520),
+    maxWidth: const Unit.percent(100),
+    maxHeight: const Unit.expression('calc(100vh - 48px)'),
+    padding: const Padding.all(Unit.pixels(32)),
+    boxSizing: BoxSizing.borderBox,
+    radius: const BorderRadius.circular(Unit.pixels(20)),
+    overflow: Overflow.auto,
+    shadow: AppShadows.dialog,
+    backgroundColor: AppColors.white,
+  ),
+  css('.report-dialog__body').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(22)),
+  ),
+  css('.report-dialog__header').styles(display: Display.flex, alignItems: AlignItems.start),
+  css('.report-dialog__heading').styles(
+    display: Display.flex,
+    minWidth: Unit.zero,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.start,
+    gap: const Gap.row(Unit.pixels(8)),
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.report-dialog__title').combine(AppTextStyles.titleXlCompact).combine(const Styles(lineHeight: Unit.pixels(32))),
+  css('.report-dialog__close').styles(flex: const Flex(shrink: 0)),
+  css('.report-dialog__intro')
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(color: AppColors.muted, lineHeight: Unit.pixels(20))),
+  css('.report-dialog__reasons').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(8)),
+  ),
+  css('.report-dialog__comment').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    gap: const Gap.row(Unit.pixels(6)),
+  ),
+  css('.report-dialog__comment-label')
+      .styles(alignSelf: AlignSelf.start)
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(fontWeight: FontWeight.w500)),
+  css('.report-dialog__comment-hint').styles(color: AppColors.muted, fontWeight: FontWeight.w400),
+  css('.report-dialog__actions').styles(
+    display: Display.flex,
+    justifyContent: JustifyContent.end,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(10)),
+  ),
+  css('.report-dialog__cancel').styles(
+    display: Display.flex,
+    height: const Unit.pixels(46),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(18)),
+    alignItems: AlignItems.center,
+  ),
+  css('.report-reason').styles(
+    display: Display.flex,
+    height: const Unit.pixels(48),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(17)),
+    boxSizing: BoxSizing.borderBox,
+    border: Border.all(color: AppColors.border, width: const Unit.pixels(1)),
+    radius: const BorderRadius.circular(Unit.pixels(10)),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(12)),
+    backgroundColor: AppColors.white,
+  ),
+  css('.report-reason--selected').styles(
+    padding: const Padding.symmetric(horizontal: Unit.pixels(16)),
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(2)),
+    backgroundColor: AppColors.primarySurface,
+  ),
+  css('.report-reason__radio').styles(
+    display: Display.block,
+    width: const Unit.pixels(18),
+    height: const Unit.pixels(18),
+    boxSizing: BoxSizing.borderBox,
+    border: Border.all(color: AppColors.borderStrong, width: const Unit.pixels(1.5)),
+    radius: const BorderRadius.circular(Unit.percent(50)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.report-reason--selected .report-reason__radio').styles(
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(5)),
+  ),
+  css('.report-reason__label')
+      .styles(
+        minWidth: Unit.zero,
+        flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+      )
+      .combine(AppTextStyles.bodyLg),
+  css('.report-reason--selected .report-reason__label').styles(fontWeight: FontWeight.w500),
+  css('.report-reason__note').styles(color: AppColors.muted),
+  css('.report-comment').styles(display: Display.flex, flexDirection: FlexDirection.column),
+  css('.report-comment__input')
+      .styles(
+        display: Display.block,
+        width: const Unit.percent(100),
+        minHeight: const Unit.pixels(64),
+        maxHeight: const Unit.pixels(104),
+        padding: const Padding.symmetric(horizontal: Unit.pixels(13), vertical: Unit.pixels(11)),
+        boxSizing: BoxSizing.borderBox,
+        border: Border.all(color: AppColors.border, width: const Unit.pixels(1)),
+        radius: const BorderRadius.circular(Unit.pixels(10)),
+        backgroundColor: AppColors.white,
+        raw: const <String, String>{
+          'outline': 'none',
+          'resize': 'none',
+          'field-sizing': 'content',
+          'caret-color': '#2B4BF2',
+        },
+      )
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(lineHeight: Unit.pixels(20))),
+  css('.report-comment__input:focus').styles(
+    border: Border.all(color: AppColors.primary, width: const Unit.pixels(1)),
+    raw: const <String, String>{'box-shadow': 'inset 0 0 0 0.5px #2B4BF2'},
+  ),
+  css('.report-comment__input--error').styles(
+    border: Border.all(color: AppColors.danger, width: const Unit.pixels(1)),
+  ),
+  css('.report-comment__input--error:focus').styles(
+    border: Border.all(color: AppColors.danger, width: const Unit.pixels(1)),
+    raw: const <String, String>{'box-shadow': 'inset 0 0 0 0.5px #E5484D'},
+  ),
+  css('.report-comment__input::placeholder').styles(opacity: 1, color: AppColors.faint),
+  css('.report-comment__footer').styles(
+    display: Display.flex,
+    padding: const Padding.only(left: Unit.pixels(14), top: Unit.pixels(8), right: Unit.pixels(14)),
+    alignItems: AlignItems.start,
+    gap: const Gap.column(Unit.pixels(16)),
+  ),
+  css('.report-comment__error')
+      .styles(
+        minWidth: Unit.zero,
+        flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+      )
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(color: AppColors.danger)),
+  css('.report-comment__counter')
+      .styles(
+        margin: const Margin.only(left: Unit.auto),
+        flex: const Flex(shrink: 0),
+      )
+      .combine(AppTextStyles.monoCaption)
+      .combine(const Styles(color: AppColors.faint)),
+];

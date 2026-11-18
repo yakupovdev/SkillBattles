@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/utils/session/auth_session.dart';
 import 'package:skill_battles/core/utils/session/session_tokens.dart';

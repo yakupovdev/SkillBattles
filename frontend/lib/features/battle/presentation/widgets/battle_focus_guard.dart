@@ -1,6 +1,7 @@
-import 'dart:ui' show ImageFilter;
-
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/js_interop.dart';
+import 'package:universal_web/web.dart' as web;
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -11,18 +12,16 @@ import 'package:skill_battles/features/battle/presentation/widgets/battle_round_
 /// not in front, and warns the player after they come back that leaving
 /// during a round is not allowed.
 ///
-/// On the web the app is `inactive` when the browser window loses focus and
-/// `hidden` when the tab is switched away, so both blur the round: it is
-/// harder to copy the question into another tab or to capture it with a
-/// screenshot tool that takes focus. Nothing is reported to the server; the
-/// warning and the count of leaves stay on this screen.
-final class BattleFocusGuard extends StatefulWidget {
-  const BattleFocusGuard({
-    required this.enabled,
-    required this.roundId,
-    required this.child,
-    super.key,
-  });
+/// The round is away when the tab is hidden (`visibilitychange`) or the
+/// browser window loses focus (`blur` of the window; `focus` brings it
+/// back), so both blur the round: it is harder to copy the question into
+/// another tab or to capture it with a screenshot tool that takes focus.
+/// While enabled it also refuses `copy`, `cut` and `dragstart` inside the
+/// round (the text is not selectable either; the right-click menu is off on
+/// the whole battle screen). Nothing is reported to the server; the warning
+/// and the count of leaves stay on this screen.
+final class BattleFocusGuard extends StatefulComponent {
+  const BattleFocusGuard({required this.enabled, required this.roundId, required this.child, super.key});
 
   /// Off: [child] is shown as is and leaves are not counted.
   final bool enabled;
@@ -30,52 +29,85 @@ final class BattleFocusGuard extends StatefulWidget {
   /// A new round clears the warning of the previous one (the count stays).
   final String roundId;
 
-  final Widget child;
+  final Component child;
 
   @override
   State<BattleFocusGuard> createState() => _BattleFocusGuardState();
 }
 
 final class _BattleFocusGuardState extends State<BattleFocusGuard> {
-  late AppLifecycleListener _lifecycle;
   late bool _isAway;
   late bool _leftWhileGuarded;
   late int _leaveCount;
   late bool _showWarning;
+  late bool _hasWindowFocus;
+  web.EventListener? _visibilityListener;
+  web.EventListener? _blurListener;
+  web.EventListener? _focusListener;
 
   @override
   void initState() {
     super.initState();
-    _isAway = !_isInFront(WidgetsBinding.instance.lifecycleState);
+    // Like Flutter's "no lifecycle state yet", only a hidden tab counts as
+    // away at the start; a window without focus is noticed by its events.
+    _hasWindowFocus = true;
+    _isAway = kIsWeb && web.document.hidden;
     _leftWhileGuarded = false;
     _leaveCount = 0;
     _showWarning = false;
-    _lifecycle = AppLifecycleListener(onStateChange: _onLifecycleChanged);
+    if (kIsWeb) {
+      final web.EventListener visibility = _onVisibilityChanged.toJS;
+      final web.EventListener blur = _onWindowBlur.toJS;
+      final web.EventListener focus = _onWindowFocus.toJS;
+      _visibilityListener = visibility;
+      _blurListener = blur;
+      _focusListener = focus;
+      web.document.addEventListener('visibilitychange', visibility);
+      web.window.addEventListener('blur', blur);
+      web.window.addEventListener('focus', focus);
+    }
   }
 
   @override
-  void didUpdateWidget(BattleFocusGuard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.roundId != widget.roundId) _showWarning = false;
+  void didUpdateComponent(BattleFocusGuard oldComponent) {
+    super.didUpdateComponent(oldComponent);
+    if (oldComponent.roundId != component.roundId) _showWarning = false;
   }
 
   @override
   void dispose() {
-    _lifecycle.dispose();
+    final web.EventListener? visibility = _visibilityListener;
+    final web.EventListener? blur = _blurListener;
+    final web.EventListener? focus = _focusListener;
+    if (visibility != null) web.document.removeEventListener('visibilitychange', visibility);
+    if (blur != null) web.window.removeEventListener('blur', blur);
+    if (focus != null) web.window.removeEventListener('focus', focus);
     super.dispose();
   }
 
-  /// No state yet means nothing has reported the app as hidden.
-  static bool _isInFront(AppLifecycleState? state) =>
-      state == null || state == AppLifecycleState.resumed;
+  void _onVisibilityChanged(web.Event _) => _update();
 
-  void _onLifecycleChanged(AppLifecycleState state) {
-    final bool away = !_isInFront(state);
-    if (away == _isAway) return;
+  void _onWindowBlur(web.Event event) {
+    // Focus moving between elements of the page also fires `blur` on them,
+    // but only the window's own event means the window lost focus.
+    if (event.target != web.window) return;
+    _hasWindowFocus = false;
+    _update();
+  }
+
+  void _onWindowFocus(web.Event event) {
+    if (event.target != web.window) return;
+    _hasWindowFocus = true;
+    _update();
+  }
+
+  void _update() {
+    final bool away = web.document.hidden || !_hasWindowFocus;
+    if (away == _isAway || !mounted) return;
     setState(() {
       _isAway = away;
       if (away) {
-        if (widget.enabled) _leftWhileGuarded = true;
+        if (component.enabled) _leftWhileGuarded = true;
       } else if (_leftWhileGuarded) {
         _leftWhileGuarded = false;
         _leaveCount++;
@@ -90,72 +122,89 @@ final class _BattleFocusGuardState extends State<BattleFocusGuard> {
     const String message =
         'You left the battle tab. Switching tabs or windows during a round '
         'is not allowed.';
-    return _leaveCount > 1
-        ? '$message ($_leaveCount times this match)'
-        : message;
+    return _leaveCount > 1 ? '$message ($_leaveCount times this match)' : message;
   }
 
+  static void _refuse(web.Event event) => event.preventDefault();
+
   @override
-  Widget build(BuildContext context) {
-    final bool obscured = widget.enabled && _isAway;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        if (widget.enabled && _showWarning)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(32, 16, 32, 0),
-            child: Center(
-              child: BattleColumn(
-                child: AppNotice(
-                  message: _warning,
-                  tone: AppNoticeTone.danger,
-                  actionLabel: 'Got it',
-                  onAction: _dismissWarning,
-                ),
-              ),
+  Component build(BuildContext context) {
+    final bool obscured = component.enabled && _isAway;
+    return div(classes: 'battle-focus-guard', <Component>[
+      if (component.enabled && _showWarning)
+        div(classes: 'battle-focus-guard__warning', <Component>[
+          BattleColumn(
+            child: AppNotice(
+              message: _warning,
+              tone: AppNoticeTone.danger,
+              actionLabel: 'Got it',
+              onAction: _dismissWarning,
             ),
           ),
-        Stack(
-          children: <Widget>[
-            ExcludeSemantics(
-              excluding: obscured,
-              child: ImageFiltered(
-                enabled: obscured,
-                imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                child: widget.child,
-              ),
-            ),
-            if (obscured) const Positioned.fill(child: _AwayCover()),
-          ],
+        ]),
+      div(classes: 'battle-focus-guard__stack', <Component>[
+        div(
+          classes: obscured
+              ? 'battle-focus-guard__round battle-focus-guard__round--obscured'
+              : 'battle-focus-guard__round',
+          attributes: obscured ? const <String, String>{'aria-hidden': 'true', 'inert': ''} : null,
+          events: component.enabled
+              ? const <String, void Function(web.Event)>{'copy': _refuse, 'cut': _refuse, 'dragstart': _refuse}
+              : null,
+          <Component>[component.child],
         ),
-      ],
-    );
+        if (obscured) const _AwayCover(),
+      ]),
+    ]);
   }
 }
 
 /// Shown over the blurred round while the battle is in the background.
-final class _AwayCover extends StatelessWidget {
+final class _AwayCover extends StatelessComponent {
   const _AwayCover();
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: AppColors.white.withValues(alpha: 0.7),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 8,
-          children: <Widget>[
-            const Text('Battle hidden', style: AppTextStyles.titleMd),
-            Text(
-              'Come back to this tab — the round clock keeps running.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodyMd.copyWith(color: AppColors.muted),
-            ),
-          ],
-        ),
-      ),
-    );
+  Component build(BuildContext context) {
+    return const div(classes: 'battle-focus-guard__cover', <Component>[
+      div(classes: 'battle-focus-guard__cover-content', <Component>[
+        p(classes: 'battle-focus-guard__cover-title', <Component>[Component.text('Battle hidden')]),
+        p(classes: 'battle-focus-guard__cover-text', <Component>[
+          Component.text('Come back to this tab — the round clock keeps running.'),
+        ]),
+      ]),
+    ]);
   }
 }
+
+@css
+List<StyleRule> get battleFocusGuardStyles => <StyleRule>[
+  css('.battle-focus-guard').styles(display: Display.flex, flexDirection: FlexDirection.column),
+  css('.battle-focus-guard__warning').styles(
+    display: Display.flex,
+    padding: const Padding.only(top: Unit.pixels(16)),
+    justifyContent: JustifyContent.center,
+  ),
+  css('.battle-focus-guard__stack').styles(position: const Position.relative()),
+  css('.battle-focus-guard__round').styles(display: Display.flex, justifyContent: JustifyContent.center),
+  css('.battle-focus-guard__round--obscured').styles(
+    filter: const Filter.blur(Unit.pixels(16)),
+    pointerEvents: PointerEvents.none,
+  ),
+  css('.battle-focus-guard__cover').styles(
+    display: Display.flex,
+    position: const Position.absolute(top: Unit.zero, left: Unit.zero, right: Unit.zero, bottom: Unit.zero),
+    justifyContent: JustifyContent.center,
+    alignItems: AlignItems.center,
+    raw: const <String, String>{'background-color': 'rgba(255, 255, 255, 0.7)'},
+  ),
+  css('.battle-focus-guard__cover-content').styles(
+    display: Display.flex,
+    flexDirection: FlexDirection.column,
+    alignItems: AlignItems.center,
+    gap: const Gap.row(Unit.pixels(8)),
+  ),
+  css('.battle-focus-guard__cover-title').combine(AppTextStyles.titleMd),
+  css('.battle-focus-guard__cover-text')
+      .combine(AppTextStyles.bodyMd)
+      .combine(const Styles(color: AppColors.muted, textAlign: TextAlign.center)),
+];

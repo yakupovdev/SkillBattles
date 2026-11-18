@@ -1,11 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
-import 'package:go_router/go_router.dart';
+import 'package:universal_web/web.dart' as web;
 import 'package:uuid/uuid.dart';
 
 import 'package:skill_battles/app/config/app_config.dart';
-import 'package:skill_battles/app/router/app_router.dart';
 import 'package:skill_battles/core/data/repository/connection_repository_impl.dart';
 import 'package:skill_battles/core/domain/repository/connection_repository.dart';
 import 'package:skill_battles/core/domain/usecases/generate_id_usecase.dart';
@@ -123,7 +121,8 @@ import 'package:skill_battles/features/subscription/domain/usecases/open_portal_
 import 'package:skill_battles/features/subscription/domain/usecases/start_checkout_usecase.dart';
 
 /// The single composition root. Presentation resolves only use cases (and
-/// `main` the router) through `AppDependenciesProvider.of(context)`.
+/// the app root the [AuthSession] for route guards) through
+/// `AppDependenciesProvider.of(context)`.
 final class AppDependencies {
   AppDependencies._(this._container, this.config);
 
@@ -146,7 +145,6 @@ final class AppDependencies {
     dependencies._registerSources();
     dependencies._registerRepositories();
     dependencies._registerUsecases();
-    dependencies._registerRouter();
     await dependencies._container.get<AuthSession>().restore();
     dependencies._container.get<RealtimeClient>().start();
     return dependencies;
@@ -161,7 +159,7 @@ final class AppDependencies {
     c.registerLazySingleton<Clock>(() => const SystemClock());
     c.registerLazySingleton<Uuid>(() => const Uuid());
     c.registerLazySingleton<TokenStorage>(
-      () => const SecureTokenStorage(FlutterSecureStorage()),
+      () => BrowserTokenStorage(web.window.localStorage),
     );
     c.registerLazySingleton<AuthSession>(
       () => AuthSession(
@@ -263,7 +261,6 @@ final class AppDependencies {
     c.registerLazySingleton<AccountRepository>(
       () => AccountRepositoryImpl(
         remote: c.get<AccountRemote>(),
-        subscriptionRemote: c.get<SubscriptionRemote>(),
         realtime: c.get<RealtimeClient>(),
         session: c.get<AuthSession>(),
       ),
@@ -357,7 +354,10 @@ final class AppDependencies {
       () => GetActivityUsecase(c.get<AccountRepository>()),
     );
     c.registerLazySingleton(
-      () => GetAccountStateUsecase(c.get<AccountRepository>()),
+      () => GetAccountStateUsecase(
+        c.get<AccountRepository>(),
+        c.get<SubscriptionRepository>(),
+      ),
     );
     c.registerLazySingleton(
       () => GetSeasonHistoryUsecase(c.get<AccountRepository>()),
@@ -526,13 +526,6 @@ final class AppDependencies {
     );
     c.registerLazySingleton(
       () => OpenPortalUsecase(c.get<SubscriptionRepository>()),
-    );
-  }
-
-  void _registerRouter() {
-    _container.registerLazySingleton<GoRouter>(
-      () => createAppRouter(session: _container.get<AuthSession>()),
-      dispose: (GoRouter router) => router.dispose(),
     );
   }
 }

@@ -476,7 +476,7 @@ final class FriendsNotificationFixture {
   late DateTime now;
   late final NotificationBloc bloc;
 
-  NotificationState get state => bloc.state;
+  NotificationState get state => bloc.stateValue;
 
   /// Disconnect and connect again: triggers a baseline recovery.
   void reconnect() {

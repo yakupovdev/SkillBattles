@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/app/theme/app_icons.dart';
 import 'package:skill_battles/core/presentation/league/league_rank.dart';
@@ -123,15 +123,14 @@ void main() {
           else
             LeagueRank(league).asset,
       ];
-      final String pubspec = File('pubspec.yaml').readAsStringSync();
-
+      // Jaspr serves everything under `web/`; there is no pubspec asset
+      // list (the Flutter test also checked `- assets/leagues/` there).
       expect(assets.toSet(), hasLength(27));
-      expect(pubspec, contains('- assets/leagues/'));
       for (final String asset in assets) {
-        expect(File(asset).existsSync(), isTrue, reason: asset);
+        expect(File('web/$asset').existsSync(), isTrue, reason: asset);
       }
       expect(
-        Directory('assets/leagues').listSync().whereType<File>(),
+        Directory('web/assets/leagues').listSync().whereType<File>(),
         hasLength(27),
       );
     });

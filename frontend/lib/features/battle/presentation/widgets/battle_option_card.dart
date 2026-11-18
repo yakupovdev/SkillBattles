@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
 
 import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
@@ -12,7 +13,7 @@ import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 enum BattleOptionState { idle, selected, correct, wrong }
 
 /// One answer option: letter badge, text and an optional trailing note.
-final class BattleOptionCard extends StatelessWidget {
+final class BattleOptionCard extends StatelessComponent {
   const BattleOptionCard({
     required this.option,
     required this.letter,
@@ -41,14 +42,8 @@ final class BattleOptionCard extends StatelessWidget {
   static String letterAt(int index) => String.fromCharCode(65 + index);
 
   @override
-  Widget build(BuildContext context) {
-    final (
-      Color border,
-      Color fill,
-      Color letterBox,
-      Color letterColor,
-      Color note,
-    ) = switch (state) {
+  Component build(BuildContext context) {
+    final (Color border, Color fill, Color letterBox, Color letterColor, Color note) = switch (state) {
       BattleOptionState.idle => (
         AppColors.border,
         AppColors.white,
@@ -90,74 +85,82 @@ final class BattleOptionCard extends StatelessWidget {
 
     return AppTappable(
       onTap: onPressed,
-      borderRadius: BorderRadius.circular(14),
+      radius: 14,
       isSelected: state == BattleOptionState.selected,
       semanticLabel: 'Answer $letter: ${MarkdownSpans.plainText(option.text)}',
       semanticValue: semanticValue.isEmpty ? null : semanticValue,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        constraints: const BoxConstraints(minHeight: 76),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: border, width: borderWidth),
-        ),
-        child: Row(
-          spacing: 16,
-          children: <Widget>[
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: letterBox,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Text(
-                letter,
-                style: AppTextStyles.monoBodyLg.copyWith(color: letterColor),
-              ),
-            ),
-            Expanded(
-              child: AppMarkdownLine(
-                option.text,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.bodyAnswer,
-              ),
-            ),
-            if (label != null)
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 240),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  spacing: 8,
-                  children: <Widget>[
-                    Flexible(
-                      child: Text(
-                        label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: AppTextStyles.bodySm.copyWith(
-                          color: note,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    if (avatar != null)
-                      AppAvatar(
-                        nickname: avatar,
-                        size: AppAvatarSize.xs,
-                        tone: AppAvatarTone.accent,
-                      ),
-                  ],
-                ),
-              ),
-          ],
-        ),
+      classes: 'battle-option-card',
+      styles: Styles(
+        border: Border.all(color: border, width: Unit.pixels(borderWidth)),
+        backgroundColor: fill,
       ),
+      child: Component.fragment(<Component>[
+        span(
+          classes: 'battle-option-card__letter',
+          styles: Styles(color: letterColor, backgroundColor: letterBox),
+          attributes: const <String, String>{'aria-hidden': 'true'},
+          <Component>[Component.text(letter)],
+        ),
+        div(classes: 'battle-option-card__text', <Component>[
+          AppMarkdownLine(option.text, maxLines: 3, style: AppTextStyles.bodyAnswer),
+        ]),
+        if (label != null)
+          div(classes: 'battle-option-card__note', <Component>[
+            span(
+              classes: 'battle-option-card__note-text',
+              styles: Styles(color: note),
+              <Component>[Component.text(label)],
+            ),
+            if (avatar != null) AppAvatar(nickname: avatar, size: AppAvatarSize.xs, tone: AppAvatarTone.accent),
+          ]),
+      ]),
     );
   }
 }
+
+@css
+List<StyleRule> get battleOptionCardStyles => <StyleRule>[
+  css('.battle-option-card').styles(
+    display: Display.flex,
+    minHeight: const Unit.pixels(76),
+    padding: const Padding.symmetric(horizontal: Unit.pixels(20), vertical: Unit.pixels(12)),
+    boxSizing: BoxSizing.borderBox,
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(16)),
+    raw: const <String, String>{
+      'transition': 'background-color 120ms, border-color 120ms',
+    },
+  ),
+  css('.battle-option-card__letter')
+      .styles(
+        display: Display.flex,
+        width: const Unit.pixels(36),
+        height: const Unit.pixels(36),
+        radius: const BorderRadius.circular(Unit.pixels(9)),
+        justifyContent: JustifyContent.center,
+        alignItems: AlignItems.center,
+        flex: const Flex(shrink: 0),
+      )
+      .combine(AppTextStyles.monoBodyLg),
+  css('.battle-option-card__text').styles(
+    minWidth: Unit.zero,
+    flex: const Flex(grow: 1, shrink: 1, basis: Unit.zero),
+  ),
+  css('.battle-option-card__note').styles(
+    display: Display.flex,
+    maxWidth: const Unit.pixels(240),
+    alignItems: AlignItems.center,
+    gap: const Gap.column(Unit.pixels(8)),
+    flex: const Flex(shrink: 0),
+  ),
+  css('.battle-option-card__note-text')
+      .styles(
+        minWidth: Unit.zero,
+        overflow: Overflow.hidden,
+        textAlign: TextAlign.right,
+        textOverflow: TextOverflow.ellipsis,
+        whiteSpace: WhiteSpace.noWrap,
+      )
+      .combine(AppTextStyles.bodySm)
+      .combine(const Styles(fontWeight: FontWeight.w600)),
+];

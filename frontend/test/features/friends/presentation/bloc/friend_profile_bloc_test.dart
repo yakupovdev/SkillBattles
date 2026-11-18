@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 import 'package:skill_battles/core/domain/usecases/watch_connection_usecase.dart';
 import 'package:skill_battles/core/presentation/bloc/load_status.dart';
@@ -55,16 +55,16 @@ void main() {
   group('FriendProfileBloc', () {
     test('FRIEND_NOT_FOUND clears previously loaded profile', () async {
       await start();
-      expect(bloc.state.profile, profileOf(friendAnna));
+      expect(bloc.stateValue.profile, profileOf(friendAnna));
       repo.onGetFriendProfile = (_) async =>
           failed(apiFailure(ApiErrorCodes.friendNotFound, status: 404));
 
       bloc.add(const FriendProfileRefreshRequested());
       await _settle();
 
-      expect(bloc.state.isNoLongerFriends, isTrue);
-      expect(bloc.state.profile, isNull);
-      expect(bloc.state.failure, isNull);
+      expect(bloc.stateValue.isNoLongerFriends, isTrue);
+      expect(bloc.stateValue.profile, isNull);
+      expect(bloc.stateValue.failure, isNull);
     });
 
     test('REMOVED for same relationship clears profile without read', () async {
@@ -74,8 +74,8 @@ void main() {
       );
       await _settle();
 
-      expect(bloc.state.isNoLongerFriends, isTrue);
-      expect(bloc.state.profile, isNull);
+      expect(bloc.stateValue.isNoLongerFriends, isTrue);
+      expect(bloc.stateValue.profile, isNull);
       expect(repo.profileCalls, <String>[friendAnna.id]);
     });
 
@@ -87,8 +87,8 @@ void main() {
       await _settle();
 
       expect(repo.profileCalls, <String>[friendAnna.id, friendAnna.id]);
-      expect(bloc.state.isNoLongerFriends, isFalse);
-      expect(bloc.state.profile, profileOf(friendAnna));
+      expect(bloc.stateValue.isNoLongerFriends, isFalse);
+      expect(bloc.stateValue.profile, profileOf(friendAnna));
     });
 
     test('REMOVED for another friend leaves profile unchanged', () async {
@@ -104,7 +104,7 @@ void main() {
       await _settle();
 
       expect(repo.profileCalls, hasLength(1));
-      expect(bloc.state.isNoLongerFriends, isFalse);
+      expect(bloc.stateValue.isNoLongerFriends, isFalse);
     });
 
     test(
@@ -114,15 +114,15 @@ void main() {
         repo.onGetFriendProfile = (_) async => failed(const TimeoutFailure());
         bloc.add(const FriendProfileRefreshRequested());
         await _settle();
-        expect(bloc.state.loadStatus, LoadStatus.failure);
-        expect(bloc.state.profile, profileOf(friendAnna));
-        expect(bloc.state.failure, const TimeoutFailure());
+        expect(bloc.stateValue.loadStatus, LoadStatus.failure);
+        expect(bloc.stateValue.profile, profileOf(friendAnna));
+        expect(bloc.stateValue.failure, const TimeoutFailure());
 
         repo.onGetFriendProfile = (_) async => ok(profileOf(friendAnna));
         bloc.add(const FriendProfileRefreshRequested());
         await _settle();
-        expect(bloc.state.loadStatus, LoadStatus.success);
-        expect(bloc.state.failure, isNull);
+        expect(bloc.stateValue.loadStatus, LoadStatus.success);
+        expect(bloc.stateValue.failure, isNull);
       },
     );
 
@@ -142,8 +142,8 @@ void main() {
         answer.complete(ok(profileOf(friendAnna)));
         await _settle();
 
-        expect(bloc.state.isNoLongerFriends, isTrue);
-        expect(bloc.state.profile, isNull);
+        expect(bloc.stateValue.isNoLongerFriends, isTrue);
+        expect(bloc.stateValue.profile, isNull);
       },
     );
 
@@ -160,7 +160,7 @@ void main() {
       older.complete(ok(profileOf(friendAnna)));
       await _settle();
 
-      expect(bloc.state.profile, profileOf(friendBoris));
+      expect(bloc.stateValue.profile, profileOf(friendBoris));
     });
 
     test('successful own removal clears profile using user id', () async {
@@ -169,9 +169,9 @@ void main() {
       await _settle();
 
       expect(repo.removeCalls, <String>[friendAnna.id]);
-      expect(bloc.state.removeStatus, LoadStatus.success);
-      expect(bloc.state.isNoLongerFriends, isTrue);
-      expect(bloc.state.profile, isNull);
+      expect(bloc.stateValue.removeStatus, LoadStatus.success);
+      expect(bloc.stateValue.isNoLongerFriends, isTrue);
+      expect(bloc.stateValue.profile, isNull);
     });
 
     test('completion after close does not emit', () async {

@@ -1,102 +1,102 @@
-import 'package:flutter/rendering.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:jaspr/dom.dart';
+import 'package:jaspr/jaspr.dart';
+import 'package:universal_web/js_interop.dart';
+import 'package:universal_web/web.dart' as web;
 
 /// Shows [child] at its natural size and scales it down, keeping the aspect
-/// ratio, when it is wider than the incoming max width.
+/// ratio, when it is wider than the available width (a display formula
+/// wider than the text column).
 ///
-/// Unlike `FittedBox` and scroll views it reports the (scaled) baseline of
-/// [child], so a formula inside a `WidgetSpan` stays on the text baseline.
-final class MathFitWidth extends SingleChildRenderObjectWidget {
-  const MathFitWidth({required Widget super.child, super.key});
+/// The child sits in an inline-block measured with a `ResizeObserver`; the
+/// scale is a CSS transform and the box takes the scaled height, so the text
+/// after it moves up with it. Nothing scrolls and nothing is cut.
+final class MathFitWidth extends StatefulComponent {
+  const MathFitWidth({required this.child, super.key});
+
+  final Component child;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderFitWidth();
+  State<MathFitWidth> createState() => _MathFitWidthState();
 }
 
-final class _RenderFitWidth extends RenderProxyBox {
-  double _scale = 1;
-
-  BoxConstraints _childConstraints(BoxConstraints constraints) =>
-      BoxConstraints(maxHeight: constraints.maxHeight);
-
-  double _scaleFor(Size natural, BoxConstraints constraints) =>
-      natural.width > constraints.maxWidth && natural.width > 0
-      ? constraints.maxWidth / natural.width
-      : 1;
+final class _MathFitWidthState extends State<MathFitWidth> {
+  late GlobalNodeKey<web.HTMLElement> _boxKey;
+  late GlobalNodeKey<web.HTMLElement> _contentKey;
+  late double _scale;
+  late double? _height;
+  web.ResizeObserver? _observer;
 
   @override
-  Size computeDryLayout(BoxConstraints constraints) {
-    final RenderBox? child = this.child;
-    if (child == null) return constraints.smallest;
-    final Size natural = child.getDryLayout(_childConstraints(constraints));
-    return constraints.constrain(natural * _scaleFor(natural, constraints));
+  void initState() {
+    super.initState();
+    _boxKey = GlobalNodeKey<web.HTMLElement>();
+    _contentKey = GlobalNodeKey<web.HTMLElement>();
+    _scale = 1;
+    _height = null;
+    if (kIsWeb) context.binding.addPostFrameCallback(_observe);
   }
 
   @override
-  void performLayout() {
-    final RenderBox? child = this.child;
-    if (child == null) {
-      size = constraints.smallest;
-      return;
-    }
-    child.layout(_childConstraints(constraints), parentUsesSize: true);
-    _scale = _scaleFor(child.size, constraints);
-    size = constraints.constrain(child.size * _scale);
+  void dispose() {
+    _observer?.disconnect();
+    super.dispose();
   }
 
-  @override
-  double? computeDistanceToActualBaseline(TextBaseline baseline) {
-    final double? childBaseline = child?.getDistanceToActualBaseline(baseline);
-    return childBaseline == null ? null : childBaseline * _scale;
-  }
-
-  @override
-  double? computeDryBaseline(
-    covariant BoxConstraints constraints,
-    TextBaseline baseline,
-  ) {
-    final RenderBox? child = this.child;
-    if (child == null) return null;
-    final BoxConstraints childConstraints = _childConstraints(constraints);
-    final double? childBaseline = child.getDryBaseline(
-      childConstraints,
-      baseline,
+  void _observe() {
+    final web.HTMLElement? box = _boxKey.currentNode;
+    final web.HTMLElement? content = _contentKey.currentNode;
+    if (!mounted || box == null || content == null) return;
+    final web.ResizeObserver observer = web.ResizeObserver(
+      ((JSArray<web.ResizeObserverEntry> entries, web.ResizeObserver observer) => _measure()).toJS,
     );
-    if (childBaseline == null) return null;
-    return childBaseline *
-        _scaleFor(child.getDryLayout(childConstraints), constraints);
+    observer
+      ..observe(box)
+      ..observe(content);
+    _observer = observer;
+    _measure();
+  }
+
+  void _measure() {
+    final web.HTMLElement? box = _boxKey.currentNode;
+    final web.HTMLElement? content = _contentKey.currentNode;
+    if (!mounted || box == null || content == null) return;
+    // Layout sizes ignore the transform: this is the natural size.
+    final double natural = content.offsetWidth.toDouble();
+    final double available = box.clientWidth.toDouble();
+    final double scale = natural > available && natural > 0 && available > 0 ? available / natural : 1;
+    final double? height = scale < 1 ? content.offsetHeight * scale : null;
+    if ((scale - _scale).abs() < 0.001 && height == _height) return;
+    setState(() {
+      _scale = scale;
+      _height = height;
+    });
   }
 
   @override
-  void paint(PaintingContext context, Offset offset) {
-    final RenderBox? child = this.child;
-    if (child == null) return;
-    if (_scale == 1) {
-      context.paintChild(child, offset);
-      return;
-    }
-    layer = context.pushTransform(
-      needsCompositing,
-      offset,
-      Matrix4.diagonal3Values(_scale, _scale, 1),
-      (PaintingContext context, Offset offset) =>
-          context.paintChild(child, offset),
-      oldLayer: layer is TransformLayer ? layer! as TransformLayer : null,
-    );
-  }
-
-  @override
-  void applyPaintTransform(RenderBox child, Matrix4 transform) {
-    transform.scaleByDouble(_scale, _scale, 1, 1);
-  }
-
-  @override
-  bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
-    return result.addWithPaintTransform(
-      transform: Matrix4.diagonal3Values(_scale, _scale, 1),
-      position: position,
-      hitTest: (BoxHitTestResult result, Offset position) =>
-          child?.hitTest(result, position: position) ?? false,
+  Component build(BuildContext context) {
+    final double? height = _height;
+    return div(
+      key: _boxKey,
+      classes: 'math-fit-width',
+      styles: height == null ? null : Styles(height: Unit.pixels(height)),
+      <Component>[
+        span(
+          key: _contentKey,
+          classes: 'math-fit-width__content',
+          styles: _scale == 1 ? null : Styles(transform: Transform.scale(_scale)),
+          <Component>[component.child],
+        ),
+      ],
     );
   }
 }
+
+@css
+List<StyleRule> get mathFitWidthStyles => <StyleRule>[
+  css('.math-fit-width').styles(maxWidth: const Unit.percent(100), overflow: Overflow.hidden),
+  css('.math-fit-width__content').styles(
+    display: Display.inlineBlock,
+    whiteSpace: WhiteSpace.noWrap,
+    raw: const <String, String>{'transform-origin': '0 0'},
+  ),
+];
