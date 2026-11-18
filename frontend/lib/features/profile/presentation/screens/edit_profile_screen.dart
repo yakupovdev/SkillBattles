@@ -29,6 +29,7 @@ import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/core/utils/form_validators.dart';
 import 'package:skill_battles/features/account/domain/entity/update_profile_params_entity.dart';
 import 'package:skill_battles/features/account/domain/usecases/update_profile_usecase.dart';
@@ -58,13 +59,18 @@ final class EditProfileScreen extends StatefulComponent implements RouteWrapper 
           create: (_) => EditProfileBloc(updateProfile: dependencies.getDep<UpdateProfileUsecase>()),
         ),
         BlocSignalProvider<SubscriptionBloc>(
-          create: (_) => SubscriptionBloc(
-            getPlans: dependencies.getDep<GetPlansUsecase>(),
-            getSubscription: dependencies.getDep<GetSubscriptionUsecase>(),
-            startCheckout: dependencies.getDep<StartCheckoutUsecase>(),
-            openPortal: dependencies.getDep<OpenPortalUsecase>(),
-            generateId: dependencies.getDep<GenerateIdUsecase>(),
-          )..add(const SubscriptionStarted()),
+          create: (_) {
+            final SubscriptionBloc bloc = SubscriptionBloc(
+              getPlans: dependencies.getDep<GetPlansUsecase>(),
+              getSubscription: dependencies.getDep<GetSubscriptionUsecase>(),
+              startCheckout: dependencies.getDep<StartCheckoutUsecase>(),
+              openPortal: dependencies.getDep<OpenPortalUsecase>(),
+              generateId: dependencies.getDep<GenerateIdUsecase>(),
+            );
+            // Payments are off: there is no subscription section to load.
+            if (FeatureFlags.billing) bloc.add(const SubscriptionStarted());
+            return bloc;
+          },
         ),
       ],
       child: this,
@@ -186,7 +192,7 @@ final class _EditProfileScreenState extends State<EditProfileScreen> {
                 onSave: _savePassword,
               ),
             ),
-            const _SubscriptionSection(),
+            if (FeatureFlags.billing) const _SubscriptionSection(),
           ]),
         ]),
       ),

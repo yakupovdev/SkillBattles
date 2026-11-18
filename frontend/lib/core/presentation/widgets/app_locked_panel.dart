@@ -5,9 +5,13 @@ import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/app/theme/app_text_styles.dart';
 import 'package:skill_battles/core/presentation/widgets/app_button.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// A Pro-only block shown to Free readers. It says what is restricted; it
 /// never pretends there is no data and never renders hidden values.
+///
+/// Without billing ([FeatureFlags.billing]) it has no PRO badge and no
+/// upgrade button; callers pass a [message] that does not offer Pro.
 final class AppLockedPanel extends StatelessComponent {
   const AppLockedPanel({
     required this.title,
@@ -30,12 +34,13 @@ final class AppLockedPanel extends StatelessComponent {
         p(classes: 'app-locked-panel__title', <Component>[Component.text(title)]),
         p(classes: 'app-locked-panel__message', <Component>[Component.text(message)]),
       ]),
-      AppButton(
-        label: actionLabel,
-        variant: AppButtonVariant.dark,
-        size: AppButtonSize.small,
-        onPressed: onUpgrade,
-      ),
+      if (FeatureFlags.billing)
+        AppButton(
+          label: actionLabel,
+          variant: AppButtonVariant.dark,
+          size: AppButtonSize.small,
+          onPressed: onUpgrade,
+        ),
     ]);
   }
 }

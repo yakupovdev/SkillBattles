@@ -18,6 +18,7 @@ import 'package:skill_battles/core/utils/error/api_error_codes.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/presentation/bloc/account_bloc/account_bloc.dart';
 import 'package:skill_battles/features/battle_result/domain/entity/battle_review_entity.dart';
 import 'package:skill_battles/features/battle_result/domain/usecases/cancel_rematch_usecase.dart';
@@ -158,7 +159,9 @@ final class _Review extends StatelessComponent {
           if (failure.hasCode(ApiErrorCodes.proRequired)) {
             return AppLockedPanel(
               title: 'Mistakes-only review',
-              message: 'Filtering to your mistakes is part of Pro.',
+              message: FeatureFlags.billing
+                  ? 'Filtering to your mistakes is part of Pro.'
+                  : 'Filtering to your mistakes is not available on your account.',
               onUpgrade: context.goPro,
             );
           }
@@ -205,10 +208,12 @@ final class _ResultFailure extends StatelessComponent {
         div(classes: 'battle-result__locked-panel', <Component>[
           AppLockedPanel(
             title: 'This match is outside your latest 10',
-            message:
-                'Free keeps your latest 10 matches open. Pro opens your full '
-                'history, including correct answers and explanations. Your '
-                'statistics already count every match.',
+            message: FeatureFlags.billing
+                ? 'Free keeps your latest 10 matches open. Pro opens your full '
+                      'history, including correct answers and explanations. Your '
+                      'statistics already count every match.'
+                : 'Your latest 10 matches stay open. Your statistics already '
+                      'count every match.',
             onUpgrade: context.goPro,
           ),
         ]),

@@ -10,6 +10,7 @@ import 'package:skill_battles/core/presentation/widgets/app_avatar.dart';
 import 'package:skill_battles/core/presentation/widgets/app_logo.dart';
 import 'package:skill_battles/core/presentation/widgets/app_svg_icon.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 
 /// A section of the main navigation.
 enum AppNavTab {
@@ -81,7 +82,7 @@ final class AppTopBar extends StatelessComponent {
           ],
         ),
         div(classes: 'app-top-bar__end', <Component>[
-          _ProPill(isPro: isPro, onPressed: onProPressed),
+          if (FeatureFlags.billing) _ProPill(isPro: isPro, onPressed: onProPressed),
           if (name != null) _AccountMenu(nickname: name, onSelected: onAccountAction),
         ]),
       ]),
@@ -255,7 +256,8 @@ final class _AccountMenuState extends State<_AccountMenu> {
           events: <String, void Function(web.Event)>{'keydown': _onMenuKeyDown},
           <Component>[
             _MenuItem(label: 'Account settings', onPressed: () => _pick(AppAccountAction.editProfile)),
-            _MenuItem(label: 'Subscription', onPressed: () => _pick(AppAccountAction.subscription)),
+            if (FeatureFlags.billing)
+              _MenuItem(label: 'Subscription', onPressed: () => _pick(AppAccountAction.subscription)),
             const div(
               classes: 'app-account-menu__divider',
               attributes: <String, String>{'role': 'separator'},

@@ -21,6 +21,7 @@ import 'package:skill_battles/core/presentation/widgets/app_tag.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
 import 'package:skill_battles/core/utils/error/failure_message.dart';
 import 'package:skill_battles/core/utils/extensions/route_extension.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/account/domain/usecases/get_statistics_usecase.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_entry_entity.dart';
 import 'package:skill_battles/features/matchmaking/domain/entity/queue_status.dart';
@@ -185,6 +186,9 @@ final class _JoinFailure extends StatelessComponent {
   Component build(BuildContext context) {
     final Failure? failure = this.failure;
     final bool isLimit = failure?.isDailyLimit ?? false;
+    if (isLimit && !FeatureFlags.billing) {
+      return _LimitOutcome(message: failure!.playMessage(DateTime.now()), disciplineCode: disciplineCode);
+    }
     return _Outcome(
       message: failure?.playMessage(DateTime.now()) ?? 'Choose a discipline on the home screen first.',
       primaryLabel: isLimit ? 'See Pro plans' : 'Try again',
@@ -212,6 +216,9 @@ final class _Ended extends StatelessComponent {
     final ApiFailure? error = entry?.error;
     final bool expired = entry?.status == QueueStatus.expired;
     final bool isLimit = error?.isDailyLimit ?? false;
+    if (isLimit && !FeatureFlags.billing) {
+      return _LimitOutcome(message: error!.playMessage(DateTime.now()), disciplineCode: disciplineCode);
+    }
     return _Outcome(
       message: error != null
           ? error.playMessage(DateTime.now())
@@ -222,6 +229,25 @@ final class _Ended extends StatelessComponent {
       onPrimary: isLimit
           ? context.goPro
           : () => context.read<RankedSearchBloc>().add(RankedSearchStarted(disciplineCode: disciplineCode)),
+      secondaryLabel: 'Back to home',
+      onSecondary: context.goHome,
+    );
+  }
+}
+
+/// The daily ranked limit without billing: the way on is a private duel.
+final class _LimitOutcome extends StatelessComponent {
+  const _LimitOutcome({required this.message, required this.disciplineCode});
+
+  final String message;
+  final String disciplineCode;
+
+  @override
+  Component build(BuildContext context) {
+    return _Outcome(
+      message: message,
+      primaryLabel: 'Play a private duel',
+      onPrimary: disciplineCode.isEmpty ? null : () => context.goPrivateDuel(disciplineCode: disciplineCode),
       secondaryLabel: 'Back to home',
       onSecondary: context.goHome,
     );

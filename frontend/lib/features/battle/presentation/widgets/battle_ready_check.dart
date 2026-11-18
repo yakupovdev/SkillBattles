@@ -18,6 +18,7 @@ import 'package:skill_battles/core/presentation/widgets/app_notice.dart';
 import 'package:skill_battles/core/presentation/widgets/app_text_link.dart';
 import 'package:skill_battles/core/presentation/widgets/pro_badge.dart';
 import 'package:skill_battles/core/utils/error/failure.dart';
+import 'package:skill_battles/core/utils/feature_flags.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_player_entity.dart';
 import 'package:skill_battles/features/battle/domain/entity/battle_snapshot_entity.dart';
 import 'package:skill_battles/features/battle/presentation/bloc/battle_bloc/battle_bloc.dart';
@@ -62,13 +63,17 @@ final class BattleReadyCheck extends StatelessComponent {
             _PlayerRow(player: player, isYou: player.id == snapshot.myUserId),
         ]),
         if (usesQuota)
-          const AppNotice(message: 'This uses one of your free ranked matches when the first question opens.'),
+          const AppNotice(
+            message: FeatureFlags.billing
+                ? 'This uses one of your free ranked matches when the first question opens.'
+                : 'This uses one of your ranked matches when the first question opens.',
+          ),
         if (snapshot.mode == BattleMode.private)
           const AppNotice(message: 'Private duel · no rating change.', tone: AppNoticeTone.warning),
         if (!connected) const AppNotice(message: 'Connecting to live updates…', tone: AppNoticeTone.warning),
         if (readyFailure != null) ...<Component>[
           AppInlineError(readyFailure.playMessage(DateTime.now())),
-          if (readyFailure.isDailyLimit)
+          if (readyFailure.isDailyLimit && FeatureFlags.billing)
             AppTextLink(
               label: 'See Pro plans',
               style: AppTextStyles.bodySm.combine(
