@@ -29,7 +29,6 @@ public class SecurityConfig {
     public SecurityFilterChain refreshChain(HttpSecurity http, SecurityErrorHandler errors) throws Exception {
         // These endpoints validate refresh JWT themselves, without the access-token filter.
         http.securityMatcher(new OrRequestMatcher(
-                PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST,"/api/v1/subscriptions/webhook"),
                 PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/refresh"),
                 PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/v1/auth/logout")));
         common(http, errors);
@@ -47,7 +46,7 @@ public class SecurityConfig {
         return http.authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/media/questions/**").permitAll()
                         .requestMatchers(HttpMethod.HEAD, "/media/questions/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/ws/v1/events","/api/v1/subscriptions/plans").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/ws/v1/events").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
                         .anyRequest().authenticated())

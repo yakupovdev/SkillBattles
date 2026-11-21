@@ -1,17 +1,18 @@
 # SkillBattles — backend v0.3
 
-Реализованы этапы A–E и 58 продуктовых REST-операций контракта v0.3, включая приглашения на реванш,
+Реализованы этапы A–E и 54 продуктовых REST-операции контракта v0.3, включая приглашения на реванш,
 друзей, их базовые профили, приглашения в существующие комнаты и временные стикеры. Вместе с публичными
-GET/HEAD иллюстраций это 60 HTTP-операций в полном OpenAPI. Generated Swagger
+GET/HEAD иллюстраций это 56 HTTP-операций в полном OpenAPI. Generated Swagger
 имеет версию `0.3.0` и строится из действующих controllers/DTO. Контрактная
 проверка сопоставляет маршруты, успешные статусы, request/response-поля,
 типы и единый ErrorResponse. Локальные спецификации остаются игнорируемыми Git.
-Stripe работает только в TEST: настоящий Checkout → webhook → Pro round trip
-пока не проверен из-за недоступного локального listener.
+Stripe и покупка Pro удалены из backend. При регистрации пользователь получает
+бессрочный Pro (`isPro=true`); оплата и внешние ключи не требуются.
 
-Текущий runtime применяет V1–V12, V14 и V15, без отдельного baseline; V13 доступна только тестам.
-`V12` содержит 239 вопросов (удалённый `SAT_MATH:15ce8207` не восстанавливается), `V13` (только test resources) —
-демонстрационные Free/Pro аккаунты. [QUESTION_BANK.md](QUESTION_BANK.md)
+Текущий runtime применяет V1–V12, V14 и V15, без отдельного baseline.
+Миграция демо-пользователей V13 удалена, новые установки не создают аккаунты.
+`V12` содержит 239 вопросов (удалённый `SAT_MATH:15ce8207` не восстанавливается).
+[QUESTION_BANK.md](QUESTION_BANK.md)
 описывает происхождение контента, 23 согласованных преобразования в A–D и
 проверки сохранности данных. `V14` добавляет nullable `image_key` и 22 ревизии 2
 с изображениями: 239 активных логических вопросов, 261 сохранённая seed-ревизия.
@@ -119,7 +120,7 @@ Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3
   раундов, сетки и обеспеченность контентом с отдельным MEDIUM-резервом.
 - `GET /api/v1/ranks`: все 27 рангов Bronze I → Legend. Рейтинг 1000 — SILVER_I,
   Legend от 3200 без верхней границы. Snapshot/result используют коды справочника.
-- Stripe TEST Checkout/Portal, signed webhooks, серверные entitlements, Free quota
+- Бессрочный Pro при регистрации, серверные entitlements, Free quota
   и history/answer access, персональный ACCOUNT_CHANGED, daily/weekly streak.
 - Пять раундов, боевой streak, overtime, индивидуальный Elo K, lifetime-калибровка
   и квартальные сезоны ET с архивом пиков/итогов.
@@ -130,17 +131,15 @@ Flyway, MapStruct 1.6.3, Lombok, Validation, springdoc 2.10.0. Maven Wrapper 3.3
 
 ## Отдельная база для обновления
 
-Runtime применяет V1–V12, V14 и V15; V13 перенесена в test resources. Исторические V1–V11 не переписаны;
+Runtime применяет V1–V12, V14 и V15; миграция демо-аккаунтов V13 удалена. Исторические V1–V11 не переписаны;
 дополнительного B11 нет. После всей цепочки остаются 14 итоговых таблиц, без
 practice_sessions и старых subject-колонок. Для обновления существующей V11-БД
 не нужны `repair`, ручное изменение history или удаление данных.
 
 Далее `V12__seed_sat_question_bank.sql` содержит 239 вопросов и дополняет topics
-двух дисциплин. Тестовая `V13__seed_local_demo_accounts.sql` добавляет только два заданных
-демо-аккаунта и их рейтинги/подписки. Повторный запуск не меняет seed-данные;
-коллизия чужого email/ника или другой ревизии вопроса останавливает миграцию
-вместо перезаписи. Перед использованием таких данных вне локальной демонстрации
-следует отдельно согласовать демо-аккаунты. Runtime JAR их больше не создаёт.
+двух дисциплин. Повторный запуск не меняет seed-вопросы;
+коллизия другой ревизии вопроса останавливает миграцию вместо перезаписи.
+Ни runtime, ни тестовая цепочка миграций больше не создают демо-пользователей.
 Для старой локальной БД с применённой V13 используйте отдельную чистую БД:
 автоматический repair/удаление не выполняется. Heroku-образ, Config Vars и команды
 первого деплоя описаны в [корневом README](../README.md#первый-деплой-на-heroku-через-github).
@@ -191,7 +190,7 @@ docker compose down
 ```
 
 Не добавляйте `-v`: dev-данные должны сохраняться. Compose передаёт приложению
-явно перечисленные DB/JWT/billing/игровые ENV; имя БД и credentials берутся из
+явно перечисленные DB/JWT/игровые ENV; имя БД и credentials берутся из
 POSTGRES_*. В контейнере DB_URL указывает на `postgres:5432`, SERVER_PORT=8080,
 BACKEND_PORT задаёт опубликованный порт. Все процессы/БД хранят время в UTC.
 
@@ -217,7 +216,6 @@ Host launcher формирует DB_URL/DB_USERNAME/DB_PASSWORD из POSTGRES_* 
 15 минут), JWT_REFRESH_TTL=`P7D`. Java 21 задаётся через JAVA_HOME.
 Swagger: `http://localhost:8080/swagger-ui.html`, JSON `/v3/api-docs`, без авторизации.
 REST: `http://localhost:8080/api/v1`, WebSocket: `ws://localhost:8080/ws/v1/events`.
-Если меняете BACKEND_PORT, обновите три BILLING_*_URL в том же `.env`.
 Frontend получает только явно выбранные публичные URLs, а не серверный ENV;
 API/WebSocket должны идти через same-origin dev proxy с поддержкой Upgrade.
 Wildcard CORS/origins не добавлены. SMTP/reset ENV описаны ниже.
@@ -410,145 +408,33 @@ statistics уже может показывать новый сезон и reset
 Создание пары блокирует рейтинги обоих аккаунтов и фиксирует единый сезон,
 чтобы переход квартала между подготовкой участников не смешивал рейтинги разных сезонов.
 
-## Stripe TEST и entitlements
+## Pro без оплаты
 
-Stripe Java SDK **34.0.0**, API **2026-10-28.endive** зафиксированы. Используется
-экземпляр StripeClient, без глобального API key; методы v1 через SDK rawRequest
-с явным Stripe-Version. GET query передаётся в URL, POST — form-urlencoded.
-Billing period читается из subscription.items.data[0].current_period_start/end,
-а не из удалённых корневых полей старых Stripe API.
+Новая регистрация создаёт постоянное право Pro в той же транзакции, что аккаунт,
+рейтинги и токены. `isPro=true` возвращается в auth/profile и публичных карточках.
+Pro включает безлимитные ranked-матчи, всю историю, правильные ответы, объяснения,
+расширенную аналитику и фильтр ошибок. Срока окончания и платёжной активации нет.
+Существующие аккаунты сохраняют свой `pro_active`; login/refresh не меняют его.
 
-Операции: GET /api/v1/subscriptions/plans (public), GET /subscriptions/me,
-POST /subscriptions/checkout, POST /subscriptions/portal (access JWT),
-POST /subscriptions/webhook (только Stripe-Signature, без JWT) и
-GET /api/v1/users/me/limits. Префикс всех subscription paths — /api/v1.
-FREE: 0; PRO_MONTHLY: 799 USD cents/month; PRO_ANNUAL: 4799 USD cents/year.
-Checkout request содержит только planCode и UUID requestId. Цена, userId,
-customerId, price ID и return URLs от клиента не принимаются.
+`GET /api/v1/subscriptions/me` (access JWT) сохранён для чтения прав:
+`planCode=PRO`, `status=ACTIVE`, `billingMode=NONE`, оба `currentPeriod*` равны null,
+`cancelAtPeriodEnd=false` у Pro. У существующего Free: `planCode=FREE`, `status=NONE`.
+Форма ответа сохранена для потребителей account state.
 
-Без Stripe ENV приложение работает как Free, checkoutAvailable=false,
-Checkout/Portal отвечают 503 BILLING_UNAVAILABLE. Публичной смены тарифа нет.
-Все настройки находятся в корневом `.env`, полный безопасный шаблон —
-корневой `.env.example`. Отдельных billing/версионных ENV для запуска нет:
+Удалены операции:
 
-| ENV | Значение |
-|---|---|
-| BILLING_MODE | Только TEST |
-| STRIPE_SECRET_KEY | Предпочтительно restricted test key rk_test_; sk_test_ также поддерживается. Никогда live key |
-| STRIPE_WEBHOOK_SECRET | whsec_ конкретного endpoint/Stripe CLI listener |
-| STRIPE_PRICE_PRO_MONTHLY | Test recurring Price: USD 799, month, count=1 |
-| STRIPE_PRICE_PRO_ANNUAL | Test recurring Price: USD 4799, year, count=1 |
-| BILLING_SUCCESS_URL | Доверенный frontend `/billing/return?success=true` |
-| BILLING_CANCEL_URL | Доверенный frontend `/billing/return?success=false` |
-| BILLING_PORTAL_RETURN_URL | Доверенный frontend `/billing/return` |
+| Метод и путь | Прежнее назначение |
+| --- | --- |
+| GET /api/v1/subscriptions/plans | Каталог Free/Pro тарифов и цен |
+| POST /api/v1/subscriptions/checkout | Создание или повтор Stripe Checkout для покупки Pro |
+| POST /api/v1/subscriptions/portal | Открытие Stripe Portal для управления оплатой/подпиской |
+| POST /api/v1/subscriptions/webhook | Приём подписанных Stripe-событий и обновление оплаченного Pro |
 
-Ключи/URLs — только server ENV. Redirect URLs требуют HTTPS, в localhost dev
-разрешён HTTP. Checkout/Portal — hosted Stripe UI, frontend publishable key
-не нужен. API проверяет фактические Price currency/amount/interval перед
-Checkout. Настройте test Customer Portal в sandbox Dashboard. Используйте
-отдельные test sandboxes для разработки и CI; родитель платит из аккаунта
-учащегося, отдельной parent-модели нет. Нужны минимальные разрешения test key
-для Customers, Prices, Checkout, Subscriptions/Invoices и Customer Portal.
-
-Checkout резервируется в PostgreSQL по user/requestId, повтор того же payload
-возвращает сохранённую session. Другой requestId при незавершённой покупке:
-409 CHECKOUT_IN_PROGRESS. Существующая подписка блокирует вторую покупку:
-409 SUBSCRIPTION_ALREADY_ACTIVE, менять её следует через Portal. Повторяйте
-неопределившийся запрос после 503 с тем же requestId; он использует Stripe
-idempotency key. После истечения 24h неопределённой резервации нужен новый ID.
-Успешная paid activation закрывает резервацию; старое событие cancellation
-не освобождает новый открытый Checkout. Клиентские return URLs/redirect success
-никогда не предоставляют Pro. Billing network-запросы выполняются вне DB TX;
-однопроцессный lock сериализует Checkout/webhooks, записи фиксируются короткими TX.
-
-Webhook проверяет исходный raw UTF-8 body, Stripe-Signature и окно 300 секунд
-через SDK и внедряемый Clock. Live events/objects отклоняются. Обрабатываются:
-checkout.session.completed, checkout.session.async_payment_succeeded,
-invoice.paid, invoice.payment_failed, customer.subscription.created/updated/deleted.
-Receipt по eventId фиксируется с состоянием аккаунта в одной транзакции;
-повтор — 204, при ошибке provider — 503 без receipt (Stripe повторит доставку).
-Непривязанные customers/неиспользуемые типы событий игнорируются без выдачи прав.
-Каждое изменение перечитывает актуальное состояние subscriptions/invoice у
-provider под billing lock: старый invoice.paid не оживляет отменённый Pro.
-
-Pro требует ACTIVE, подтверждённый paid invoice, разрешённый Price и текущее
-время внутри оплаченного period. INCOMPLETE/PAST_DUE/UNPAID/CANCELED/EXPIRED —
-без Pro. Scheduled cancellation сохраняет доступ до periodEnd; на самом end
-доступ уже закрыт даже до webhook. Expiry job проверяет периоды раз в секунду.
-Права не берутся из JWT. Операции аккаунта увеличивают version; ACCOUNT_CHANGED
-публикуется персонально после commit. Его AccountState содержит own user,
-subscription, limits и streaks. Клиент перечитывает snapshot/review после этого
-события, даже если battle.version не изменился. Entitlement version в snapshot
-инвалидирует старую персональную view; версии разных ресурсов не сравниваются.
-Уже увиденные/скопированные ответы технически отозвать невозможно.
-
-Настройка только Stripe TEST, **из корня**:
-
-```powershell
-npm install -g @stripe/cli
-stripe agent setup
-.\backend\scripts\Initialize-StripeTest.ps1
-.\backend\scripts\Start-StripeListener.ps1
-```
-
-Initialize-StripeTest проверяет test key/account, переиспользует совпадающие
-активные recurring Prices ($7.99/month, $47.99/year, USD; суммы 799/4799 центов),
-иначе создаёт их с постоянными lookup/idempotency keys и сохраняет IDs в `.env`.
-Проверяет default TEST Portal; если его нет — создаёт конфигурацию. Существующий
-default Portal сохраняется; недостающие настройки cancellation/payment methods
-нужно включить в Dashboard. Подписки/Customers/платежи setup-скрипт не создаёт.
-
-Listener получает тот же TEST key через environment, не argv/URL, пересылает
-семь поддерживаемых типов событий на localhost:BACKEND_PORT/api/v1/subscriptions/webhook,
-сохраняет **настоящий** signing secret в корневом `.env` и не выводит сырые
-CLI-логи/секрет. Держите его запущенным в отдельном терминале. После сообщения
-ready перезапустите backend (`docker compose up -d --force-recreate backend`
-либо host launcher), чтобы применить secret. Запуск с другим sandbox недопустим.
-
-На текущем компьютере npm CLI установлен, но **Windows Application Control
-блокирует stripe.exe**. `stripe agent setup`/listener поэтому не запустились;
-MCP `stripe_implementation_planner` в текущей сессии недоступен. Не обходите
-политику: требуется разрешение официального CLI администратором компьютера,
-после чего повторите agent setup/listener. При необходимости разрешите CLI/MCP
-доступ для TEST sandbox в Dashboard. До получения signing secret
-STRIPE_WEBHOOK_SECRET остаётся пустым: Free работает, Checkout/Portal приложения
-возвращают BILLING_UNAVAILABLE. Это не завершённая проверка оплаты/Pro.
-
-Ручной round trip после запуска listener (только отдельный тестовый аккаунт):
-
-1. В Swagger зарегистрируйте тестового пользователя или войдите в существующий
-   demo-аккаунт, задайте access JWT через Authorize. Не вставляйте JWT в URL.
-2. GET /api/v1/subscriptions/plans должен показать checkoutAvailable=true.
-3. POST /api/v1/subscriptions/checkout: `{"planCode":"PRO_MONTHLY","requestId":"<новый UUID>"}`.
-   Откройте `url` из ответа — это ссылка на реальный TEST Checkout, фиксированной
-   публичной ссылки нет. Повторяйте запрос с тем же requestId, чтобы не создавать
-   новые sessions. Цена на форме должна быть $7.99, отметка TEST обязательна.
-4. Оплатите тестовой картой 4242 4242 4242 4242, любой будущей датой и CVC,
-   укажите тестовые данные. Не используйте настоящую карту. Redirect на Swagger
-   не активирует Pro: дождитесь подписанных webhooks и GET /subscriptions/me
-   с ACTIVE/PRO_MONTHLY и оплаченной currentPeriodEnd.
-5. POST /api/v1/subscriptions/portal без тела → откройте `url`, проверьте
-   возврат и cancellation at period end. Проверьте /subscriptions/me ещё раз.
-   Не повторяйте покупку активной подписки; используйте Portal.
-
-До запуска listener связанную с приложением Checkout-ссылку получить нельзя.
-Случайный stripe trigger с чужим customer не должен предоставлять Pro.
-Listener/webhook, оплата, выдача Pro и Portal приложения требуют отдельного
-завершения этой ручной проверки. Не публикуйте ключи, signing secrets и JWT.
-
-Проверки единой конфигурации: безопасный ENV-parser, `docker compose config --quiet`,
-сборка/запуск Docker и host JVM, HTTP 200 для Swagger/OpenAPI/return URLs,
-соответствие runtime ENV, Stripe TEST account/Prices/default Portal и повторный
-setup без новых Prices. Предыдущий verify этапа C: **306 тестов, 0 ошибок/пропусков**.
-Секретов в tracked/unignored файлах и verify-логе не обнаружено. Полный
-Checkout → webhook → Pro → Portal round trip пока не выполнен из-за блокировки CLI.
-
-Stripe Tax/automatic_tax не включены. Перед реальными платежами нужна отдельная
-[налоговая настройка](https://docs.stripe.com/billing/taxes/collect-taxes);
-этап C реализует только test billing и не считается production billing release.
-Документация: [webhooks](https://docs.stripe.com/billing/subscriptions/webhooks),
-[подпись](https://docs.stripe.com/webhooks/signature),
-[sandboxes](https://docs.stripe.com/sandboxes).
+SDK, интеграционные клиенты/обработчики, scheduler срока подписки, платёжные DTO,
+настройки и скрипты Stripe удалены. Swagger больше не содержит эти операции и
+`stripeSignature`. Старые DDL-миграции, включая V8, сохранены без изменения checksum;
+неиспользуемые платёжные колонки/receipt-таблица не участвуют в работе приложения.
+Удаление V13 не удаляет уже существующих пользователей из БД.
 
 ## Free quota, история и ответы
 
@@ -710,11 +596,9 @@ GET и GET `/users/me/activity`. События могут теряться, д�
 
 ## Контракт и передача frontend
 
-Swagger `/v3/api-docs` содержит 58 продуктовых REST-операций и 2 media GET/HEAD. OpenAPI 3.1 может
+Swagger `/v3/api-docs` содержит 54 продуктовых REST-операции и 2 media GET/HEAD. OpenAPI 3.1 может
 представлять nullable как `type: [integer, null]`, эквивалент nullable=true целевого
 OpenAPI 3.0.3. Имена схем могут отличаться; публичные поля и типы сверяются.
-Webhook дополнительно документирует фактический 503 BILLING_UNAVAILABLE для retry
-при сбое reconciliation — уточнение существующей обработки внешнего отказа.
 
 Frontend нужно передать generated OpenAPI и следующие изменения:
 - birthYear/birthMonth/условный birthDay; reset route без логирования token;
@@ -728,12 +612,10 @@ Frontend нужно передать generated OpenAPI и следующие и�
 
 Согласованная с frontend функция similar practice удалена: нет трёх routes,
 Practice DTO/mapper/service/repository/entity, соответствующего entitlement и прав в
-описаниях Pro. Цены и остальные права не менялись. Версия API осталась 0.3.0.
+описаниях Pro. Остальные права не менялись. Версия API осталась 0.3.0.
 V11 удаляет только practice_sessions; V10 и более старые миграции не редактируются.
 Frontend не изменён, отдельной frontend-спецификации в репозитории нет.
-Предоставленный банк теперь включён в V12; реальные платежи вне задачи. Stripe TEST остаётся fail-closed:
-STRIPE_WEBHOOK_SECRET пустой, Windows Application Control блокирует stripe.exe.
-Полный внешний Checkout → webhook → Pro не проверен; политики ОС не менялись.
+Предоставленный банк включён в V12; покупка Pro и Stripe удалены.
 
 ## Проверки
 
@@ -749,12 +631,10 @@ STRIPE_WEBHOOK_SECRET пустой, Windows Application Control блокируе
 ranked/private, profile, leaderboard, reports, Pro gates, rematch consent/activity/events/cancel,
 перезапуск и recovery. Runner использовал отдельную tmpfs PostgreSQL и случайный
 loopback-порт; собственные процессы/контейнер удалены. Синтаксис smoke script и
-`git diff --check` проверены. Внешняя SMTP-доставка и настоящий Stripe webhook round trip
-этими проверками не подтверждаются.
+`git diff --check` проверены. Внешняя SMTP-доставка этими проверками не подтверждается.
 
-К существующим проверкам scoring/overtime/калибровки/сезонов добавлены signed
-webhook fixtures, SDK payload/version/period, duplicate/out-of-order/payment failure,
-конкурентный Checkout, last ticket/refund/downgrade/start, ET midnight/DST,
+К существующим проверкам scoring/overtime/калибровки/сезонов добавлены
+Pro при регистрации, отсутствие платёжных ручек, last ticket/refund/downgrade/start, ET midnight/DST,
 last10-before-filter и все пути redaction, daily/weekly streak, реальные
 REST/STOMP ACCOUNT_CHANGED и rollback. Используются отдельные PostgreSQL контейнеры.
 
@@ -762,12 +642,12 @@ REST/STOMP ACCOUNT_CHANGED и rollback. Используются отдельн�
 reset privacy/replay/race/expiry, all-history statistics/Pro gating, leaderboard ties/top50/pending,
 mistakesOnly, rematch races/expiry/cancel/rollback, report idempotency/races, отсутствие удалённых routes/entitlement и миграция
 V10 → V11 с сохранением пользователей, батлов и жалоб. Реальный STOMP проверяет REMATCH_CHANGED.
-Тесты не используют внешние SMTP/Stripe credentials.
+Тесты не используют внешние SMTP credentials.
 
 Из backend/, Java 21 и Docker:
 
 ```powershell
-.\mvnw.cmd -B -ntp '-Dtest=BillingPostgresTest,BillingRealtimePostgresTest,StripeBillingClientTest,StreakCalculatorTest' test
+.\mvnw.cmd -B -ntp '-Dtest=EntitlementsPostgresTest,AccountRealtimePostgresTest,AuthPostgresTest,StreakCalculatorTest' test
 .\mvnw.cmd -B -ntp verify
 git diff --check
 ```
@@ -792,9 +672,8 @@ REST/STOMP ranked/private, retry/conflict, reconnect, review/history и пере
 БД/volumes не затрагиваются. Логи — target/e2e-*.log. Пароли/JWT не выводятся.
 Runner также проверяет PRIVATE overtime с одним tieBreakPoint, калибровку ranked,
 согласованность сезонных полей и сохранение новых матчей после рестарта.
-Runner принудительно исключает STRIPE_/BILLING_ deployment ENV, проверяет Free
-fallback, квоту, masked review, ACCOUNT_CHANGED, profile/reset availability, leaderboard, report и rematch consent/activity/REMATCH_CHANGED наряду с прежними flow. Он не
-выполняет платежи даже при наличии ключей в пользовательском окружении.
+Runner проверяет Pro при регистрации, отсутствие платёжных routes,
+ACCOUNT_CHANGED, profile/reset availability, leaderboard, report и rematch consent/activity/REMATCH_CHANGED наряду с прежними flow.
 
 Текущий банк: V12 содержит 239 SAT-вопросов; удалённый источник не восстанавливается,
 с достаточными пулами всех сложностей обеих дисциплин. Оригиналы и изменения

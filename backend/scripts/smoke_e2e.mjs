@@ -156,11 +156,18 @@ try {
   const mainCount = catalogue.find(item => item.disciplineCode === 'SAT_MATH').questionCount;
   assert.equal(mainCount, 5); assert.equal((await get('/api/v1/ranks', a)).length, 27);
   assert.equal(api.info.version, '0.3.0');
-  const plans = await get('/api/v1/subscriptions/plans', null);
-  assert.deepEqual(plans.map(plan => plan.amountCents), [0, 799, 4799]); assert(plans.every(plan => plan.checkoutAvailable === false));
-  assert.equal((await get('/api/v1/subscriptions/me', a)).entitlements.isPro, false);
-  assert.equal((await get('/api/v1/users/me/limits', a)).freeRankedRemaining, 5);
-  assert.equal((await request('POST', '/api/v1/subscriptions/checkout', a, {planCode:'PRO_MONTHLY', requestId:randomUUID()}, 503)).code, 'BILLING_UNAVAILABLE');
+  assert.equal(a.user.isPro, true);
+  const subscription = await get('/api/v1/subscriptions/me', a);
+  assert.equal(subscription.entitlements.isPro, true);
+  assert.equal(subscription.planCode, 'PRO');
+  assert.equal(subscription.billingMode, 'NONE');
+  assert.equal(subscription.currentPeriodEnd, null);
+  assert.equal((await get('/api/v1/users/me/limits', a)).freeRankedRemaining, null);
+  assert(!api.paths['/api/v1/subscriptions/plans']);
+  for (const route of ['checkout', 'portal', 'webhook']) {
+    assert(!api.paths['/api/v1/subscriptions/' + route]);
+    await request('POST', '/api/v1/subscriptions/' + route, a, {}, 404);
+  }
   const currentSeason = await get('/api/v1/seasons/current', a);
   assert.equal(currentSeason.timezone, 'America/New_York');
   assert.equal((await get('/api/v1/users/me/seasons', a)).data.length, 0);
@@ -177,7 +184,7 @@ try {
     const questionEvent = await battleEvent(sa, ranked, 'QUESTION', number);
     if (number === 1) {
       const account = await sa.event(event => event.type === 'ACCOUNT_CHANGED' && event.resourceId === a.user.id && event.data.limits.rankedStartedToday === 1);
-      assert.equal(account.data.subscription.entitlements.isPro, false);
+      assert.equal(account.data.subscription.entitlements.isPro, true);
     }
     const state = await snapshot(ranked, a); const other = await snapshot(ranked, b);
     assert.deepEqual(state.round.question, other.round.question);
@@ -263,22 +270,23 @@ try {
   const surrendered = await consistency(surrenderId, a);
   assert.equal(surrendered.reason, 'SURRENDER'); assert(surrendered.players.every(player => player.score === 0 && player.ratingDelta === 0));
   let savedHistory = await history(a);
-  assert.equal(savedHistory.historyLimit, 10);
-  const freeReview = await review(ranked, a);
-  assert(freeReview.rounds.every(round => round.question.correctOptionId === null && round.question.explanation === null));
-  freeReview.rounds.forEach(round => questionImage(round.question));
-  assert(freeReview.rounds.every(round => round.answers.filter(answer => answer.userId !== a.user.id).every(answer => answer.selectedOptionId === null)));
+  assert.equal(savedHistory.historyLimit, null);
+  const proReview = await review(ranked, a);
+  assert(proReview.rounds.every(round => round.question.correctOptionId !== null && round.question.explanation !== null));
+  proReview.rounds.forEach(round => questionImage(round.question));
+  assert(proReview.rounds.every(round => round.answers.filter(answer => answer.userId !== a.user.id).every(answer => answer.selectedOptionId !== null)));
   assert.equal((await get('/api/v1/users/me/limits', a)).rankedStartedToday, 1);
   const savedReviews = new Map(); const savedResults = new Map();
   for (const id of [ranked, privateId, surrenderId]) { savedReviews.set(id, await review(id, a)); savedResults.set(id, await result(id, a)); }
-  // Stage D/E: real HTTP/STOMP checks stay Free and never call a live mail/payment provider.
+  // Stage D/E: real HTTP/STOMP checks use registration Pro and no external mail provider.
   const reviewRound = (await review(surrenderId, a)).rounds[0];
   const reportPath = `/api/v1/battles/${surrenderId}/rounds/${reviewRound.roundId}/report`;
   const reportPayload = {reason: 'TYPO', comment: 'TEST ONLY smoke report'};
   const report = await request('POST', reportPath, a, reportPayload, 201);
   assert.deepEqual(await request('POST', reportPath, a, reportPayload), report);
   assert.equal((await request('POST', reportPath, a, {reason: 'OTHER', comment: 'Different TEST ONLY report'}, 409)).code, 'REPORT_ALREADY_EXISTS');
-  assert.equal((await get(`/api/v1/battles/${surrenderId}/review?mistakesOnly=true`, a, 403)).code, 'PRO_REQUIRED');
+  const mistakes = await get(`/api/v1/battles/${surrenderId}/review?mistakesOnly=true`, a);
+  assert.equal(mistakes.answerAccess.canViewCorrectAnswer, true);
   const board = await get('/api/v1/leaderboards/SAT_MATH', a);
   assert.equal(board.me.player.id, a.user.id); assert.equal(board.me.rating, 1032); privateShape(board);
   const rematchPath = `/api/v1/battles/${privateId}/rematch`;
@@ -296,7 +304,7 @@ try {
   const incoming = await raw('GET', '/api/v1/users/me/rematch-invitations', b);
   assert.equal(incoming.status, 200); assert.equal(incoming.cacheControl, 'no-store');
   assert.deepEqual(Object.keys(incoming.data).sort(), ['data', 'serverTime']);
-  assert.deepEqual(incoming.data.data, [{sourceBattleId: privateId, requester: {id: a.user.id, isPro: false, nickname: a.user.nickname}, disciplineCode: 'SAT_MATH', expiresAt: consent.expiresAt, version: consent.version}]);
+  assert.deepEqual(incoming.data.data, [{sourceBattleId: privateId, requester: {id: a.user.id, isPro: true, nickname: a.user.nickname}, disciplineCode: 'SAT_MATH', expiresAt: consent.expiresAt, version: consent.version}]);
   assert(new Date(incoming.data.serverTime) < new Date(consent.expiresAt));
   assert.deepEqual((await invitations(a)).data, []); assert.deepEqual((await invitations(third)).data, []);
   assert(!sc.events.some(event => event.type === 'REMATCH_CHANGED'));
@@ -331,7 +339,7 @@ try {
   assert.equal(statsBefore.disciplines.find(item => item.disciplineCode === 'SAT_MATH').ranked.wins, 1);
   assert.equal(statsBefore.disciplines.find(item => item.disciplineCode === 'SAT_MATH').privateMatches.played, 1);
   assert.equal(statsBefore.disciplines.find(item => item.disciplineCode === 'SAT_RW').rating, 1000);
-  assert.equal(statsBefore.streaks.dailyCurrent, 1); assert.equal(statsBefore.entitlements.isPro, false);
+  assert.equal(statsBefore.streaks.dailyCurrent, 1); assert.equal(statsBefore.entitlements.isPro, true);
   console.log('Private REST/STOMP: overtime, one tieBreakPoint, surrender, incomplete-round review and unchanged Elo passed.');
 
   const lostEntry = await request('POST', '/api/v1/matchmaking/entries', third, {disciplineCode: 'SAT_RW', format: 'STANDARD'}, 201);

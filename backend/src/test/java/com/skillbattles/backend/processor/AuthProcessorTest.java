@@ -24,7 +24,7 @@ class AuthProcessorTest {
     @InjectMocks AuthProcessorImpl processor;
 
     @Test
-    void registrationInitializesRatingsBeforeIssuingTokens() {
+    void registrationInitializesRatingsAndProBeforeIssuingTokens() {
         when(transactions.getTransaction(any())).thenReturn(new org.springframework.transaction.support.SimpleTransactionStatus());
         RegisterDto registration = new RegisterDto(); registration.setBirthYear(2000); registration.setBirthMonth(1);
         UserDto user = new UserDto();
@@ -32,10 +32,13 @@ class AuthProcessorTest {
         user.setId(id);
         when(users.register(registration)).thenReturn(user);
         when(tokens.issue(id)).thenReturn(new TokenPairDto("access", "refresh", 900, 604800, Instant.MAX));
-        processor.register(registration);
-        InOrder order = inOrder(users, ratings, tokens);
+        when(subscriptions.entitlements(id)).thenReturn(new EntitlementsDto(true,1,true,null,true,true,true,true));
+        assertThat(processor.register(registration).getUser().isPro()).isTrue();
+        InOrder order = inOrder(users, ratings, subscriptions, tokens);
         order.verify(users).register(registration);
         order.verify(ratings).initialize(id);
+        order.verify(subscriptions).initialize(id);
+        order.verify(subscriptions).entitlements(id);
         order.verify(tokens).issue(id);
     }
 
