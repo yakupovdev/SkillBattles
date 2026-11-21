@@ -1,6 +1,7 @@
 import 'package:jaspr/dom.dart';
 import 'package:jaspr/jaspr.dart';
 
+import 'package:skill_battles/app/theme/app_colors.dart';
 import 'package:skill_battles/core/presentation/widgets/app_tappable.dart';
 
 /// A tappable piece of text without a box ("See all", "Cancel duel",
@@ -14,6 +15,7 @@ final class AppTextLink extends StatelessComponent {
     required this.style,
     required this.onPressed,
     this.textAlign,
+    this.focusColor = AppColors.primary,
     super.key,
   });
 
@@ -22,12 +24,16 @@ final class AppTextLink extends StatelessComponent {
   final VoidCallback? onPressed;
   final TextAlign? textAlign;
 
+  /// Color of the keyboard focus ring (white on a blue panel).
+  final Color focusColor;
+
   @override
   Component build(BuildContext context) {
     final TextAlign? align = textAlign;
     return AppTappable(
       onTap: onPressed,
       radius: 4,
+      focusColor: focusColor,
       classes: align == null ? 'app-text-link app-text-link--hug' : 'app-text-link',
       styles: align == null ? style : style.combine(Styles(textAlign: align)),
       child: span(<Component>[Component.text(label)]),

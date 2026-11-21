@@ -9,6 +9,9 @@ enum AppAvatarSize {
   /// 24 — next to an answer on the reveal screen.
   xs(24, 11, 14),
 
+  /// 28 — the landing page's leaderboard sample.
+  compact(28, 12, 16),
+
   /// 32 — leaderboard rows.
   row(32, 13, 16),
 
