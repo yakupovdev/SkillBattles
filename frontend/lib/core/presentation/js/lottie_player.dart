@@ -19,6 +19,7 @@ final class LottiePlayer extends StatefulComponent {
     required this.height,
     this.playOnce = true,
     this.loop = false,
+    this.replayToken = 0,
     this.label,
     super.key,
   });
@@ -28,6 +29,10 @@ final class LottiePlayer extends StatefulComponent {
   final double height;
   final bool playOnce;
   final bool loop;
+
+  /// Changing this number replays the animation from the first frame
+  /// without re-creating the player (no blank flash).
+  final int replayToken;
 
   /// Accessible name; `null` hides the animation from assistive technology.
   final String? label;
@@ -55,6 +60,8 @@ final class _LottiePlayerState extends State<LottiePlayer> {
         oldComponent.playOnce != component.playOnce) {
       _stop();
       context.binding.addPostFrameCallback(_start);
+    } else if (oldComponent.replayToken != component.replayToken) {
+      _animation?.goToAndPlay(0, true);
     }
   }
 
@@ -132,5 +139,6 @@ extension type _LoadParams._(JSObject _) implements JSObject {
 extension type _AnimationItem._(JSObject _) implements JSObject {
   external num get totalFrames;
   external void goToAndStop(num value, bool isFrame);
+  external void goToAndPlay(num value, bool isFrame);
   external void destroy();
 }

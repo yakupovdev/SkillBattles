@@ -23,9 +23,10 @@ import 'package:skill_battles/features/profile/presentation/screens/edit_profile
 import 'package:skill_battles/features/profile/presentation/screens/profile_screen.dart';
 import 'package:skill_battles/features/subscription/presentation/screens/billing_return_screen.dart';
 import 'package:skill_battles/features/subscription/presentation/screens/pro_screen.dart';
+import 'package:skill_battles/features/welcome/presentation/screens/welcome_screen.dart';
 
-/// Builds the app router. Signed-out users only reach the auth routes; a
-/// signed-in user never sees the log-in screen. The live battle is
+/// Builds the app router. Signed-out users only reach the welcome page and
+/// the auth routes; a signed-in user never sees the log-in screen. The live battle is
 /// full-screen; everything else sits in [AppShell].
 ///
 /// The router does not listen to [session] itself: the app root re-runs
@@ -33,7 +34,7 @@ import 'package:skill_battles/features/subscription/presentation/screens/pro_scr
 Router createAppRouter({required AuthSession session, Key? key}) {
   return Router(
     key: key,
-    redirect: (BuildContext context, RouteState state) => _redirect(session, state),
+    redirect: (BuildContext context, RouteState state) => redirectFor(session, state.location),
     errorBuilder: (BuildContext context, RouteState state) => const _NotFound(),
     routes: <RouteBase>[
       // Dialogs and snack bars live inside the router so their content can
@@ -42,9 +43,17 @@ Router createAppRouter({required AuthSession session, Key? key}) {
         builder: (BuildContext context, RouteState state, Component child) => AppOverlayHost(child: child),
         routes: <RouteBase>[
           wrappedRoute(
+            name: AppRoutes.welcome.name,
+            path: AppRoutes.welcome.path,
+            title: 'SkillBattles — live 1v1 SAT battles',
+            wrappedBuilder: (_, _) => const WelcomeScreen(),
+          ),
+          wrappedRoute(
             name: AppRoutes.auth.name,
             path: AppRoutes.auth.path,
-            wrappedBuilder: (_, _) => const AuthScreen(),
+            wrappedBuilder: (_, RouteState state) => AuthScreen(
+              startWithSignUp: state.queryParams[AppRoutes.authModeParam] == AppRoutes.authModeSignUp,
+            ),
           ),
           wrappedRoute(
             name: AppRoutes.forgotPassword.name,
@@ -160,12 +169,17 @@ Router createAppRouter({required AuthSession session, Key? key}) {
   );
 }
 
-String? _redirect(AuthSession session, RouteState state) {
-  final String path = Uri.parse(state.location).path;
+/// Where the router sends [location] for the current [session], or `null`
+/// to stay. Public for tests: the router's own redirect needs a
+/// `BuildContext`.
+String? redirectFor(AuthSession session, String location) {
+  final String path = Uri.parse(location).path;
   final bool isPublic = AppRoutes.public.any(
     (AppRoutes route) => route.path == path,
   );
-  if (!session.isSignedIn) return isPublic ? null : AppRoutes.auth.path;
+  if (!session.isSignedIn) return isPublic ? null : AppRoutes.welcome.path;
+  // The landing page is for visitors only.
+  if (path == AppRoutes.welcome.path) return AppRoutes.home.path;
   // Payments are off: the Pro and billing pages are not reachable.
   if (!FeatureFlags.billing && (path == AppRoutes.pro.path || path == AppRoutes.billingReturn.path)) {
     return AppRoutes.home.path;
@@ -191,8 +205,8 @@ String? _query(RouteState state, String key) {
   return value == null || value.isEmpty ? null : value;
 }
 
-/// An unknown address: back to the home page (which redirects to log-in
-/// when signed out).
+/// An unknown address: back to the home page (which redirects to the
+/// welcome page when signed out).
 final class _NotFound extends StatefulComponent {
   const _NotFound();
 
