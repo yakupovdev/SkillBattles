@@ -52,16 +52,6 @@ app:
     ttl: ${PASSWORD_RESET_TTL:PT20M}
     base-url: ${PASSWORD_RESET_BASE_URL:}
     from: ${MAIL_FROM:}
-  billing:
-    mode: ${BILLING_MODE:TEST}
-    secret-key: ${STRIPE_SECRET_KEY:}
-    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
-    monthly-price: ${STRIPE_PRICE_PRO_MONTHLY:}
-    annual-price: ${STRIPE_PRICE_PRO_ANNUAL:}
-    success-url: ${BILLING_SUCCESS_URL:}
-    cancel-url: ${BILLING_CANCEL_URL:}
-    portal-return-url: ${BILLING_PORTAL_RETURN_URL:}
-    expiry-scan-ms: 1000
   season:
     scan-ms: ${SEASON_SCAN_MS:60000}
     scheduling:

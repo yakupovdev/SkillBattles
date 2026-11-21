@@ -114,7 +114,17 @@ class QuestionImagesPostgresTest {
     }
 
     @Test void v14UpgradePreservesAllContentCustomDataAndHistoryAndRefusesNewerSources() {
-        var before=flyway("images_upgrade","13");before.migrate();
+        var before=flyway("images_upgrade","12");before.migrate();
+        // Explicit test fixtures replace the removed demonstration-account migration.
+        jdbc.update("""
+                INSERT INTO images_upgrade.users(id,created_at,updated_at,email_normalized,nickname,nickname_normalized,password_hash)
+                VALUES ('00000000-0000-0000-0000-000000000001',now(),now(),'first@example.test','First','first','test-only hash'),
+                       ('00000000-0000-0000-0000-000000000002',now(),now(),'second@example.test','Second','second','test-only hash')
+                """);
+        jdbc.update("""
+                INSERT INTO images_upgrade.ratings(id,created_at,updated_at,user_id,discipline_code,rating,season_id)
+                SELECT gen_random_uuid(),now(),now(),id,'SAT_MATH',1375,'FALL_2026' FROM images_upgrade.users
+                """);
         jdbc.update("""
                 INSERT INTO images_upgrade.battles(id,created_at,updated_at,first_user_id,second_user_id,
                     discipline_code,mode,phase,version,state,result)
@@ -138,10 +148,10 @@ class QuestionImagesPostgresTest {
         assertThat(jdbc.queryForList("SELECT row_to_json(u)::text FROM images_upgrade.users u ORDER BY id")).isEqualTo(users);
         assertThat(jdbc.queryForList("SELECT row_to_json(r)::text FROM images_upgrade.ratings r ORDER BY id")).isEqualTo(ratings);
         assertThat(jdbc.queryForList("SELECT row_to_json(b)::text FROM images_upgrade.battles b ORDER BY id")).isEqualTo(history);
-        assertThat(jdbc.queryForList("SELECT version,checksum FROM images_upgrade.flyway_schema_history WHERE version::int<=13 OR version IS NULL ORDER BY installed_rank")).isEqualTo(checksums);
+        assertThat(jdbc.queryForList("SELECT version,checksum FROM images_upgrade.flyway_schema_history WHERE version::int<=12 OR version IS NULL ORDER BY installed_rank")).isEqualTo(checksums);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM images_upgrade.questions a JOIN images_upgrade.questions b USING(external_key) WHERE a.content_version=1 AND b.content_version=2 AND (a.prompt,a.options,a.correct_option_id,a.explanation,a.topic_code,a.topic_name,a.difficulty) IS DISTINCT FROM (b.prompt,b.options,b.correct_option_id,b.explanation,b.topic_code,b.topic_name,b.difficulty)",Integer.class)).isZero();
         assertThat(latest.migrate().migrationsExecuted).isZero();latest.validate();
-        flyway("images_conflict","13").migrate();
+        flyway("images_conflict","12").migrate();
         jdbc.update("UPDATE images_conflict.questions SET content_version=3 WHERE external_key='SAT_MATH:3f5a3602'");
         var conflictBefore=jdbc.queryForList("SELECT row_to_json(q)::text FROM images_conflict.questions q ORDER BY id");
         assertThatThrownBy(()->flyway("images_conflict","14").migrate()).hasStackTraceContaining("conflicts with expected V12 revision 1");
@@ -223,7 +233,7 @@ class QuestionImagesPostgresTest {
             processor.surrender(id,a.getUser().getId());
             var review=rest(http,"/api/v1/battles/"+id+"/review",a,200).path("rounds").get(0).path("question");
             assertThat(review.path("imageUrl")).isEqualTo(question.path("imageUrl"));
-            assertThat(review.path("correctOptionId").isNull()).isTrue();assertThat(review.path("explanation").isNull()).isTrue();
+            assertThat(review.path("correctOptionId").isTextual()).isTrue();assertThat(review.path("explanation").asText()).isNotBlank();
             // Legacy persisted JSON, including overtime, is readable without looking up today's bank.
             jdbc.update("UPDATE battles SET state=jsonb_set(state,'{rounds,0,question}',(state#>'{rounds,0,question}')-'imageKey') WHERE id=?",id);
             assertThat(rest(http,"/api/v1/battles/"+id,a,200).path("round").path("question").path("imageUrl").isNull()).isTrue();

@@ -192,6 +192,8 @@ class RematchInvitationsPostgresTest {
 
     @Test void sourceHistoryPolicyRemainsAuthoritativeWhileMinimalInvitationIsVisible() throws Exception {
         var a=register();var b=register();var c=register();UUID source=source(a,b);
+        // Preserve coverage for an existing Free account.
+        jdbc.update("UPDATE subscription_accounts SET pro_active=false WHERE user_id=?",id(b));
         for(int n=0;n<11;n++)source(b,c);
         rematches.request(source,id(a));
         assertThat(incoming(b).path("data")).hasSize(1);
@@ -329,7 +331,7 @@ class RematchInvitationsPostgresTest {
     UUID id(AuthDto user){return user.getUser().getId();}
     String bearer(AuthDto user){return "Bearer "+user.getTokens().getAccessToken();}
     String rematch(UUID source){return "/api/v1/battles/"+source+"/rematch";}
-    void grant(AuthDto user){String customer="cus_fixture_"+id(user);subscriptions.bindCustomer(id(user),customer);subscriptions.apply(id(user),"evt_fixture_"+UUID.randomUUID(),new ProviderSubscriptionDto(customer,"sub_fixture_"+id(user),"price_fixture","ACTIVE",START.minusSeconds(1),START.plusSeconds(86400),false,true,false),"PRO_MONTHLY");}
+    void grant(AuthDto user){jdbc.update("UPDATE subscription_accounts SET pro_active=true WHERE user_id=?",id(user));}
     List<String> race(Callable<String> a,Callable<String> b)throws Exception {
         var gate=new CountDownLatch(1);
         try(var pool=Executors.newFixedThreadPool(2)){

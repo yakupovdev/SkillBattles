@@ -160,8 +160,7 @@ class BattleStickersPostgresTest {
     void identicalPolicyForPlansModesAndDisciplines(String discipline, BattleMode mode, boolean pro) throws Exception {
         var a = register(); var b = register();
         if (pro) {
-            String customer = "cus_sticker_" + a.getUser().getId(); subscriptions.bindCustomer(a.getUser().getId(), customer);
-            subscriptions.apply(a.getUser().getId(), "evt_sticker_" + UUID.randomUUID(), new ProviderSubscriptionDto(customer, "sub_sticker_" + UUID.randomUUID(), "price_fixture", "ACTIVE", START.minusSeconds(1), START.plusSeconds(86400), false, true, false), "PRO_MONTHLY");
+            jdbc.update("UPDATE subscription_accounts SET pro_active=true WHERE user_id=?", a.getUser().getId());
         }
         UUID id = createBattle(a, b, discipline, mode);
         assertThat(rest("POST", path(id), a, Map.of("stickerId", "lol", "submissionId", UUID.randomUUID()), 200).path("senderUserId").asText()).isEqualTo(a.getUser().getId().toString());

@@ -234,6 +234,16 @@ class FriendsPostgresTest {
 
     @Test void migrationUpgradePreservesUsersQuestionsRatingsAndExistingHistory(){
         String schema="friends_upgrade";var old=Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).target("14").load();old.migrate();
+        // Explicit test fixtures: migrations no longer create demonstration accounts.
+        jdbc.update("""
+            INSERT INTO friends_upgrade.users(id,created_at,updated_at,email_normalized,nickname,nickname_normalized,password_hash)
+            VALUES ('00000000-0000-0000-0000-000000000001',now(),now(),'first@example.test','First','first','test-only hash'),
+                   ('00000000-0000-0000-0000-000000000002',now(),now(),'second@example.test','Second','second','test-only hash')
+            """);
+        jdbc.update("""
+            INSERT INTO friends_upgrade.ratings(id,created_at,updated_at,user_id,discipline_code,rating,season_id)
+            SELECT gen_random_uuid(),now(),now(),id,'SAT_MATH',1375,'FALL_2026' FROM friends_upgrade.users
+            """);
         var beforeUsers=jdbc.queryForList("SELECT to_jsonb(u)::text AS value FROM friends_upgrade.users u ORDER BY id");
         var beforeQuestions=jdbc.queryForList("SELECT to_jsonb(q)::text FROM friends_upgrade.questions q ORDER BY id");
         var beforeRatings=jdbc.queryForList("SELECT to_jsonb(r)::text FROM friends_upgrade.ratings r ORDER BY id");
@@ -287,12 +297,12 @@ class FriendsPostgresTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM battles",Integer.class)).isEqualTo(2);
     }
 
-    private AuthDto register(){var r=new RegisterDto();r.setBirthYear(2000);r.setBirthMonth(1);String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);r.setEmail(suffix+"@example.com");r.setNickname("Friend_"+suffix);r.setPassword("ExamplePass123!");return auth.register(r);}
+    private AuthDto register(){var r=new RegisterDto();r.setBirthYear(2000);r.setBirthMonth(1);String suffix=UUID.randomUUID().toString().replace("-","").substring(0,12);r.setEmail(suffix+"@example.com");r.setNickname("Friend_"+suffix);r.setPassword("ExamplePass123!");var a=auth.register(r);jdbc.update("UPDATE subscription_accounts SET pro_active=false WHERE user_id=?",id(a));return a;}
     private UUID id(AuthDto a){return a.getUser().getId();}
     private SocialCommandDto<RelationshipDto> send(AuthDto a,AuthDto b){return friends.send(id(a),friends.code(id(b)).friendCode());}
     private RelationshipDto makeFriends(AuthDto a,AuthDto b){return friends.respond(id(b),send(a,b).value().id(),FriendStatus.ACCEPTED);}
     private void sendAlreadyAccepted(AuthDto a,AuthDto b){assertThatThrownBy(()->send(a,b)).isInstanceOf(ConflictException.class);}
-    private void grant(AuthDto user){String customer="cus_test_"+id(user);subscriptions.bindCustomer(id(user),customer);subscriptions.apply(id(user),"evt_test_"+UUID.randomUUID(),new ProviderSubscriptionDto(customer,"sub_test_"+id(user),"price_test","ACTIVE",START.minusSeconds(1),START.plusSeconds(86400),false,true,false),"PRO_MONTHLY");}
+    private void grant(AuthDto user){jdbc.update("UPDATE subscription_accounts SET pro_active=true WHERE user_id=?",id(user));}
     private Set<String> fields(JsonNode node){var set=new HashSet<String>();node.fieldNames().forEachRemaining(set::add);return set;}
     private JsonNode rest(String method,String path,Object user,Object body,int expected)throws Exception{var r=request(org.springframework.http.HttpMethod.valueOf(method),path);if(user!=null)r.header("Authorization","Bearer "+(user instanceof AuthDto a?a.getTokens().getAccessToken():user));if(body!=null)r.contentType("application/json").content(json.writeValueAsBytes(body));var response=mvc.perform(r).andReturn().getResponse();assertThat(response.getStatus()).as(method+" "+path+" "+response.getContentAsString()).isEqualTo(expected);assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");return response.getContentAsByteArray().length==0?json.nullNode():json.readTree(response.getContentAsString());}
     private List<Object> race(Supplier<Object> first,Supplier<Object> second)throws Exception{try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);var a=pool.submit(()->{start.await();try{return first.get();}catch(BusinessException e){return e.getCode();}});var b=pool.submit(()->{start.await();try{return second.get();}catch(BusinessException e){return e.getCode();}});start.countDown();return Arrays.asList(a.get(15,TimeUnit.SECONDS),b.get(15,TimeUnit.SECONDS));}}

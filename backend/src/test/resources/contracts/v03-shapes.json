@@ -2701,53 +2701,6 @@
       "409": "ROUND_NOT_REVEALED, REPORT_ALREADY_EXISTS"
     }
   },
-  "GET /api/v1/subscriptions/plans": {
-    "success": {
-      "200": {
-        "[]": {
-          "code": {
-            "$type": "string"
-          },
-          "name": {
-            "$type": "string"
-          },
-          "amountCents": {
-            "$type": "integer"
-          },
-          "currency": {
-            "$type": "string"
-          },
-          "interval": {
-            "$type": "string"
-          },
-          "intervalCount": {
-            "$type": "integer"
-          },
-          "monthlyEquivalentCents": {
-            "$type": "integer"
-          },
-          "annualSavingsPercent": {
-            "$type": "integer"
-          },
-          "checkoutAvailable": {
-            "$type": "boolean"
-          },
-          "features": {
-            "[]": {
-              "$type": "string"
-            }
-          }
-        }
-      }
-    },
-    "request": {
-      "$type": "object"
-    },
-    "errors": {
-      "400": "VALIDATION_ERROR",
-      "500": "INTERNAL_ERROR"
-    }
-  },
   "GET /api/v1/subscriptions/me": {
     "success": {
       "200": {
@@ -2801,91 +2754,8 @@
       "$type": "object"
     },
     "errors": {
-      "400": "VALIDATION_ERROR",
       "500": "INTERNAL_ERROR",
       "401": "UNAUTHORIZED"
-    }
-  },
-  "POST /api/v1/subscriptions/checkout": {
-    "success": {
-      "200": {
-        "checkoutSessionId": {
-          "$type": "string"
-        },
-        "url": {
-          "$type": "string"
-        },
-        "expiresAt": {
-          "$type": "string"
-        }
-      }
-    },
-    "request": {
-      "planCode": {
-        "$type": "string"
-      },
-      "requestId": {
-        "$type": "string"
-      }
-    },
-    "errors": {
-      "400": "VALIDATION_ERROR",
-      "500": "INTERNAL_ERROR",
-      "401": "UNAUTHORIZED",
-      "409": "SUBSCRIPTION_ALREADY_ACTIVE, CHECKOUT_IN_PROGRESS",
-      "503": "BILLING_UNAVAILABLE"
-    }
-  },
-  "POST /api/v1/subscriptions/portal": {
-    "success": {
-      "200": {
-        "url": {
-          "$type": "string"
-        }
-      }
-    },
-    "request": {
-      "$type": "object"
-    },
-    "errors": {
-      "400": "VALIDATION_ERROR",
-      "500": "INTERNAL_ERROR",
-      "401": "UNAUTHORIZED",
-      "409": "BILLING_CUSTOMER_NOT_FOUND",
-      "503": "BILLING_UNAVAILABLE"
-    }
-  },
-  "POST /api/v1/subscriptions/webhook": {
-    "success": {
-      "204": {
-        "$type": "object"
-      }
-    },
-    "request": {
-      "id": {
-        "$type": "string"
-      },
-      "object": {
-        "$type": "string"
-      },
-      "type": {
-        "$type": "string"
-      },
-      "livemode": {
-        "$type": "boolean"
-      },
-      "created": {
-        "$type": "integer"
-      },
-      "data": {
-        "object": {
-          "$type": "object"
-        }
-      }
-    },
-    "errors": {
-      "400": "VALIDATION_ERROR, INVALID_WEBHOOK_SIGNATURE, INVALID_WEBHOOK_EVENT",
-      "500": "INTERNAL_ERROR"
     }
   },
   "GET /api/v1/users/me/rematch-invitations": {

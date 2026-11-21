@@ -2,20 +2,15 @@ package com.skillbattles.backend;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.skillbattles.backend.dto.LoginDto;
-import com.skillbattles.backend.processor.AuthProcessor;
-import com.skillbattles.backend.service.SubscriptionService;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -26,8 +21,6 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {"app.jwt.secret=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "app.battle.scheduling.enabled=false", "app.matchmaking.scheduling.enabled=false"})
@@ -43,10 +36,6 @@ class SeedQuestionBankPostgresTest {
     }
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
-    @Autowired AuthProcessor auth;
-    @Autowired PasswordEncoder passwords;
-    @Autowired SubscriptionService subscriptions;
-    @Autowired MockMvc mvc;
 
     @Test void all239QuestionsPreserveSourceContentAndAll216RemainingOriginalChoiceSets() throws Exception {
         var math = source("SAT_Questions_Math.md", "cb779fb46ce96a132821f573fb044397fc61e5f91641b2b37d2203fd1372407d");
@@ -62,31 +51,9 @@ class SeedQuestionBankPostgresTest {
                 """)).hasSize(6).allSatisfy(row -> assertThat(((Number) row.get("count")).intValue()).isEqualTo(row.get("discipline_code").equals("SAT_MATH") && row.get("difficulty").equals("EASY") ? 39 : 40));
     }
 
-    @Test void demoAccountsAuthenticateWithCorrectFreeAndProRightsAndNoProviderBindings() throws Exception {
-        for (String nickname : List.of("admin", "adminpro")) {
-            String email = nickname + "@gmail.com";
-            var login = new LoginDto();
-            login.setEmail(email); login.setPassword("qwerty12");
-            var signedIn = auth.login(login);
-            assertThat(signedIn.getUser().getNickname()).isEqualTo(nickname);
-            var id = signedIn.getUser().getId();
-            String hash = jdbc.queryForObject("SELECT password_hash FROM users WHERE id=?", String.class, id);
-            assertThat(passwords.matches("qwerty12", hash)).isTrue();
-            assertThat(hash).startsWith("$2a$10$").doesNotContain("qwerty12");
-            assertThat(subscriptions.entitlements(id).isPro()).isEqualTo(nickname.equals("adminpro"));
-            assertThat(jdbc.queryForObject("SELECT count(*) FROM ratings WHERE user_id=? AND rating=1000 AND calibration_completed_matches=0", Integer.class, id)).isEqualTo(2);
-            assertThat(jdbc.queryForObject("SELECT customer_id FROM subscription_accounts WHERE user_id=?", String.class, id)).isNull();
-            assertThat(jdbc.queryForObject("SELECT subscription_id FROM subscription_accounts WHERE user_id=?", String.class, id)).isNull();
-            var catalogue = json.readTree(mvc.perform(get("/api/v1/battle-modes")
-                    .header("Authorization", "Bearer " + signedIn.getTokens().getAccessToken()))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            assertThat(catalogue).hasSize(2);
-            for (JsonNode mode : catalogue) {
-                assertThat(mode.path("contentAvailable").asBoolean()).isTrue();
-                for (JsonNode schedule : mode.path("difficultySchedules")) assertThat(schedule.path("contentAvailable").asBoolean()).isTrue();
-            }
-        }
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM stripe_event_receipts", Integer.class)).isZero();
+    @Test void migrationsDoNotCreateUserAccounts() {
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM users", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_accounts", Integer.class)).isZero();
     }
 
     @Test void repeatedStartupDoesNotDuplicateOrResetSeededRows() {
@@ -97,7 +64,7 @@ class SeedQuestionBankPostgresTest {
         flyway.validate();
         assertThat(jdbc.queryForList("SELECT row_to_json(q)::text FROM questions q ORDER BY external_key")).isEqualTo(before);
         assertThat(jdbc.queryForList("SELECT row_to_json(u)::text FROM users u ORDER BY email_normalized")).isEqualTo(users);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_accounts", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM subscription_accounts", Integer.class)).isZero();
     }
 
     private String source(String file, String sha256) throws Exception {

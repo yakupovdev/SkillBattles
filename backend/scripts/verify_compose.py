@@ -47,8 +47,6 @@ def main():
                POSTGRES_PASSWORD=secrets.token_hex(24), JWT_SECRET=base64.b64encode(secrets.token_bytes(32)).decode(),
                POSTGRES_PORT=ports[0], BACKEND_PORT=ports[1], FRONTEND_PORT=ports[2], FRONTEND_HTTPS_PORT=ports[3],
                COUNTDOWN_SECONDS='1', REVEAL_SECONDS='1',
-               STRIPE_SECRET_KEY='', STRIPE_WEBHOOK_SECRET='', STRIPE_PRICE_PRO_MONTHLY='', STRIPE_PRICE_PRO_ANNUAL='',
-               BILLING_SUCCESS_URL='', BILLING_CANCEL_URL='', BILLING_PORTAL_RETURN_URL='',
                SMTP_HOST='', SMTP_USERNAME='', SMTP_PASSWORD='', MAIL_FROM='', PASSWORD_RESET_BASE_URL='')
     ca_file = root / 'backend/.cache/local-tls/ca.crt'
     if not ca_file.is_file():
@@ -145,7 +143,7 @@ def main():
         runner_code = runner.wait(timeout=15)
         if runner_code != 0 or not restarted:
             raise RuntimeError(f'Compose REST/STOMP check failed (runner exit {runner_code}, restarted={restarted})')
-        print('Compose check passed: clean V1-V12 + V14-V15 (test-only V13 excluded), 239 active/261 stored seed revisions, fixture dry/apply, friends/images and REST/STOMP through HTTPS proxy, whole-stack recreate with retained data.', flush=True)
+        print('Compose check passed: clean V1-V12 + V14-V15 (no demo account migration), 239 active/261 stored seed revisions, fixture dry/apply, friends/images and REST/STOMP through HTTPS proxy, whole-stack recreate with retained data.', flush=True)
     finally:
         if runner and runner.poll() is None:
             runner.terminate()

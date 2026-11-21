@@ -187,7 +187,7 @@ class RealtimePostgresTest {
         rest("POST", "/api/v1/battles/" + id + "/answers", second, answer(state, false), 200);
         JsonNode reveal = b.event(item -> "BATTLE_CHANGED".equals(item.path("type").asText()) && "REVEAL".equals(item.path("data").path("phase").asText()));
         assertThat(reveal.path("data").path("round").path("reveal").path("answers").size()).isEqualTo(2);
-        assertThat(reveal.path("data").path("round").path("reveal").path("correctOptionId").isNull()).isTrue();
+        assertThat(reveal.path("data").path("round").path("reveal").path("correctOptionId").asText()).isEqualTo(answer(state,true).getOptionId().toString());
         assertThat(c.hasMessage(Duration.ofMillis(200))).isFalse();
     }
 

@@ -45,6 +45,8 @@ class AuthPostgresTest {
         String refresh = auth.path("refreshToken").asText();
         String id = auth.path("user").path("id").asText();
         assertThat(auth.path("user").has("passwordHash")).isFalse();
+        assertThat(auth.path("user").path("isPro").asBoolean()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT pro_active FROM subscription_accounts WHERE user_id=?", Boolean.class, UUID.fromString(id))).isTrue();
         assertThat(auth.path("user").path("createdAt").asText()).endsWith("Z");
         assertThat(auth.path("accessExpiresIn").asLong()).isEqualTo(900);
         assertThat(auth.path("refreshExpiresIn").asLong()).isEqualTo(604800);
@@ -53,12 +55,14 @@ class AuthPostgresTest {
         String passwordHash = jdbc.queryForObject("select password_hash from users where id = ?", String.class, UUID.fromString(id));
         assertThat(passwordHash).startsWith("$2a$").isNotEqualTo("ExamplePass123!");
         mvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + access))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id)).andExpect(jsonPath("$.passwordHash").doesNotExist());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id)).andExpect(jsonPath("$.isPro").value(true)).andExpect(jsonPath("$.passwordHash").doesNotExist());
         JsonNode otherSession = body(mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("email", auth.path("user").path("email").asText().toUpperCase(Locale.ROOT), "password", "ExamplePass123!"))))
                 .andExpect(status().isOk()).andReturn());
         JsonNode rotated = body(mvc.perform(post("/api/v1/auth/refresh").header("Authorization", "Bearer " + refresh))
                 .andExpect(status().isOk()).andReturn());
+        assertThat(otherSession.path("user").path("isPro").asBoolean()).isTrue();
+        assertThat(rotated.path("user").path("isPro").asBoolean()).isTrue();
         assertThat(rotated.path("refreshToken").asText()).isNotEqualTo(refresh);
         mvc.perform(post("/api/v1/auth/refresh").header("Authorization", "Bearer " + refresh))
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("UNAUTHORIZED"));

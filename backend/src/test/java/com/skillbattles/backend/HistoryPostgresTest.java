@@ -265,8 +265,6 @@ class HistoryPostgresTest {
     private AuthDto register() {
         var dto = new RegisterDto(); dto.setBirthYear(2000); dto.setBirthMonth(1); String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         dto.setEmail(suffix + "@example.com"); dto.setNickname("History_" + suffix); dto.setPassword("ExamplePass123!"); var user=auth.register(dto);
-        // Internal fixture: old full-history/revision tests exercise the Pro view. No public switch exists.
-        jdbc.update("UPDATE subscription_accounts SET plan_code='PRO_MONTHLY',status='ACTIVE',paid=true,pro_active=true,current_period_start=?,current_period_end=? WHERE user_id=?",java.sql.Timestamp.from(clock.instant().minusSeconds(1)),java.sql.Timestamp.from(clock.instant().plusSeconds(3600)),id(user));
         return user;
     }
 }

@@ -201,7 +201,7 @@ class SeasonsPostgresTest {
                 .andExpect(jsonPath("$.disciplines[0].rank.divisionRpTarget").isEmpty())
                 .andExpect(jsonPath("$.disciplines[0].calibration.isCalibrating").value(true))
                 .andExpect(jsonPath("$.disciplines[0].calibration.nextKFactor").value(64))
-                .andExpect(jsonPath("$.entitlements.isPro").value(false));
+                .andExpect(jsonPath("$.entitlements.isPro").value(true));
     }
     @Test void catalogueAvailabilityUsesRolledRatingBeforeChoosingAnApplicableGrid() throws Exception {
         var a=register();setRating(a,2800,2800,2800,5);

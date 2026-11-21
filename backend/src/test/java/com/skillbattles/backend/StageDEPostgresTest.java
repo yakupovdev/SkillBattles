@@ -11,7 +11,6 @@ import com.skillbattles.backend.dto.CreateBattleDto;
 import com.skillbattles.backend.dto.DuelDto;
 import com.skillbattles.backend.dto.LeaderboardResponse;
 import com.skillbattles.backend.dto.LoginDto;
-import com.skillbattles.backend.dto.ProviderSubscriptionDto;
 import com.skillbattles.backend.dto.QuestionImportDto;
 import com.skillbattles.backend.dto.RegisterDto;
 import com.skillbattles.backend.dto.RematchDto;
@@ -484,7 +483,7 @@ class StageDEPostgresTest {
          this.clock.set(this.clock.instant().plusSeconds(1L));
       }
 
-      this.jdbc.update("UPDATE subscription_accounts SET paid=false,pro_active=false WHERE user_id=?", new Object[]{this.id(a)});
+      this.jdbc.update("UPDATE subscription_accounts SET pro_active=false WHERE user_id=?", new Object[]{this.id(a)});
 
       for(String path : List.of(root + "/review", root + "/rematch")) {
          Assertions.assertThat(this.rest("GET", path, a, null, 403).path("code").asText()).isEqualTo("HISTORY_ACCESS_REQUIRED");
@@ -522,8 +521,6 @@ class StageDEPostgresTest {
    grant(caller);Assertions.assertThat(rest("GET","/api/v1/subscriptions/me",caller,null,200).path("entitlements").path("canFilterMistakes").asBoolean()).isTrue();
    Assertions.assertThat(rest("GET","/api/v1/subscriptions/me",caller,null,200).toString()).doesNotContain("canPracticeSimilar");
   }
-  var plans=rest("GET","/api/v1/subscriptions/plans",null,null,200);Assertions.assertThat(plans.toString().toLowerCase(Locale.ROOT)).doesNotContain("similar practice");
-  Assertions.assertThat(plans.get(1).path("amountCents").asInt()).isEqualTo(799);Assertions.assertThat(plans.get(2).path("amountCents").asInt()).isEqualTo(4799);
   Assertions.assertThat(jdbc.queryForObject("select to_regclass('public.practice_sessions')::text",String.class)).isNull();
  }
  @Test void migrationRemovesOnlyPracticeDataAndPreservesReportsAndBattles(){
@@ -571,14 +568,14 @@ class StageDEPostgresTest {
  }
  int confirmStatus(String raw){try{resetProcessor.confirm(raw,"ResetPassword123!","test-race");return 204;}catch(BusinessValidationException ex){return 400;}}
  <T> List<T> race(Callable<T> a,Callable<T> b)throws Exception{var gate=new CountDownLatch(1);try(var executor=Executors.newFixedThreadPool(2)){var f=executor.submit(()->{gate.await();return a.call();});var g=executor.submit(()->{gate.await();return b.call();});gate.countDown();return List.of(f.get(20,TimeUnit.SECONDS),g.get(20,TimeUnit.SECONDS));}}
- AuthDto register(){var r=new RegisterDto();r.setBirthYear(2000);r.setBirthMonth(1);r.setEmail(suffix()+"@example.com");r.setNickname("DE_"+suffix());r.setPassword("ExamplePass123!");return auth.register(r);}
+ AuthDto register(){var r=new RegisterDto();r.setBirthYear(2000);r.setBirthMonth(1);r.setEmail(suffix()+"@example.com");r.setNickname("DE_"+suffix());r.setPassword("ExamplePass123!");var a=auth.register(r);jdbc.update("UPDATE subscription_accounts SET pro_active=false WHERE user_id=?",id(a));return a;}
  String suffix(){return UUID.randomUUID().toString().replace("-","").substring(0,12);}
  UUID id(AuthDto a){return a.getUser().getId();}
  LoginDto login(AuthDto a){var d=new LoginDto();d.setEmail(a.getUser().getEmail());d.setPassword("ExamplePass123!");return d;}
  UUID create(AuthDto a,AuthDto b,BattleMode mode){return processor.create(new CreateBattleDto(id(a),id(b),"SAT_MATH",mode));}
  void start(UUID battle,AuthDto a,AuthDto b){presence.connect(id(a),clock.instant());presence.connect(id(b),clock.instant());processor.ready(battle,id(a));processor.ready(battle,id(b));clock.set(clock.instant().plusSeconds(3));processor.tick(battle);}
  BattleDto source(AuthDto a,AuthDto b,BattleMode mode){UUID battle=create(a,b,mode);start(battle,a,b);var state=battles.getForParticipant(battle,id(a));processor.answer(battle,id(a),BattleFixtures.answer(state,false),clock.instant());processor.surrender(battle,id(b));clock.set(clock.instant().plusSeconds(1));return battles.getForParticipant(battle,id(a));}
- void grant(AuthDto a){String customer="cus_fixture_"+id(a);subscriptions.bindCustomer(id(a),customer);var p=new ProviderSubscriptionDto(customer,"sub_fixture_"+id(a),"price_fixture","ACTIVE",BattleFixtures.START.minusSeconds(1),BattleFixtures.START.plusSeconds(86400),false,true,false);subscriptions.apply(id(a),"evt_fixture_"+UUID.randomUUID(),p,"PRO_MONTHLY");}
+ void grant(AuthDto a){jdbc.update("UPDATE subscription_accounts SET pro_active=true WHERE user_id=?",id(a));}
  @TestConfiguration static class Config {
   @Bean @Primary BattleFixtures.MutableClock testClock(){return new BattleFixtures.MutableClock();}
   @Bean @Primary BattleFixtures.TestPresence presence(){return new BattleFixtures.TestPresence();}

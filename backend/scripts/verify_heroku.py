@@ -143,7 +143,7 @@ def main():
         start()
         assert sql('select count(*) from flyway_schema_history where success') == '14'
         assert sql('select max(version::int) from flyway_schema_history where success') == '15'
-        assert sql('select count(*) from users') == '0'  # Test-only V13 is absent from the runtime JAR.
+        assert sql('select count(*) from users') == '0'  # Migrations never create demo accounts.
         assert sql('select count(*) from questions where active and not deleted') == '239'
         assert int(sql("select count(*) from pg_stat_ssl where ssl and pid in (select pid from pg_stat_activity where usename='heroku_check')")) > 0
         for route in ['/', '/auth', '/auth/forgot', '/auth/reset?token=not-a-secret', '/billing/return?success=true',
@@ -220,7 +220,7 @@ def main():
         # Short HTTP load, on top of the preceding concurrent real gameplay sockets.
         began = time.monotonic()
         with ThreadPoolExecutor(max_workers=8) as pool:
-            list(pool.map(lambda _: http('/api/v1/subscriptions/plans'), range(240)))
+            list(pool.map(lambda _: http('/v3/api-docs'), range(240)))
         report['load'] = {'requests': 240, 'concurrency': 8, 'seconds': round(time.monotonic() - began, 2)}
         time.sleep(2)
         assert command('inspect', '--format', '{{.State.OOMKilled}}', web) == 'false'

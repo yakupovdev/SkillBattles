@@ -13,7 +13,7 @@ if ($PublicOrigin) {
         $uri.AbsolutePath -ne '/') { throw 'PublicOrigin must be the actual public HTTPS origin, without path/query/credentials.' }
     $PublicOrigin = $PublicOrigin.TrimEnd('/')
 }
-$values = [ordered]@{SPRING_PROFILES_ACTIVE='heroku'; BILLING_MODE='TEST'}
+$values = [ordered]@{SPRING_PROFILES_ACTIVE='heroku'}
 # Explicit allowlist. No Compose/database credentials, PORT, local URLs or build-time secrets.
 foreach ($key in @('JWT_SECRET','JWT_ISSUER','JWT_ACCESS_TTL','JWT_REFRESH_TTL',
     'PASSWORD_RESET_TTL','SEASON_SCAN_MS','SEASON_SCHEDULING_ENABLED','MATCHMAKING_SEARCH_SECONDS',
@@ -22,17 +22,6 @@ foreach ($key in @('JWT_SECRET','JWT_ISSUER','JWT_ACCESS_TTL','JWT_REFRESH_TTL',
     if ($sourceValues.ContainsKey($key)) { $values[$key] = $sourceValues[$key] }
 }
 if (!$values.Contains('JWT_SECRET') -or !$values['JWT_SECRET']) { throw 'JWT_SECRET is missing in local .env.' }
-foreach ($key in @('STRIPE_SECRET_KEY','STRIPE_PRICE_PRO_MONTHLY','STRIPE_PRICE_PRO_ANNUAL')) {
-    $values[$key] = if ($sourceValues.ContainsKey($key)) { $sourceValues[$key] } else { '' }
-}
-if ($values.STRIPE_SECRET_KEY -and $values.STRIPE_SECRET_KEY -notmatch '^[sr]k_test_') {
-    throw 'Local Stripe key is not a TEST key; no file was written.'
-}
-# A local stripe listen secret is not the signing secret of the public Heroku endpoint.
-$values['STRIPE_WEBHOOK_SECRET'] = ''
-$values['BILLING_SUCCESS_URL'] = if ($PublicOrigin) { "$PublicOrigin/billing/return?success=true" } else { '' }
-$values['BILLING_CANCEL_URL'] = if ($PublicOrigin) { "$PublicOrigin/billing/return?success=false" } else { '' }
-$values['BILLING_PORTAL_RETURN_URL'] = if ($PublicOrigin) { "$PublicOrigin/pro" } else { '' }
 $values['PASSWORD_RESET_BASE_URL'] = if ($PublicOrigin) { "$PublicOrigin/auth/reset" } else { '' }
 # Reuse SMTP only when an external host actually exists; never copy mailhog/Compose DNS.
 $externalSmtp = $sourceValues.ContainsKey('SMTP_HOST') -and $sourceValues.SMTP_HOST -match '\.' -and
@@ -50,7 +39,6 @@ $lines.Add('# LOCAL SECRET FILE. Never commit, print, or pass it to a frontend b
 $lines.Add('# DATABASE_URL is supplied by the attached Heroku Postgres; PORT by Heroku.')
 $lines.Add('# Empty values below are unknown, not invented. Complete them in a local editor.')
 $lines.Add('# Obtain the actual HTTPS origin from Heroku Settings > Domains and certificates.')
-$lines.Add('# STRIPE_WEBHOOK_SECRET: TEST endpoint /api/v1/subscriptions/webhook in Stripe Workbench.')
 $lines.Add('# SMTP credentials, MAIL_FROM and SMTP_PORT/AUTH/STARTTLS: your SMTP provider.')
 foreach ($key in $values.Keys) {
     $value = [string]$values[$key]
@@ -64,4 +52,4 @@ if (!$externalSmtp) {
 }
 [IO.File]::WriteAllLines($destination, $lines, [Text.UTF8Encoding]::new($false))
 Write-Output 'Created ignored .env.heroku using an allowlist. Original .env was not changed.'
-Write-Output 'Missing: actual public HTTPS URLs, endpoint-specific Stripe webhook signing secret, SMTP configuration.'
+Write-Output 'Missing: actual public HTTPS URL and SMTP configuration.'
