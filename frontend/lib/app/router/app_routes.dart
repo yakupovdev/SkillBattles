@@ -1,6 +1,7 @@
 /// Every screen of the app. Use `AppRoutes.x.name` / `AppRoutes.x.path`;
 /// never write a route path or name as a string literal.
 enum AppRoutes {
+  welcome('/welcome'),
   auth('/auth'),
   forgotPassword('/auth/forgot'),
   resetPassword('/auth/reset'),
@@ -38,6 +39,13 @@ enum AppRoutes {
   /// Query: code room to resume on [privateDuel].
   static const String duelParam = 'duel';
 
+  /// Query of [auth]: the tab to open. [authModeSignUp] opens "Create
+  /// account"; anything else (or no value) opens "Log in".
+  static const String authModeParam = 'mode';
+
+  /// Value of [authModeParam] that opens the "Create account" tab.
+  static const String authModeSignUp = 'signup';
+
   /// Query: one-use reset token of [resetPassword]; removed from the
   /// address bar as soon as it is read.
   static const String tokenParam = 'token';
@@ -48,6 +56,7 @@ enum AppRoutes {
 
   /// Routes reachable without a session.
   static const Set<AppRoutes> public = <AppRoutes>{
+    welcome,
     auth,
     forgotPassword,
     resetPassword,

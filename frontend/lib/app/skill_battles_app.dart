@@ -59,8 +59,8 @@ final class _SkillBattlesAppState extends State<SkillBattlesApp> {
   }
 
   /// Re-runs the redirect for the current address, like go_router's
-  /// `refreshListenable`: sign-out leaves for the log-in page, sign-in
-  /// leaves the auth pages.
+  /// `refreshListenable`: sign-out leaves for the welcome page, sign-in
+  /// leaves the auth and welcome pages.
   void _onSessionChanged() {
     final RouterState? router = _routerKey.currentState;
     if (router == null) return;

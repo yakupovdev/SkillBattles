@@ -41,7 +41,10 @@ import 'package:skill_battles/features/auth/presentation/widgets/auth_failure_me
 /// day only when the user turns 13 this ET month), then the credentials.
 /// The server re-checks the age and has the final word.
 final class AuthScreen extends StatelessComponent implements RouteWrapper {
-  const AuthScreen({super.key});
+  const AuthScreen({this.startWithSignUp = false, super.key});
+
+  /// Opens the "Create account" tab (`/auth?mode=signup`).
+  final bool startWithSignUp;
 
   @override
   Component wrappedRoute(BuildContext context) {
@@ -58,7 +61,7 @@ final class AuthScreen extends StatelessComponent implements RouteWrapper {
 
   @override
   Component build(BuildContext context) {
-    return const AuthLayout(child: _AuthForm());
+    return AuthLayout(child: _AuthForm(startWithSignUp: startWithSignUp));
   }
 }
 
@@ -168,7 +171,9 @@ final class _HeroCaptions extends StatelessComponent {
 enum _AuthTab { signUp, logIn }
 
 final class _AuthForm extends StatefulComponent {
-  const _AuthForm();
+  const _AuthForm({required this.startWithSignUp});
+
+  final bool startWithSignUp;
 
   @override
   State<_AuthForm> createState() => _AuthFormState();
@@ -204,7 +209,7 @@ final class _AuthFormState extends State<_AuthForm> {
     _nicknameFocus = FocusNode();
     _emailFocus = FocusNode();
     _passwordFocus = FocusNode();
-    _tab = _AuthTab.logIn;
+    _tab = component.startWithSignUp ? _AuthTab.signUp : _AuthTab.logIn;
     _month = null;
     _year = null;
     // Typing the day is a birth edit (Flutter: the day field's onChanged).
